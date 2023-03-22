@@ -7,8 +7,8 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @EnableDiscoveryClient
-@SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
 @EnableJpaAuditing
+@SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
 public class Application {
 	public static void main(String[] args) {
 		SpringApplication.run(Application.class, args);

@@ -12,13 +12,15 @@ spring:
   application:
     name: user
   datasource:
-    driver-class-name: org.h2.Driver
-    username: sa
-    url: jdbc:h2:tcp://localhost/~/test
+    url: jdbc:mysql://52.79.162.165:3306/afterlike?useSSL=false&characterEncoding=UTF-8&serverTimezone=UTC
+    username: admin
+    password: afterlike6937
   jpa:
     properties:
       hibernate:
+        use_sql_comments: 'true'
         format_sql: 'true'
+        show_sql: 'true'
     hibernate:
       naming:
         implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
@@ -29,6 +31,11 @@ spring:
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
+  devtools:
+    restart:
+      enabled: 'true'
+    livereload:
+      enabled: 'true'
 
 logging:
   level:

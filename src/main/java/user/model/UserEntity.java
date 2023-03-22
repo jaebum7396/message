@@ -20,41 +20,41 @@ import java.util.List;
 public class UserEntity extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "userCd")
+    @Column(name = "USER_CD")
     private Long userCd;
 
-    @Column(name = "domainCd")
+    @Column(name = "DOMAIN_CD")
     @ColumnDefault("1")
     private String domainCd;
 
-    @Column(name = "userID", nullable = false)
+    @Column(name = "USER_ID", nullable = false)
     private String userId;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-    @Column(name = "userPW", nullable = false)
+    @Column(name = "USER_PW", nullable = false)
     private String userPw;
 
-    @Column(name = "userType",nullable = true)
+    @Column(name = "USER_TYPE",nullable = true)
     @ColumnDefault("1")
     private String userType;
 
-    @Column(name = "userStatus",nullable = true)
+    @Column(name = "USER_STATUS",nullable = true)
     @ColumnDefault("1")
     private String userStatus;
 
-    @Column(name = "userNm",nullable = false)
+    @Column(name = "USER_NM",nullable = false)
     private String userNm;
 
-    @Column(name = "userPhoneNo",nullable = false)
+    @Column(name = "USER_PHONE_NUMBER",nullable = false)
     private String userPhoneNo;
 
-    @Column(name = "userNickNm",nullable = true)
+    @Column(name = "USER_NICK_NM",nullable = true)
     private String userNickNm;
 
-    @Column(name = "userGender",nullable = true)
+    @Column(name = "USER_GENDER",nullable = true)
     private String userGender;
 
-    @Column(name = "userBirth",nullable = true)
+    @Column(name = "USER_BIRTH",nullable = true)
     private String userBirth;
 
     @OneToMany(mappedBy = "userEntity", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
