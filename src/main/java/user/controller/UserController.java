@@ -21,7 +21,7 @@ import user.service.UserService;
 public class UserController {
     @Autowired
     UserService userService;
-    @PostMapping(value = "/user/signup")
+    @PostMapping(value = "/signup")
     @Operation(summary="회원가입", description="회원 가입 API")
     @ApiResponses({
         @ApiResponse(code = 200, message="ok",response = ResponseResult.class),
@@ -32,7 +32,7 @@ public class UserController {
         return userService.signup(signupRequest);
     }
 
-    @GetMapping(value = "/user/me")
+    @GetMapping(value = "/me")
     @Operation(summary="내 정보 보기", description="가입한 회원 정보를 가져오는 API(로그인 후 인증정보 - jwt token 필수)")
     @ApiResponses({
         @ApiResponse(code = 200, message="ok",response = ResponseResult.class),

@@ -49,7 +49,6 @@ public class UserService implements UserDetailsService {
             resultMap.put("userNm", userEntity.getUserNm());
             resultMap.put("roles", userEntity.getRoles());
 
-            System.out.println("가입 성공");
             responseResult = ResponseResult.builder()
                     .statusCode(HttpStatus.OK.value())
                     .status(HttpStatus.OK)
