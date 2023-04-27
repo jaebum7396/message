@@ -11,7 +11,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import user.model.ResponseResult;
+import user.model.Response;
 
 @RestControllerAdvice
 public class ErrorResponseAdvice {
@@ -19,10 +19,10 @@ public class ErrorResponseAdvice {
 	
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity handleException(Exception e) {
-		ResponseResult responseResult;
+		Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 		e.printStackTrace();
-        responseResult = ResponseResult.builder()
+        responseResult = Response.builder()
                 .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .message("서버쪽 오류가 발생했습니다. 관리자에게 문의하십시오")
@@ -32,13 +32,13 @@ public class ErrorResponseAdvice {
 	
 	@ExceptionHandler(BadCredentialsException.class)
 	public ResponseEntity handleBadCredentialsException(BadCredentialsException e) {
-		ResponseResult responseResult;
+		Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 		e.printStackTrace();
-        responseResult = ResponseResult.builder()
+        responseResult = Response.builder()
                 .statusCode(HttpStatus.UNAUTHORIZED.value())
                 .status(HttpStatus.UNAUTHORIZED)
-                .message("인증되지 않은 사용자입니다.")
+                .message("잘못된 접근입니다.")
                 .result(resultMap).build();
         return ResponseEntity.internalServerError().body(responseResult);
 	}

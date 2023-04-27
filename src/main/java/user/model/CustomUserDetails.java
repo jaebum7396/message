@@ -9,11 +9,11 @@ import java.util.stream.Collectors;
 
 public class CustomUserDetails implements UserDetails {
 
-    private final UserEntity userEntity;
-    public CustomUserDetails(UserEntity userEntity) {
+    private final User userEntity;
+    public CustomUserDetails(User userEntity) {
         this.userEntity = userEntity;
     }
-    public final UserEntity getMember() {
+    public final User getMember() {
         return userEntity;
     }
     @Override

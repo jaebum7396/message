@@ -13,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class LoginResponse {
-    public LoginResponse(UserEntity userEntity) {
+    public LoginResponse(User userEntity) {
         this.userId = userEntity.getUserId();
         this.userNm = userEntity.getUserNm();
         this.roles = userEntity.getRoles();
@@ -21,6 +21,6 @@ public class LoginResponse {
     private String userId;
     private String userNm;
     @Builder.Default
-    private List<AuthEntity> roles = new ArrayList<AuthEntity>();
+    private List<Auth> roles = new ArrayList<Auth>();
     private String token;
 }

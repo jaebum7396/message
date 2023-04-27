@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import user.model.UserEntity;
+import user.model.User;
 
 import java.util.Optional;
 
@@ -20,7 +20,7 @@ public class AuditingConfig {
             log.debug("Not found AuthenticationToken");
             return null;
         }
-        UserEntity userEntity = (UserEntity) authentication.getDetails();
+        User userEntity = (User) authentication.getDetails();
         return () -> Optional.of(userEntity.getUserCd());
     }
 }

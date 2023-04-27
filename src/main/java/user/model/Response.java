@@ -10,7 +10,7 @@ import java.util.Map;
 @Data
 @Builder
 @AllArgsConstructor
-public class ResponseResult {
+public class Response {
     @ApiModelProperty(value="200", example="200")
     int statusCode;
     @ApiModelProperty(value="OK", example="OK")

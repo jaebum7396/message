@@ -6,15 +6,15 @@ eureka:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:9999/eureka
+      defaultZone: ${DISCOVERY_URL}
 
 spring:
   application:
     name: user
   datasource:
-    url: jdbc:mysql://52.79.162.165:3306/afterlike?useSSL=false&characterEncoding=UTF-8&serverTimezone=UTC
-    username: admin
-    password: afterlike6937
+    url: jdbc:mysql://${AFLK_DB_URI}?useSSL=false&characterEncoding=UTF-8&serverTimezone=UTC
+    username: ${AFLK_DB_USERNAME}
+    password: ${AFLK_DB_PASSWORD}
   jpa:
     properties:
       hibernate:
@@ -49,10 +49,10 @@ logging:
 #SECRET KEY
 jwt:
   secret:
-    key: x!A%D*G-KaPdSgVkYp3s5v8y/B?E(H+M
+    key: ${JWT_SECRET_KEY}
 jasypt:
   encryptor:
-    password: aflkkey
+    password: ${JASYPT_ENCRYPTOR_PASSWORD}
 token:
   access-expired-time : 3600000
   refresh-expired-time : 3600000

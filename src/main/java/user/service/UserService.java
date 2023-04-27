@@ -31,7 +31,7 @@ public class UserService implements UserDetailsService {
     @Autowired
     private final AES128Util aes128Util = new AES128Util();
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
-        ResponseResult responseResult;
+        Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try {
             //중복 아이디 검사
@@ -39,9 +39,9 @@ public class UserService implements UserDetailsService {
                 throw new BadCredentialsException("중복된 아이디입니다.");
             }
             signupRequest.setUserPw(passwordEncoder.encode(signupRequest.getUserPw()));
-            UserEntity userEntity = signupRequest.toEntity();
+            User userEntity = signupRequest.toEntity();
             //ROLE 설정
-            userEntity.setRoles(Collections.singletonList(AuthEntity.builder().authType("ROLE_USER").build()));
+            userEntity.setRoles(Collections.singletonList(Auth.builder().authType("ROLE_USER").build()));
 
             userRepository.save(userEntity);
 
@@ -49,7 +49,7 @@ public class UserService implements UserDetailsService {
             resultMap.put("userNm", userEntity.getUserNm());
             resultMap.put("roles", userEntity.getRoles());
 
-            responseResult = ResponseResult.builder()
+            responseResult = Response.builder()
                     .statusCode(HttpStatus.OK.value())
                     .status(HttpStatus.OK)
                     .message("가입 성공")
@@ -57,7 +57,7 @@ public class UserService implements UserDetailsService {
             return ResponseEntity.ok().body(responseResult);
         }catch(BadCredentialsException be){
             System.out.println(be.getMessage());
-            responseResult = ResponseResult.builder()
+            responseResult = Response.builder()
                     .statusCode(HttpStatus.BAD_REQUEST.value())
                     .status(HttpStatus.BAD_REQUEST)
                     .message(be.getMessage())
@@ -65,7 +65,7 @@ public class UserService implements UserDetailsService {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseResult);
         } catch (Exception e) {
             e.printStackTrace();
-            responseResult = ResponseResult.builder()
+            responseResult = Response.builder()
                     .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .message("서버쪽 오류가 발생했습니다. 관리자에게 문의하십시오")
@@ -74,7 +74,7 @@ public class UserService implements UserDetailsService {
         }
     }
     public ResponseEntity getMyInfo(){
-        ResponseResult responseResult;
+        Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
             final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -82,13 +82,13 @@ public class UserService implements UserDetailsService {
                 throw new BadCredentialsException("토큰 인증에 실패하였습니다.");
             }
             System.out.println(authentication.getName());
-            UserEntity userEntity = userRepository.findByUserId(authentication.getName()).get();
+            User userEntity = userRepository.findByUserId(authentication.getName()).get();
             resultMap.put("userId", userEntity.getUserId());
             resultMap.put("password", userEntity.getUserPw());
             resultMap.put("name", userEntity.getUserNm());
             //resultMap.put("regNo", aes128Util.decrypt(userEntity.getRegNo()));
 
-            responseResult = ResponseResult.builder()
+            responseResult = Response.builder()
                     .statusCode(HttpStatus.OK.value())
                     .status(HttpStatus.OK)
                     .message("유저 정보 요청 성공")
@@ -96,7 +96,7 @@ public class UserService implements UserDetailsService {
 
             return ResponseEntity.ok().body(responseResult);
         }catch(BadCredentialsException be){
-            responseResult = ResponseResult.builder()
+            responseResult = Response.builder()
                     .statusCode(HttpStatus.BAD_REQUEST.value())
                     .status(HttpStatus.BAD_REQUEST)
                     .message(be.getMessage())
@@ -105,7 +105,7 @@ public class UserService implements UserDetailsService {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseResult);
         }catch(Exception e){
             e.printStackTrace();
-            responseResult = ResponseResult.builder()
+            responseResult = Response.builder()
                     .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .message("서버쪽 오류가 발생했습니다. 관리자에게 문의하십시오")
@@ -121,7 +121,7 @@ public class UserService implements UserDetailsService {
     }
     @Override
     public UserDetails loadUserByUsername(String name) throws UsernameNotFoundException {
-        UserEntity userEntity = userRepository.findByUserNm(name).orElseThrow(
+        User userEntity = userRepository.findByUserNm(name).orElseThrow(
             () -> new UsernameNotFoundException("Invalid authentication!")
         );
         return new CustomUserDetails(userEntity);

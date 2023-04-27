@@ -16,8 +16,8 @@ import java.util.List;
 @NoArgsConstructor
 @Getter
 @Builder
-@Entity(name = "TB_USER")
-public class UserEntity extends BaseEntity {
+@Entity(name = "USER")
+public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "USER_CD")
@@ -59,10 +59,10 @@ public class UserEntity extends BaseEntity {
 
     @OneToMany(mappedBy = "userEntity", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @Builder.Default
-    private List<AuthEntity> roles = new ArrayList<>();
+    private List<Auth> roles = new ArrayList<>();
 
-    public void setRoles(List<AuthEntity> role) {
+    public void setRoles(List<Auth> role) {
         this.roles = role;
-        role.forEach(o -> o.setUserEntity(this));
+        role.forEach(o -> o.setUser(this));
     }
 }

@@ -20,8 +20,8 @@ public class SignupRequest {
     @ApiModelProperty(value="userPhoneNo", example="010-0000-0366", required=true)
     private String userPhoneNo;
 
-    public UserEntity toEntity() {
-        return UserEntity.builder()
+    public User toEntity() {
+        return User.builder()
                 .userId(userId)
                 .userPw(userPw)
                 .userNm(userNm)

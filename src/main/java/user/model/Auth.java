@@ -23,8 +23,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @Builder
 @EqualsAndHashCode(callSuper=false)
-@Entity(name = "TB_AUTH")
-public class AuthEntity extends BaseEntity {
+@Entity(name = "AUTH")
+public class Auth extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @JsonIgnore
@@ -37,8 +37,8 @@ public class AuthEntity extends BaseEntity {
     @JoinColumn(name = "userCd")
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnore
-    private UserEntity userEntity;
-    public void setUserEntity(UserEntity userEntity) {
+    private User userEntity;
+    public void setUser(User userEntity) {
         this.userEntity = userEntity;
     }
 }
