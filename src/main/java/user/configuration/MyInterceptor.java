@@ -35,6 +35,7 @@ public class MyInterceptor implements HandlerInterceptor{
     	
     	String requestUri = request.getHeader("x-forwarded-host");
     	if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
+			log.info("requestUri : "+ requestUri);
     		throw new BadCredentialsException("잘못된 접근입니다.");
     	}
 		return HandlerInterceptor.super.preHandle(request, response, handler);
