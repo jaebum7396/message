@@ -7,9 +7,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -23,24 +21,23 @@ public class MyInterceptor implements HandlerInterceptor{
 	
 	private Logger logger = LoggerFactory.getLogger(MyInterceptor.class);
 	
-	@Autowired
-	private Environment environment;
+	@Value("${gateway.uri}")
+	private String GATEWAY_URI;
 
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 		log.info("===============================================");
         log.info("==================== BEGIN ====================");
-		String GATEWAY_URI = environment.getProperty("gateway.uri");
-		log.info("GATEWAY_URI : "+ GATEWAY_URI);
-		Enumeration eHeader = request.getHeaderNames();
-		while (eHeader.hasMoreElements()) {
-			String key = (String)eHeader.nextElement();
-			String value = request.getHeader(key);
-			log.info("key : " + key + " ===> value : " + value);
-		}
+        Enumeration eHeader = request.getHeaderNames();
+    	while (eHeader.hasMoreElements()) {
+	    	String key = (String)eHeader.nextElement();
+	    	String value = request.getHeader(key);
+	    	log.info("key : " + key + " ===> value : " + value);
+	    }
 
-		String requestUri = request.getHeader("x-forwarded-host");
-		if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
+    	String requestUri = request.getHeader("x-forwarded-host");
+    	if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
+			log.info("GATEWAY_URI : "+ GATEWAY_URI);
 			log.info("requestUri : "+ requestUri);
     		throw new BadCredentialsException("잘못된 접근입니다.");
     	}
