@@ -1,29 +1,29 @@
 package user.configuration;
 
-import java.util.Enumeration;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
-import lombok.extern.slf4j.Slf4j;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Enumeration;
 
 @Slf4j
-@Component
 public class MyInterceptor implements HandlerInterceptor{
-	
-	private Logger logger = LoggerFactory.getLogger(MyInterceptor.class);
-	
-	@Value("${gateway.uri}")
+
 	private String GATEWAY_URI;
 
+	public MyInterceptor(String GATEWAY_URI) {
+		this.GATEWAY_URI = GATEWAY_URI;
+	}
+
+	private Logger logger = LoggerFactory.getLogger(MyInterceptor.class);
+	
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 		log.info("===============================================");
@@ -37,8 +37,6 @@ public class MyInterceptor implements HandlerInterceptor{
 
     	String requestUri = request.getHeader("x-forwarded-host");
     	if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
-			log.info("GATEWAY_URI : "+ GATEWAY_URI);
-			log.info("requestUri : "+ requestUri);
     		throw new BadCredentialsException("잘못된 접근입니다.");
     	}
 		return HandlerInterceptor.super.preHandle(request, response, handler);

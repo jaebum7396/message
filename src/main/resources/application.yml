@@ -1,8 +1,9 @@
 server:
   port: 8001
 
-gateway:
-  uri: ${GATEWAY_URI}
+cloud:
+  gateway:
+    uri: ${GATEWAY_URI}
 
 eureka:
   client:
