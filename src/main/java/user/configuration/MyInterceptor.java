@@ -15,15 +15,12 @@ import java.util.Enumeration;
 
 @Slf4j
 public class MyInterceptor implements HandlerInterceptor{
-
+	private Logger logger = LoggerFactory.getLogger(MyInterceptor.class);
 	private String GATEWAY_URI;
-
 	public MyInterceptor(String GATEWAY_URI) {
 		this.GATEWAY_URI = GATEWAY_URI;
 	}
 
-	private Logger logger = LoggerFactory.getLogger(MyInterceptor.class);
-	
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 		log.info("===============================================");

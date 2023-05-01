@@ -25,11 +25,9 @@ import java.util.Map;
 @Transactional
 @RequiredArgsConstructor
 public class UserService implements UserDetailsService {
-    @Autowired
-    UserRepository userRepository;
+    @Autowired UserRepository userRepository;
     @Autowired PasswordEncoder passwordEncoder;
-    @Autowired
-    private final AES128Util aes128Util = new AES128Util();
+    @Autowired private final AES128Util aes128Util = new AES128Util();
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
         Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
