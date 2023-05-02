@@ -37,7 +37,6 @@ public class UserService implements UserDetailsService {
 
     @Value("${jwt.secret.key}")
     String JWT_SECRET_KEY;
-    Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
 
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
         Response responseResult;
@@ -85,6 +84,7 @@ public class UserService implements UserDetailsService {
     public ResponseEntity getMyInfo(HttpServletRequest request){
         Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
         System.out.println("secretKey : " + secretKey);
         try{
             String userNm = Jwts.parserBuilder().setSigningKey(secretKey).build()
