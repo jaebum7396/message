@@ -32,10 +32,12 @@ public class MyInterceptor implements HandlerInterceptor{
 	    	log.info("key : " + key + " ===> value : " + value);
 	    }
 
-		System.out.println("GATEWAY_URI : " + GATEWAY_URI);
+		String requestUri = request.getHeader("x-forwarded-host");
 
-    	String requestUri = request.getHeader("x-forwarded-host");
-    	if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
+		System.out.println("GATEWAY_URI : " + GATEWAY_URI);
+		System.out.println("요청_URI : " + requestUri);
+
+		if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
     		throw new BadCredentialsException("잘못된 접근입니다.");
     	}
 		return HandlerInterceptor.super.preHandle(request, response, handler);

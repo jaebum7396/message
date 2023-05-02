@@ -5,6 +5,7 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,8 +13,12 @@ import user.model.Response;
 import user.model.SignupRequest;
 import user.service.UserService;
 
+import javax.servlet.http.HttpServletRequest;
+import java.util.Enumeration;
+
 @Api(tags = "UserController")
 @Tag(name = "UserController", description = "회원가입, 유저정보")
+@Slf4j
 @RestController
 public class UserController {
     @Autowired
@@ -37,7 +42,14 @@ public class UserController {
         @ApiResponse(code = 400, message="잘못된 요청",response = Response.class),
         @ApiResponse(code = 500, message="서버 에러",response = Response.class)
     })
-    public ResponseEntity getMyInfo() {
+    public ResponseEntity getMyInfo(HttpServletRequest request) {
+        log.info("getMyInfo");
+        Enumeration eHeader = request.getHeaderNames();
+        while (eHeader.hasMoreElements()) {
+            String key = (String)eHeader.nextElement();
+            String value = request.getHeader(key);
+            log.info("key : " + key + " ===> value : " + value);
+        }
         return userService.getMyInfo();
     }
 }
