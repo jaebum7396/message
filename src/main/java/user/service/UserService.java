@@ -1,6 +1,7 @@
 package user.service;
 
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,8 @@ import user.repository.UserRepository;
 import user.utils.AES128Util;
 
 import javax.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -34,6 +37,7 @@ public class UserService implements UserDetailsService {
 
     @Value("${jwt.secret.key}")
     String JWT_SECRET_KEY;
+    Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
 
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
         Response responseResult;
@@ -81,9 +85,9 @@ public class UserService implements UserDetailsService {
     public ResponseEntity getMyInfo(HttpServletRequest request){
         Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        System.out.println("JWT_SECRET_KEY : " + JWT_SECRET_KEY);
+        System.out.println("secretKey : " + secretKey);
         try{
-            String userNm = Jwts.parserBuilder().setSigningKey(JWT_SECRET_KEY).build()
+            String userNm = Jwts.parserBuilder().setSigningKey(secretKey).build()
                     .parseClaimsJws(request.getHeader("authorization")).getBody()
                     .getSubject();
             //final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
