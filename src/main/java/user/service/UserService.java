@@ -33,7 +33,7 @@ public class UserService implements UserDetailsService {
     @Autowired private final AES128Util aes128Util = new AES128Util();
 
     @Value("${jwt.secret.key}")
-    private static String JWT_SECRET_KEY;
+    String JWT_SECRET_KEY;
 
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
         Response responseResult;
@@ -81,6 +81,7 @@ public class UserService implements UserDetailsService {
     public ResponseEntity getMyInfo(HttpServletRequest request){
         Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        System.out.println("JWT_SECRET_KEY : " + JWT_SECRET_KEY);
         try{
             String userNm = Jwts.parserBuilder().setSigningKey(JWT_SECRET_KEY).build()
                     .parseClaimsJws(request.getHeader("authorization")).getBody()
