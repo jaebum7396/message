@@ -1,7 +1,9 @@
 package user.service;
 
+import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -17,6 +19,7 @@ import user.model.*;
 import user.repository.UserRepository;
 import user.utils.AES128Util;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +31,10 @@ public class UserService implements UserDetailsService {
     @Autowired UserRepository userRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired private final AES128Util aes128Util = new AES128Util();
+
+    @Value("${jwt.secret.key}")
+    private static String JWT_SECRET_KEY;
+
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
         Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
@@ -71,16 +78,19 @@ public class UserService implements UserDetailsService {
             return ResponseEntity.internalServerError().body(responseResult);
         }
     }
-    public ResponseEntity getMyInfo(){
+    public ResponseEntity getMyInfo(HttpServletRequest request){
         Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
-            final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || authentication.getName() == null) {
+            String userNm = Jwts.parserBuilder().setSigningKey(JWT_SECRET_KEY).build()
+                    .parseClaimsJws(request.getHeader("authorization")).getBody()
+                    .getSubject();
+            //final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (userNm == null || userNm == null) {
                 throw new BadCredentialsException("토큰 인증에 실패하였습니다.");
             }
-            System.out.println(authentication.getName());
-            User userEntity = userRepository.findByUserId(authentication.getName()).get();
+            System.out.println("userNm : " + userNm);
+            User userEntity = userRepository.findByUserId(userNm).get();
             resultMap.put("userId", userEntity.getUserId());
             resultMap.put("password", userEntity.getUserPw());
             resultMap.put("name", userEntity.getUserNm());

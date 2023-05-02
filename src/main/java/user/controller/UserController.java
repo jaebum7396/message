@@ -43,13 +43,6 @@ public class UserController {
         @ApiResponse(code = 500, message="서버 에러",response = Response.class)
     })
     public ResponseEntity getMyInfo(HttpServletRequest request) {
-        log.info("getMyInfo");
-        Enumeration eHeader = request.getHeaderNames();
-        while (eHeader.hasMoreElements()) {
-            String key = (String)eHeader.nextElement();
-            String value = request.getHeader(key);
-            log.info("key : " + key + " ===> value : " + value);
-        }
-        return userService.getMyInfo();
+        return userService.getMyInfo(request);
     }
 }
