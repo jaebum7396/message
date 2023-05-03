@@ -8,13 +8,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import user.model.LoginRequest;
 import user.model.Response;
 import user.model.SignupRequest;
 import user.service.UserService;
 
 import javax.servlet.http.HttpServletRequest;
-import java.util.Enumeration;
 
 @Api(tags = "UserController")
 @Tag(name = "UserController", description = "회원가입, 유저정보")
