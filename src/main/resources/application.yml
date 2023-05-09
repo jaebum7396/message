@@ -16,7 +16,7 @@ spring:
   application:
     name: user
   datasource:
-    url: jdbc:mysql://${AFLK_DB_URI}?useSSL=false&characterEncoding=UTF-8&serverTimezone=UTC
+    url: jdbc:mysql://${AFLK_DB_URI}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC
     username: ${AFLK_DB_USERNAME}
     password: ${AFLK_DB_PASSWORD}
   jpa:
