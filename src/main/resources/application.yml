@@ -19,6 +19,7 @@ spring:
     url: jdbc:mysql://${AFLK_DB_URI}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC
     username: ${AFLK_DB_USERNAME}
     password: ${AFLK_DB_PASSWORD}
+    initialization-mode: always #import data
   jpa:
     properties:
       hibernate:
@@ -32,6 +33,7 @@ spring:
       ddl-auto: 'create'
       #ddl-auto=none:
     #show-sql: 'true'
+    defer-datasource-initialization: 'true' #import data
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
