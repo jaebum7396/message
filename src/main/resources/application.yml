@@ -33,7 +33,7 @@ spring:
       ddl-auto: 'create'
       #ddl-auto=none:
     #show-sql: 'true'
-    defer-datasource-initialization: 'true' #import data
+    #defer-datasource-initialization: 'true' #import data
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
