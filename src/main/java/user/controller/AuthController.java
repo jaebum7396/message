@@ -15,7 +15,7 @@ import user.model.Response;
 import user.service.AuthService;
 
 @Api(tags = "AuthenticationController")
-@Tag(name = "AuthenticationController", description = "회원가입, 로그인, 유저정보")
+@Tag(name = "AuthenticationController", description = "로그인")
 @RestController
 public class AuthController {
     @Autowired
