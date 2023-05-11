@@ -41,17 +41,17 @@ public class JwtProvider {
         secretKey = Keys.hmacShaKeyFor(salt.getBytes(StandardCharsets.UTF_8));
     }
     // 토큰 생성
-    public String createToken(String account, List<Auth> roles) {
-        Claims claims = Jwts.claims().setSubject(account);
+    public String createToken(String domainCd, Long userCd, String userId, List<Auth> roles) {
+        Claims claims = Jwts.claims().setSubject(userId);
+        claims.put("domainCd", domainCd);
+        claims.put("userCd", userCd);
         claims.put("roles", roles);
         return Jwts.builder()
-                .setClaims(claims)
-                .setExpiration(
-                    new Date(System.currentTimeMillis()  + ACCESS_EXPIRED_TIME)
-                )
-                .setIssuedAt(new Date())
-                .signWith(secretKey, SignatureAlgorithm.HS256)
-                .compact();
+            .setClaims(claims)
+            .setExpiration(new Date(System.currentTimeMillis()  + ACCESS_EXPIRED_TIME))
+            .setIssuedAt(new Date())
+            .signWith(secretKey, SignatureAlgorithm.HS256)
+            .compact();
     }
 
     public String createRefreshToken() {

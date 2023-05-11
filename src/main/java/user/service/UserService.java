@@ -85,11 +85,13 @@ public class UserService implements UserDetailsService {
         Response responseResult;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
-        System.out.println("secretKey : " + secretKey);
+        //System.out.println("secretKey : " + secretKey);
         try{
             String userNm = Jwts.parserBuilder().setSigningKey(secretKey).build()
                     .parseClaimsJws(request.getHeader("authorization")).getBody()
                     .getSubject();
+            System.out.println(Jwts.parserBuilder().setSigningKey(secretKey).build()
+                    .parseClaimsJws(request.getHeader("authorization")).getBody());
             //final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (userNm == null || userNm == null) {
                 throw new BadCredentialsException("토큰 인증에 실패하였습니다.");

@@ -45,7 +45,11 @@ public class AuthService implements UserDetailsService {
             resultMap.put("userId", userEntity.getUserId());
             resultMap.put("name", userEntity.getUserNm());
             resultMap.put("roles", userEntity.getRoles());
-            resultMap.put("token", jwtProvider.createToken(userEntity.getUserId(), userEntity.getRoles()));
+            resultMap.put("token", jwtProvider.createToken(
+                    userEntity.getDomainCd()
+                    , userEntity.getUserCd()
+                    , userEntity.getUserId()
+                    , userEntity.getRoles()));
 
             responseResult = Response.builder()
                     .statusCode(HttpStatus.OK.value())
