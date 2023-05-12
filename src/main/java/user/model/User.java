@@ -7,15 +7,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 import javax.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
-@DynamicInsert
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Builder
+@DynamicInsert
+@DynamicUpdate
 @Entity(name = "USER")
 public class User extends BaseEntity {
     @Id
