@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import user.model.LoginRequest;
 import user.model.Response;
 import user.model.SignupRequest;
+import user.service.AuthService;
 import user.service.UserService;
 
 import javax.servlet.http.HttpServletRequest;
@@ -22,7 +23,6 @@ import javax.servlet.http.HttpServletRequest;
 @Tag(name = "UserController", description = "회원가입, 유저정보")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/user")
 public class UserController {
     @Autowired
     UserService userService;
@@ -32,8 +32,15 @@ public class UserController {
         return userService.signup(signupRequest);
     }
     @GetMapping(value = "/me")
-    @Operation(summary="내 정보 보기", description="가입한 회원 정보를 가져오는 API(로그인 후 인증정보 - jwt token 필수)")
+    @Operation(summary="내 정보 보기", description="가입한 회원 정보를 가져오는 API(jwt 인증 요구)")
     public ResponseEntity getMyInfo(HttpServletRequest request) {
         return userService.getMyInfo(request);
+    }
+    @Autowired
+    AuthService authService;
+    @PostMapping(value = "/login")
+    @Operation(summary="로그인", description="가입한 회원을 로그인 하는 API")
+    public ResponseEntity login(@RequestBody LoginRequest loginRequest) throws Exception {
+        return authService.login(loginRequest);
     }
 }
