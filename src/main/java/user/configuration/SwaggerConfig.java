@@ -2,37 +2,46 @@ package user.configuration;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import springfox.documentation.builders.ApiInfoBuilder;
 import springfox.documentation.builders.PathSelectors;
 import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.builders.ResponseBuilder;
 import springfox.documentation.service.*;
 import springfox.documentation.spi.DocumentationType;
 import springfox.documentation.spi.service.contexts.SecurityContext;
 import springfox.documentation.spring.web.plugins.Docket;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Configuration
 @EnableSwagger2
 public class SwaggerConfig {
     private String version = "V0.1";
-
     @Bean
     public Docket api() {
         return new Docket(DocumentationType.SWAGGER_2)
-                .securityContexts(Arrays.asList(securityContext())) // 추가
-                .securitySchemes(Arrays.asList(apiKey())) // 추가
-                .consumes(getConsumeContentTypes())
-                .produces(getProduceContentTypes())
                 .select()
                 .apis(RequestHandlerSelectors.any())
                 .paths(PathSelectors.any())
                 .build()
-                .apiInfo(apiInfo());
+                .securityContexts(Arrays.asList(securityContext())) // 추가
+                .securitySchemes(Arrays.asList(apiKey())) // 추가
+                .consumes(getConsumeContentTypes())
+                .produces(getProduceContentTypes())
+                .apiInfo(apiInfo())
+                .globalResponses(HttpMethod.GET, getGlobalResponses())
+                .globalResponses(HttpMethod.POST, getGlobalResponses())
+                .globalResponses(HttpMethod.PUT, getGlobalResponses())
+                .globalResponses(HttpMethod.DELETE, getGlobalResponses());
+    }
+    private List<Response> getGlobalResponses() {
+        List<Response> globalResponses = new ArrayList<>();
+        globalResponses.add(new ResponseBuilder().code("200").description("OK").build());
+        globalResponses.add(new ResponseBuilder().code("400").description("잘못된 요청").build());
+        globalResponses.add(new ResponseBuilder().code("500").description("서버 에러").build());
+        return globalResponses;
     }
 
     private Set<String> getConsumeContentTypes(){
