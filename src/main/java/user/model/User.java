@@ -20,13 +20,13 @@ import java.util.List;
 @DynamicUpdate
 @Entity(name = "USER")
 public class User extends BaseEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "USER_CD")
-    private Long userCd;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long idx;
 
-    @Column(name = "DOMAIN_CD")
-    @ColumnDefault("1")
+    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "USER_CD", referencedColumnName = "idx")
+    private UserInfo userInfo;
+
+    @Column(name = "DOMAIN_CD") @ColumnDefault("1")
     private String domainCd;
 
     @Column(name = "USER_ID", nullable = false)
@@ -36,12 +36,10 @@ public class User extends BaseEntity {
     @Column(name = "USER_PW", nullable = false)
     private String userPw;
 
-    @Column(name = "USER_TYPE",nullable = true)
-    @ColumnDefault("1")
+    @Column(name = "USER_TYPE",nullable = true) @ColumnDefault("1")
     private String userType;
 
-    @Column(name = "USER_STATUS",nullable = true)
-    @ColumnDefault("1")
+    @Column(name = "USER_STATUS",nullable = true) @ColumnDefault("1")
     private String userStatus;
 
     @Column(name = "USER_NM",nullable = false)
@@ -50,17 +48,13 @@ public class User extends BaseEntity {
     @Column(name = "USER_PHONE_NUMBER",nullable = false)
     private String userPhoneNo;
 
-    @Column(name = "USER_NICK_NM",nullable = true)
-    private String userNickNm;
-
     @Column(name = "USER_GENDER",nullable = true)
     private String userGender;
 
     @Column(name = "USER_BIRTH",nullable = true)
     private String userBirth;
 
-    @OneToMany(mappedBy = "userEntity", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
-    @Builder.Default
+    @OneToMany(mappedBy = "userEntity", fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
     private List<Auth> roles = new ArrayList<>();
 
     public void setRoles(List<Auth> role) {
