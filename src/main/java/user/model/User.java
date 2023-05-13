@@ -21,9 +21,10 @@ import java.util.List;
 @Entity(name = "USER")
 public class User extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idx;
+    @Column(name = "USER_CD", unique = true, nullable = false)
+    private Long userCd;
 
-    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "USER_CD", referencedColumnName = "idx")
+    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "USER_CD")
     private UserInfo userInfo;
 
     @Column(name = "DOMAIN_CD") @ColumnDefault("1")

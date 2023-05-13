@@ -14,10 +14,8 @@ import javax.persistence.*;
 @Entity(name = "USER_INFO")
 public class UserInfo extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idx;
-
-    @OneToOne(mappedBy = "userInfo")
-    private User user;
+    @Column(name = "USER_CD", unique = true, nullable = false)
+    private Long userCd;
 
     @Column(name = "USER_NICK_NM",nullable = true)
     private String userNickNm;
