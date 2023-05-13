@@ -96,12 +96,8 @@ public class UserService implements UserDetailsService {
             if (userNm == null || userNm == null) {
                 throw new BadCredentialsException("토큰 인증에 실패하였습니다.");
             }
-            System.out.println("userNm : " + userNm);
             User userEntity = userRepository.findByUserId(userNm).get();
-            resultMap.put("userId", userEntity.getUserId());
-            resultMap.put("password", userEntity.getUserPw());
-            resultMap.put("name", userEntity.getUserNm());
-            //resultMap.put("regNo", aes128Util.decrypt(userEntity.getRegNo()));
+            resultMap.put("User", userEntity);
 
             responseResult = Response.builder()
                     .statusCode(HttpStatus.OK.value())
