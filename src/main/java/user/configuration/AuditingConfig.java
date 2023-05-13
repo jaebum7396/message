@@ -21,6 +21,6 @@ public class AuditingConfig {
             return null;
         }
         User userEntity = (User) authentication.getDetails();
-        return () -> Optional.of(userEntity.getUserCd());
+        return () -> Optional.of(userEntity.getIdx());
     }
 }

@@ -9,7 +9,6 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, String> {
     User save(User userEntity);
-    Optional<User> findByUserCd(Long userCd);
     Optional<User> findByUserId(String userId);
     Optional<User> findByUserNm(String userNm);
     List<User> findAll();

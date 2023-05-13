@@ -47,7 +47,7 @@ public class AuthService implements UserDetailsService {
             resultMap.put("roles", userEntity.getRoles());
             resultMap.put("token", jwtProvider.createToken(
                     userEntity.getDomainCd()
-                    , userEntity.getUserCd()
+                    , userEntity.getIdx()
                     , userEntity.getUserId()
                     , userEntity.getRoles()));
 
