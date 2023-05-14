@@ -22,4 +22,7 @@ public class UserInfo extends BaseEntity {
 
     @Column(name = "ABOUT_ME", nullable = true)
     private String aboutMe;
+
+    @Column(name = "PROFILE_IMG_URL", nullable = true)
+    private String profileImgUrl;
 }
