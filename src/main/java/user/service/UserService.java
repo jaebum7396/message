@@ -97,7 +97,7 @@ public class UserService implements UserDetailsService {
                 throw new BadCredentialsException("토큰 인증에 실패하였습니다.");
             }
             User userEntity = userRepository.findByUserId(userNm).get();
-            resultMap.put("User", userEntity);
+            resultMap.put("user", userEntity);
 
             responseResult = Response.builder()
                     .statusCode(HttpStatus.OK.value())
