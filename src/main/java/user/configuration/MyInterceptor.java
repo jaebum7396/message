@@ -17,8 +17,10 @@ import java.util.Enumeration;
 public class MyInterceptor implements HandlerInterceptor{
 	private Logger logger = LoggerFactory.getLogger(MyInterceptor.class);
 	private String GATEWAY_URI;
-	public MyInterceptor(String GATEWAY_URI) {
+	private String ACTIVE_PROFILE;
+	public MyInterceptor(String GATEWAY_URI, String ACTIVE_PROFILE) {
 		this.GATEWAY_URI = GATEWAY_URI;
+		this.ACTIVE_PROFILE = ACTIVE_PROFILE;
 	}
 
 	@Override
@@ -36,10 +38,13 @@ public class MyInterceptor implements HandlerInterceptor{
 
 		System.out.println("GATEWAY_URI : " + GATEWAY_URI);
 		System.out.println("요청_URI : " + requestUri);
-
-		if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
-    		throw new BadCredentialsException("잘못된 접근입니다.");
-    	}
+		if(ACTIVE_PROFILE.equals("local")) {
+			//GATEWAY_URI = "http://localhost:8080";
+		}else{
+			if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
+				throw new BadCredentialsException("잘못된 접근입니다.");
+			}
+		}
 		return HandlerInterceptor.super.preHandle(request, response, handler);
 	}
 
