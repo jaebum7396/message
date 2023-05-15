@@ -12,7 +12,7 @@ eureka:
     service-url:
       defaultZone: ${DISCOVERY_URL}
   instance:
-    hostname: ${GATEWAY_URI}
+    hostname: localhost
 
 spring:
   application:
