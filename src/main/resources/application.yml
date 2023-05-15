@@ -11,8 +11,6 @@ eureka:
     fetch-registry: true
     service-url:
       defaultZone: ${DISCOVERY_URL}
-  instance:
-    hostname: ${HOST_IP}
 
 spring:
   application:
