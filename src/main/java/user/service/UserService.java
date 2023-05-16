@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -37,7 +38,7 @@ public class UserService implements UserDetailsService {
     @Autowired UserInfoRepository userInfoRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired private final AES128Util aes128Util = new AES128Util();
-
+    private final RedisTemplate<String, Object> redisTemplate;
     @Value("${jwt.secret.key}")
     private String JWT_SECRET_KEY;
 
@@ -109,7 +110,7 @@ public class UserService implements UserDetailsService {
             }
         }
         userInfo = userInfoRepository.save(userInfo);
-
+        redisTemplate.convertAndSend("updateUserInfo", userInfo);
         resultMap.put("userInfo", userInfo);
 
         response = Response.builder()
