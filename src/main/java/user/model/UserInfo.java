@@ -4,11 +4,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
+@Data
 @Builder
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER_INFO")
@@ -23,6 +25,17 @@ public class UserInfo extends BaseEntity {
     @Column(name = "ABOUT_ME", nullable = true)
     private String aboutMe;
 
-    @Column(name = "PROFILE_IMG_URL", nullable = true)
-    private String profileImgUrl;
+    @OneToMany(mappedBy = "userInfo", fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
+    private List<UserProfileImage> userProfileImages = new ArrayList<>();
+
+    public void addUserProfileImage(UserProfileImage userProfileImage) {
+        this.userProfileImages.add(userProfileImage);
+    }
+    public void setUserProfileImages(List<UserProfileImage> userProfileImages) {
+        this.userProfileImages = userProfileImages;
+        userProfileImages.forEach(o -> o.setUserInfo(this));
+    }
+
+    //@Column(name = "PROFILE_IMG_URL", nullable = true)
+    //private String profileImgUrl;
 }

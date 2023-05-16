@@ -1,5 +1,6 @@
 package user.service;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import user.model.*;
+import user.repository.UserInfoRepository;
 import user.repository.UserRepository;
 import user.utils.AES128Util;
 
@@ -32,100 +34,19 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UserService implements UserDetailsService {
     @Autowired UserRepository userRepository;
+    @Autowired UserInfoRepository userInfoRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired private final AES128Util aes128Util = new AES128Util();
 
     @Value("${jwt.secret.key}")
-    String JWT_SECRET_KEY;
+    private String JWT_SECRET_KEY;
 
-    public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
-        Response responseResult;
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        try {
-            //중복 아이디 검사
-            if (duplicateIdValidate(signupRequest)) {
-                throw new BadCredentialsException("중복된 아이디입니다.");
-            }
-            signupRequest.setUserPw(passwordEncoder.encode(signupRequest.getUserPw()));
-            User userEntity = signupRequest.toEntity();
-            //ROLE 설정
-            userEntity.setRoles(Collections.singletonList(Auth.builder().authType("ROLE_USER").build()));
-
-            userRepository.save(userEntity);
-
-            resultMap.put("userId", userEntity.getUserId());
-            resultMap.put("userNm", userEntity.getUserNm());
-            resultMap.put("roles", userEntity.getRoles());
-
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.OK.value())
-                    .status(HttpStatus.OK)
-                    .message("가입 성공")
-                    .result(resultMap).build();
-            return ResponseEntity.ok().body(responseResult);
-        }catch(BadCredentialsException be){
-            System.out.println(be.getMessage());
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.BAD_REQUEST.value())
-                    .status(HttpStatus.BAD_REQUEST)
-                    .message(be.getMessage())
-                    .result(resultMap).build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseResult);
-        } catch (Exception e) {
-            e.printStackTrace();
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .message("서버쪽 오류가 발생했습니다. 관리자에게 문의하십시오")
-                    .result(resultMap).build();
-            return ResponseEntity.internalServerError().body(responseResult);
-        }
-    }
-    public ResponseEntity getMyInfo(HttpServletRequest request){
-        Response responseResult;
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+    public Claims getClaims(HttpServletRequest request) {
         Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
-        //System.out.println("secretKey : " + secretKey);
-        try{
-            String userNm = Jwts.parserBuilder().setSigningKey(secretKey).build()
-                    .parseClaimsJws(request.getHeader("authorization")).getBody()
-                    .getSubject();
-            System.out.println(Jwts.parserBuilder().setSigningKey(secretKey).build()
-                    .parseClaimsJws(request.getHeader("authorization")).getBody());
-            //final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (userNm == null || userNm == null) {
-                throw new BadCredentialsException("토큰 인증에 실패하였습니다.");
-            }
-            User userEntity = userRepository.findByUserId(userNm).get();
-            resultMap.put("user", userEntity);
-
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.OK.value())
-                    .status(HttpStatus.OK)
-                    .message("유저 정보 요청 성공")
-                    .result(resultMap).build();
-
-            return ResponseEntity.ok().body(responseResult);
-        }catch(BadCredentialsException be){
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.BAD_REQUEST.value())
-                    .status(HttpStatus.BAD_REQUEST)
-                    .message(be.getMessage())
-                    .result(resultMap).build();
-
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseResult);
-        }catch(Exception e){
-            e.printStackTrace();
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .message("서버쪽 오류가 발생했습니다. 관리자에게 문의하십시오")
-                    .result(resultMap).build();
-
-            return ResponseEntity.internalServerError().body(responseResult);
-        }
+        Claims claim = Jwts.parserBuilder().setSigningKey(secretKey).build()
+                .parseClaimsJws(request.getHeader("authorization")).getBody();
+        return claim;
     }
-    //중복된 아이디인지 검증
     public boolean duplicateIdValidate(SignupRequest signupRequest) {
         boolean check = userRepository.findByUserId(signupRequest.getUserId()).isPresent();
         return check;
@@ -133,8 +54,89 @@ public class UserService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String name) throws UsernameNotFoundException {
         User userEntity = userRepository.findByUserNm(name).orElseThrow(
-            () -> new UsernameNotFoundException("Invalid authentication!")
+                () -> new UsernameNotFoundException("Invalid authentication!")
         );
         return new CustomUserDetails(userEntity);
     }
+
+    public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
+        Response response;
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        //중복 아이디 검사
+        if (duplicateIdValidate(signupRequest)) {
+            throw new BadCredentialsException("중복된 아이디입니다.");
+        }
+        signupRequest.setUserPw(passwordEncoder.encode(signupRequest.getUserPw()));
+        User userEntity = signupRequest.toEntity();
+        //ROLE 설정
+        userEntity.setRoles(Collections.singletonList(Auth.builder().authType("ROLE_USER").build()));
+
+        userRepository.save(userEntity);
+
+        resultMap.put("userId", userEntity.getUserId());
+        resultMap.put("userNm", userEntity.getUserNm());
+        resultMap.put("roles", userEntity.getRoles());
+
+        response = Response.builder()
+                .statusCode(HttpStatus.OK.value())
+                .status(HttpStatus.OK)
+                .message("가입 성공")
+                .result(resultMap).build();
+        return ResponseEntity.ok().body(response);
+    }
+
+    public ResponseEntity saveUserInfo(HttpServletRequest request, UserInfo updateUserInfo){
+        Response response;
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+
+        Claims claim = getClaims(request);
+        Long userCd = claim.get("userCd", Long.class);
+        UserInfo userInfo = userInfoRepository.findByUserCd(userCd).orElseGet(() -> {
+            return UserInfo.builder()
+                .userCd(userCd)
+                .build();
+        });
+        // 업데이트할 필드가 있다면 업데이트합니다.
+        if (updateUserInfo.getUserNickNm() != null) {
+            userInfo.setUserNickNm(updateUserInfo.getUserNickNm());
+        }
+        if (updateUserInfo.getAboutMe() != null) {
+            userInfo.setAboutMe(updateUserInfo.getAboutMe());
+        }
+        if (updateUserInfo.getUserProfileImages().size() != 0) {
+            for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
+                userInfo.addUserProfileImage(upi);
+            }
+        }
+        userInfo = userInfoRepository.save(userInfo);
+
+        resultMap.put("userInfo", userInfo);
+
+        response = Response.builder()
+                .statusCode(HttpStatus.OK.value())
+                .status(HttpStatus.OK)
+                .message("유저 정보 업데이트 성공")
+                .result(resultMap).build();
+
+        return ResponseEntity.ok().body(response);
+    }
+
+    public ResponseEntity getMyInfo(HttpServletRequest request){
+        Response response;
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+
+        Claims claim = getClaims(request);
+        String userId = claim.getSubject();
+        User userEntity = userRepository.findByUserId(userId).get();
+        resultMap.put("user", userEntity);
+
+        response = Response.builder()
+            .statusCode(HttpStatus.OK.value())
+            .status(HttpStatus.OK)
+            .message("유저 정보 요청 성공")
+            .result(resultMap).build();
+
+        return ResponseEntity.ok().body(response);
+    }
+    //중복된 아이디인지 검증
 }

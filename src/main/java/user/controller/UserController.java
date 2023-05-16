@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import user.model.LoginRequest;
 import user.model.Response;
 import user.model.SignupRequest;
+import user.model.UserInfo;
 import user.service.AuthService;
 import user.service.UserService;
 
@@ -26,6 +27,12 @@ import javax.servlet.http.HttpServletRequest;
 public class UserController {
     @Autowired UserService userService;
     @Autowired AuthService authService;
+
+    @PostMapping(value = "/userInfo")
+    @Operation(summary="회원 정보 갱신 API", description="회원 정보 갱신 API")
+    public ResponseEntity UserInfo(HttpServletRequest request, @RequestBody UserInfo updateUserInfo) throws Exception {
+        return userService.saveUserInfo(request, updateUserInfo);
+    }
     @PostMapping(value = "/signup")
     @Operation(summary="회원가입", description="회원 가입 API")
     public ResponseEntity signup(@RequestBody SignupRequest signupRequest) throws Exception {
