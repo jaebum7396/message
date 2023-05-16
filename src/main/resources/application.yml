@@ -16,7 +16,7 @@ spring:
   application:
     name: user
   profiles:
-    active: deploy
+    active: local
   datasource:
     url: jdbc:mysql://${AFLK_DB_URI}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC
     username: ${AFLK_DB_USERNAME}

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 
 import javax.persistence.*;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +15,7 @@ import java.util.List;
 @Builder
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER_INFO")
-public class UserInfo extends BaseEntity {
+public class UserInfo extends BaseEntity implements Serializable {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "USER_CD", unique = true, nullable = false)
     private Long userCd;
@@ -31,6 +32,7 @@ public class UserInfo extends BaseEntity {
     public void addUserProfileImage(UserProfileImage userProfileImage) {
         this.userProfileImages.add(userProfileImage);
     }
+
     public void setUserProfileImages(List<UserProfileImage> userProfileImages) {
         this.userProfileImages = userProfileImages;
         userProfileImages.forEach(o -> o.setUserInfo(this));

@@ -3,6 +3,7 @@ package user.model;
 import lombok.*;
 
 import javax.persistence.*;
+import java.io.Serializable;
 
 
 @AllArgsConstructor
@@ -11,7 +12,7 @@ import javax.persistence.*;
 @Builder
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER_PROFILE_IMAGE")
-public class UserProfileImage extends BaseEntity {
+public class UserProfileImage extends BaseEntity implements Serializable {
     @Id @ManyToOne @JoinColumn(name = "USER_CD")
     private UserInfo userInfo;
 
