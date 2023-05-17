@@ -31,6 +31,7 @@ public class UserController {
     @PostMapping(value = "/userInfo")
     @Operation(summary="회원 정보 갱신 API", description="회원 정보 갱신 API")
     public ResponseEntity UserInfo(HttpServletRequest request, @RequestBody UserInfo updateUserInfo) throws Exception {
+        System.out.println("UserController.userInfo.param : " + updateUserInfo);
         return userService.saveUserInfo(request, updateUserInfo);
     }
     @PostMapping(value = "/signup")

@@ -87,6 +87,7 @@ public class UserService implements UserDetailsService {
     }
 
     public ResponseEntity saveUserInfo(HttpServletRequest request, UserInfo updateUserInfo){
+        System.out.println("UserService.saveUserInfo.params : " + updateUserInfo.toString());
         Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 
@@ -110,6 +111,7 @@ public class UserService implements UserDetailsService {
             }
         }
         userInfo = userInfoRepository.save(userInfo);
+        System.out.println("redis 전송 updateUserInfo: " + userInfo.toString());
         redisTemplate.convertAndSend("updateUserInfo", userInfo);
         resultMap.put("userInfo", userInfo);
 
