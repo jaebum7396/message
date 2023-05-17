@@ -116,7 +116,7 @@ public class UserService implements UserDetailsService {
             }
         }
         userInfo = userInfoRepository.save(userInfo);
-        System.out.println("redis 전송 userInfo: " + userInfo.toString());
+        //System.out.println("redis 전송 userInfo: " + userInfo.toString());
         redisTemplate.convertAndSend("updateUserInfo", userInfo);
         resultMap.put("userInfo", userInfo);
 
