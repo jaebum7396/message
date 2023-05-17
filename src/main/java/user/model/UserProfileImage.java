@@ -18,9 +18,16 @@ public class UserProfileImage extends BaseEntity implements Serializable {
     @Column(name = "USER_PROFILE_IMAGE_CD", unique = true, nullable = false)
     private Long userProfileImageCd;
 
+    @Column(name = "PROFILE_IMG_URL", nullable = true)
+    private String profileImgUrl;
+
     @ManyToOne @JoinColumn(name = "USER_CD") @JsonIgnore
     private UserInfo userInfo;
 
-    @Column(name = "PROFILE_IMG_URL", nullable = true)
-    private String profileImgUrl;
+    public void setUserInfo(UserInfo userInfo) {
+        this.userInfo = userInfo;
+        if (!userInfo.getUserProfileImages().contains(this)) {
+            userInfo.getUserProfileImages().add(this); // UserInfo와의 양방향 관계 설정
+        }
+    }
 }
