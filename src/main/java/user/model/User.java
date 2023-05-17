@@ -24,7 +24,7 @@ public class User extends BaseEntity {
     @Column(name = "USER_CD", unique = true, nullable = false)
     private Long userCd;
 
-    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "USER_CD")
+    @OneToOne(fetch = FetchType.EAGER) @JoinColumn(name = "USER_CD")
     private UserInfo userInfo;
 
     @Column(name = "DOMAIN_CD") @ColumnDefault("1")
