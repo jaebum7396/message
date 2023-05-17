@@ -14,7 +14,8 @@ import java.io.Serializable;
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER_PROFILE_IMAGE")
 public class UserProfileImage extends BaseEntity implements Serializable {
-    @Id
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "USER_PROFILE_IMAGE_CD", unique = true, nullable = false)
     private Long userProfileImageCd;
 
     @ManyToOne @JoinColumn(name = "USER_CD") @JsonIgnore
