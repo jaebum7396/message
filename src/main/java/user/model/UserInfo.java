@@ -31,7 +31,9 @@ public class UserInfo extends BaseEntity implements Serializable {
 
     public void addUserProfileImage(UserProfileImage userProfileImage) {
         this.userProfileImages.add(userProfileImage);
-        userProfileImage.setUserInfo(this); // UserProfileImage와의 양방향 관계 설정
+        if (userProfileImage.getUserInfo() != this) {
+            userProfileImage.setUserInfo(this); // UserProfileImage와의 양방향 관계 설정
+        }
     }
 
     public void setUserProfileImages(List<UserProfileImage> userProfileImages) {

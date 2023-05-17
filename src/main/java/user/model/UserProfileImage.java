@@ -23,11 +23,4 @@ public class UserProfileImage extends BaseEntity implements Serializable {
 
     @ManyToOne @JoinColumn(name = "USER_CD") @JsonIgnore
     private UserInfo userInfo;
-
-    public void setUserInfo(UserInfo userInfo) {
-        this.userInfo = userInfo;
-        if (!userInfo.getUserProfileImages().contains(this)) {
-            userInfo.getUserProfileImages().add(this); // UserInfo와의 양방향 관계 설정
-        }
-    }
 }
