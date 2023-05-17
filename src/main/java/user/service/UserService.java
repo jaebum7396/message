@@ -109,7 +109,7 @@ public class UserService implements UserDetailsService {
         }
         if (updateUserInfo.getUserProfileImages().size() != 0) {
             for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
-                upi.setUserInfo(userInfo);
+                //upi.setUserInfo(userInfo);
                 System.out.println(upi);
                 //userProfileImageRepository.save(upi);
                 userInfo.addUserProfileImage(upi);
