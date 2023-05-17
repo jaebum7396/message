@@ -111,8 +111,8 @@ public class UserService implements UserDetailsService {
             for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
                 upi.setUserInfo(userInfo);
                 System.out.println(upi);
-                userProfileImageRepository.save(upi);
-                //userInfo.addUserProfileImage(upi);
+                //userProfileImageRepository.save(upi);
+                userInfo.addUserProfileImage(upi);
             }
         }
         userInfo = userInfoRepository.save(userInfo);
