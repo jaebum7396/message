@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import user.model.*;
 import user.repository.UserInfoRepository;
+import user.repository.UserProfileImageRepository;
 import user.repository.UserRepository;
 import user.utils.AES128Util;
 
@@ -36,6 +37,7 @@ import java.util.Map;
 public class UserService implements UserDetailsService {
     @Autowired UserRepository userRepository;
     @Autowired UserInfoRepository userInfoRepository;
+    @Autowired UserProfileImageRepository userProfileImageRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired private final AES128Util aes128Util = new AES128Util();
     private final RedisTemplate<String, Object> redisTemplate;
@@ -108,6 +110,9 @@ public class UserService implements UserDetailsService {
         if (updateUserInfo.getUserProfileImages().size() != 0) {
             for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
                 upi.setUserInfo(userInfo);
+
+                System.out.println(upi);
+                userProfileImageRepository.save(upi);
                 userInfo.addUserProfileImage(upi);
             }
         }
