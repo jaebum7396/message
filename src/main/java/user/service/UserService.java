@@ -107,11 +107,12 @@ public class UserService implements UserDetailsService {
         }
         if (updateUserInfo.getUserProfileImages().size() != 0) {
             for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
+                upi.setUserInfo(userInfo);
                 userInfo.addUserProfileImage(upi);
             }
         }
         userInfo = userInfoRepository.save(userInfo);
-        System.out.println("redis 전송 updateUserInfo: " + userInfo.toString());
+        System.out.println("redis 전송 userInfo: " + userInfo.toString());
         redisTemplate.convertAndSend("updateUserInfo", userInfo);
         resultMap.put("userInfo", userInfo);
 
