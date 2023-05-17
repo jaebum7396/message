@@ -26,7 +26,7 @@ public class UserInfo extends BaseEntity implements Serializable {
     @Column(name = "ABOUT_ME", nullable = true)
     private String aboutMe;
 
-    @OneToMany(mappedBy = "userInfo", fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
+    @OneToMany(mappedBy = "userInfo", fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default @JsonIgnore
     private List<UserProfileImage> userProfileImages = new ArrayList<>();
 
     public void addUserProfileImage(UserProfileImage userProfileImage) {
