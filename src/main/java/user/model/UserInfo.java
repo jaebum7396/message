@@ -35,9 +35,5 @@ public class UserInfo extends BaseEntity implements Serializable {
 
     public void setUserProfileImages(List<UserProfileImage> userProfileImages) {
         this.userProfileImages = userProfileImages;
-        userProfileImages.forEach(o -> o.setUserInfo(this));
     }
-
-    //@Column(name = "PROFILE_IMG_URL", nullable = true)
-    //private String profileImgUrl;
 }
