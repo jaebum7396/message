@@ -36,11 +36,11 @@ public class MyInterceptor implements HandlerInterceptor{
 
 		String requestUri = request.getHeader("x-forwarded-host");
 
-		System.out.println("GATEWAY_URI : " + GATEWAY_URI);
-		System.out.println("요청_URI : " + requestUri);
 		if(ACTIVE_PROFILE.equals("local")) {
 			//GATEWAY_URI = "http://localhost:8080";
 		}else{
+			System.out.println("GATEWAY_URI : " + GATEWAY_URI);
+			System.out.println("요청_URI : " + requestUri);
 			if(("".equals(requestUri)||requestUri == null||!requestUri.equals(GATEWAY_URI))) {
 				throw new BadCredentialsException("잘못된 접근입니다.");
 			}
