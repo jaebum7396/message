@@ -13,7 +13,6 @@ import user.configuration.RedisSubscriber;
 
 @EnableDiscoveryClient
 @EnableJpaAuditing
-/*@SpringBootApplication*/
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
 public class Application implements CommandLineRunner {
 	private final RedisSubscriber redisSubscriber;

@@ -18,11 +18,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
 			.addPathPatterns("/*")
 			.excludePathPatterns("/css/**", "/images/**", "/js/**");
 	}
-	//@Override
-	//public void addCorsMappings(CorsRegistry registry) {
-	//	registry.addMapping("/**") // 모든 경로에 대해 CORS 설정 적용
-	//		.allowedOrigins("*") // 허용할 도메인을 allowedOrigins에 지정
-	//		.allowedMethods("*") // 허용할 HTTP 메서드 설정
-	//		.allowedHeaders("*"); // 허용할 헤더 설정
-	//}
+	@Override
+	public void addCorsMappings(CorsRegistry registry) {
+		registry.addMapping("/**") // 모든 경로에 대해 CORS 설정 적용
+			.allowedOrigins(GATEWAY_URI) // 허용할 도메인을 allowedOrigins에 지정
+			.allowedMethods("*") // 허용할 HTTP 메서드 설정
+			.allowedHeaders("*"); // 허용할 헤더 설정
+	}
 }
