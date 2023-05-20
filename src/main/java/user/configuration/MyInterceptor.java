@@ -36,6 +36,7 @@ public class MyInterceptor implements HandlerInterceptor{
 
 		String requestUri = request.getHeader("x-forwarded-host");
 
+		System.out.println("ACTIVE_PROFILE : " + ACTIVE_PROFILE);
 		if(ACTIVE_PROFILE.equals("local")) {
 			//GATEWAY_URI = "http://localhost:8080";
 		}else{
