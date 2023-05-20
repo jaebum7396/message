@@ -67,5 +67,5 @@ jasypt:
   encryptor:
     password: ${JASYPT_ENCRYPTOR_PASSWORD}
 token:
-  access-expired-time : 3600000
+  access-expired-time : 14400000
   refresh-expired-time : 2629800000
