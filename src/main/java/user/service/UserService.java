@@ -7,6 +7,8 @@ import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,9 +31,7 @@ import user.utils.AES128Util;
 import javax.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @Transactional
@@ -117,12 +117,18 @@ public class UserService implements UserDetailsService {
         if (updateUserInfo.getUserProfileImages().size() != 0) {
             for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
                 //upi.setUserInfo(userInfo);
-                System.out.println(upi);
                 //userProfileImageRepository.save(upi);
+                System.out.println(upi);
+                upi.setUserCd(userCd);
                 userInfo.addUserProfileImage(upi);
             }
         }
         userInfo = userInfoRepository.save(userInfo);
+
+        Pageable page = Pageable.ofSize(10);
+        //Page<User> usersPage = userRepository.findUsersWithPageable(userInfo.getUserCd(), page);
+        //System.out.println("usersPage = " + usersPage.getContent().toString());
+
         System.out.println("redis 전송 userInfo: " + userInfo.toString());
         redisTemplate.convertAndSend("updateUserInfo", userInfo);
         resultMap.put("userInfo", userInfo);
@@ -153,5 +159,27 @@ public class UserService implements UserDetailsService {
 
         return ResponseEntity.ok().body(response);
     }
-    //중복된 아이디인지 검증
+
+    public ResponseEntity getUsersWithPageable(HttpServletRequest request, Pageable page) {
+        Response response;
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        HashMap<String, Object> paramMap = new HashMap<String, Object>();
+        List<User> userArr = new ArrayList<User>();
+
+        Claims claim = getClaims(request);
+        Long userCd = claim.get("userCd", Long.class);
+
+        Page<User> usersPage = userRepository.findUsersWithPageable(userCd, page);
+        userArr = usersPage.getContent();
+
+        resultMap.put("userArr", userArr);
+        resultMap.put("p_page", page.getPageNumber());
+
+        response = Response.builder()
+                .statusCode(HttpStatus.OK.value())
+                .status(HttpStatus.OK)
+                .message("요청 성공")
+                .result(resultMap).build();
+        return ResponseEntity.ok().body(response);
+    }
 }

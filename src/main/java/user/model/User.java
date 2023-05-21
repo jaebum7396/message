@@ -1,10 +1,7 @@
 package user.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
@@ -14,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
+@Data
 @Builder
 @DynamicInsert
 @DynamicUpdate

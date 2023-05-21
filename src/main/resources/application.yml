@@ -12,6 +12,7 @@ spring:
   application:
     name: user
   profiles:
+    #active: local
     active: deploy
   redis:
     host: ${REDIS_URI}
