@@ -1,6 +1,7 @@
 package user.service;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import user.model.*;
 import user.repository.UserInfoRepository;
 import user.repository.UserProfileImageRepository;
@@ -44,12 +46,6 @@ public class UserService implements UserDetailsService {
     @Value("${jwt.secret.key}")
     private String JWT_SECRET_KEY;
 
-    public Claims getClaims(HttpServletRequest request) {
-        Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
-        Claims claim = Jwts.parserBuilder().setSigningKey(secretKey).build()
-                .parseClaimsJws(request.getHeader("authorization")).getBody();
-        return claim;
-    }
     public boolean duplicateIdValidate(SignupRequest signupRequest) {
         boolean check = userRepository.findByUserId(signupRequest.getUserId()).isPresent();
         return check;
@@ -60,6 +56,17 @@ public class UserService implements UserDetailsService {
                 () -> new UsernameNotFoundException("Invalid authentication!")
         );
         return new CustomUserDetails(userEntity);
+    }
+
+    public Claims getClaims(HttpServletRequest request){
+        try{
+            Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+            Claims claim = Jwts.parserBuilder().setSigningKey(secretKey).build()
+                    .parseClaimsJws(request.getHeader("authorization")).getBody();
+            return claim;
+        } catch (ExpiredJwtException e) {
+            throw new ExpiredJwtException(null, null, "로그인 시간이 만료되었습니다.");
+        }
     }
 
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
@@ -116,7 +123,7 @@ public class UserService implements UserDetailsService {
             }
         }
         userInfo = userInfoRepository.save(userInfo);
-        //System.out.println("redis 전송 userInfo: " + userInfo.toString());
+        System.out.println("redis 전송 userInfo: " + userInfo.toString());
         redisTemplate.convertAndSend("updateUserInfo", userInfo);
         resultMap.put("userInfo", userInfo);
 

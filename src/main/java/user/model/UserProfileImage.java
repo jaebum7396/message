@@ -1,11 +1,9 @@
 package user.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 
 import javax.persistence.*;
 import java.io.Serializable;
-
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -18,9 +16,12 @@ public class UserProfileImage extends BaseEntity implements Serializable {
     @Column(name = "USER_PROFILE_IMAGE_CD", unique = true, nullable = false)
     private Long userProfileImageCd;
 
+    @Column(name = "USER_CD")
+    private Long userCd;
+
     @Column(name = "PROFILE_IMG_URL", nullable = true)
     private String profileImgUrl;
 
-    @ManyToOne @JoinColumn(name = "USER_CD") @JsonIgnore
-    private UserInfo userInfo;
+    //@ManyToOne @JoinColumn(name = "USER_CD") @JsonBackReference
+    //private UserInfo userInfo;
 }

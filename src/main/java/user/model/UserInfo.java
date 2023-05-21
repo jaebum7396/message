@@ -1,6 +1,7 @@
 package user.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.*;
 
 import javax.persistence.*;
@@ -26,14 +27,15 @@ public class UserInfo extends BaseEntity implements Serializable {
     @Column(name = "ABOUT_ME", nullable = true)
     private String aboutMe;
 
-    @OneToMany(mappedBy = "userInfo", fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
+    @JoinColumn(name = "USER_CD")
     private List<UserProfileImage> userProfileImages = new ArrayList<>();
 
     public void addUserProfileImage(UserProfileImage userProfileImage) {
         this.userProfileImages.add(userProfileImage);
-        if (userProfileImage.getUserInfo() != this) {
-            userProfileImage.setUserInfo(this); // UserProfileImage와의 양방향 관계 설정
-        }
+        //if (userProfileImage.getUserInfo() != this) {
+        //    userProfileImage.setUserInfo(this); // UserProfileImage와의 양방향 관계 설정
+        //}
     }
 
     public void setUserProfileImages(List<UserProfileImage> userProfileImages) {

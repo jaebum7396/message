@@ -3,6 +3,7 @@ package user.configuration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,20 @@ public class ErrorResponseAdvice {
                 .status(HttpStatus.UNAUTHORIZED)
                 .message("잘못된 접근입니다.")
                 .result(resultMap).build();
-        return ResponseEntity.internalServerError().body(responseResult);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED.value()).body(responseResult);
+	}
+
+	@ExceptionHandler(ExpiredJwtException.class)
+	public ResponseEntity handleExpiredJwtException(ExpiredJwtException e) {
+		System.out.println("ExpiredJwtException");
+		Response responseResult;
+		Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+		e.printStackTrace();
+		responseResult = Response.builder()
+				.statusCode(HttpStatus.UNAUTHORIZED.value())
+				.status(HttpStatus.UNAUTHORIZED)
+				.message("로그인 시간이 만료되었습니다.")
+				.result(resultMap).build();
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED.value()).body(responseResult);
 	}
 }
