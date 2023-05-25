@@ -16,7 +16,9 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.GenericGenerator;
 
+import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -25,16 +27,15 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "AUTH")
 public class Auth extends BaseEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @JsonIgnore
-    @Column(name = "AUTH_CD")
-    private Long authCd;
+    @Id @GeneratedValue(generator = "uuid2")
+    @GenericGenerator(name = "uuid2", strategy = "uuid2")
+    @Column(columnDefinition = "BINARY(16)", name = "AUTH_CD")
+    private UUID authCd;
 
     @Column(name = "AUTH_TYPE")
     private String authType;
 
-    @JoinColumn(name = "userCd")
+    @JoinColumn(name = "USER_CD")
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnore
     private User userEntity;

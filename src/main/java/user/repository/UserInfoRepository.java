@@ -7,8 +7,9 @@ import user.model.UserInfo;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface UserInfoRepository extends JpaRepository<UserInfo, String> {
-    Optional<UserInfo> findByUserCd(Long userCd);
+public interface UserInfoRepository extends JpaRepository<UserInfo, UUID> {
+    Optional<UserInfo> findByUserCd(UUID userCd);
 }

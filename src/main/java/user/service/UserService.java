@@ -83,6 +83,15 @@ public class UserService implements UserDetailsService {
 
         userRepository.save(userEntity);
 
+        UserInfo userInfo = UserInfo.builder()
+                .userCd(userEntity.getUserCd())
+                .userNickNm(userEntity.getUserNm())
+                .build();
+
+        userEntity.setUserInfo(userInfo);
+
+        userRepository.save(userEntity);
+
         resultMap.put("userId", userEntity.getUserId());
         resultMap.put("userNm", userEntity.getUserNm());
         resultMap.put("roles", userEntity.getRoles());
@@ -101,7 +110,7 @@ public class UserService implements UserDetailsService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 
         Claims claim = getClaims(request);
-        Long userCd = claim.get("userCd", Long.class);
+        UUID userCd = claim.get("userCd", UUID.class);
         UserInfo userInfo = userInfoRepository.findByUserCd(userCd).orElseGet(() -> {
             return UserInfo.builder()
                 .userCd(userCd)
@@ -167,7 +176,7 @@ public class UserService implements UserDetailsService {
         List<User> userArr = new ArrayList<User>();
 
         Claims claim = getClaims(request);
-        Long userCd = claim.get("userCd", Long.class);
+        UUID userCd = claim.get("userCd", UUID.class);
 
         Page<User> usersPage = userRepository.findUsersWithPageable(userCd, page);
         userArr = usersPage.getContent();

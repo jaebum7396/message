@@ -15,8 +15,8 @@ public class LoginRequest {
     @ApiModelProperty(value="domainCd", example="1", required=true)
     @ColumnDefault("1")
     private String domainCd;
-    @ApiModelProperty(value="userId", example="gildongh0366", required=true)
+    @ApiModelProperty(value="userId", example="TEST_PLUS", required=true)
     private String userId;
-    @ApiModelProperty(value="userPw", example="pwd0366", required=true)
+    @ApiModelProperty(value="userPw", example="TEST_PLUS1234", required=true)
     private String userPw;
 }

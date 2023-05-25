@@ -9,12 +9,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import user.model.User;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Configuration
 public class AuditingConfig {
     @Bean
-    public AuditorAware<Long> auditorProvider() {
+    public AuditorAware<UUID> auditorProvider() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             log.debug("Not found AuthenticationToken");

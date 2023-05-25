@@ -11,11 +11,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class SignupRequest {
-    @ApiModelProperty(value="userId", example="gildongh0366", required=true)
+    @ApiModelProperty(value="userId", example="TEST_PLUS", required=true)
     private String userId;
-    @ApiModelProperty(value="userPw", example="pwd0366", required=true)
+    @ApiModelProperty(value="userPw", example="TEST_PLUS1234", required=true)
     private String userPw;
-    @ApiModelProperty(value="userNm", example="홍길동", required=true)
+    @ApiModelProperty(value="userNm", example="테스트플러스", required=true)
     private String userNm;
     @ApiModelProperty(value="userPhoneNo", example="010-0000-0366", required=true)
     private String userPhoneNo;
