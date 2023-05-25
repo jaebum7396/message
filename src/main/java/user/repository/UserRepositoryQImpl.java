@@ -18,7 +18,6 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Repository
 public class UserRepositoryQImpl implements UserRepositoryQ {
@@ -27,7 +26,7 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
     private EntityManager entityManager;
 
     @Override
-    public Page<User> findUsersWithPageable(UUID userCd, Pageable pageable) {
+    public Page<User> findUsersWithPageable(String userCd, Pageable pageable) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
         QUser user = QUser.user;

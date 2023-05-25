@@ -1,15 +1,11 @@
 package user.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.*;
-import org.hibernate.annotations.GenericGenerator;
 
 import javax.persistence.*;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 
 @AllArgsConstructor
@@ -20,8 +16,8 @@ import java.util.UUID;
 @Entity(name = "USER_INFO")
 public class UserInfo extends BaseEntity implements Serializable {
     @Id
-    @Column(columnDefinition = "BINARY(16)", name = "USER_CD")
-    private UUID userCd;
+    @Column(name = "USER_CD")
+    private String userCd;
 
     @Column(name = "USER_NICK_NM",nullable = true)
     private String userNickNm;

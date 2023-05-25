@@ -41,7 +41,7 @@ public class JwtProvider {
         secretKey = Keys.hmacShaKeyFor(salt.getBytes(StandardCharsets.UTF_8));
     }
     // 토큰 생성
-    public String createToken(String domainCd, UUID userCd, String userId, List<Auth> roles) {
+    public String createToken(String domainCd, String userCd, String userId, List<Auth> roles) {
         Claims claims = Jwts.claims().setSubject(userId);
         claims.put("domainCd", domainCd);
         claims.put("userCd", userCd);

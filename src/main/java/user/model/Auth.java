@@ -1,24 +1,10 @@
 package user.model;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.GenericGenerator;
 
-import java.util.UUID;
+import javax.persistence.*;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -27,10 +13,11 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "AUTH")
 public class Auth extends BaseEntity {
-    @Id @GeneratedValue(generator = "uuid2")
-    @GenericGenerator(name = "uuid2", strategy = "uuid2")
-    @Column(columnDefinition = "BINARY(16)", name = "AUTH_CD")
-    private UUID authCd;
+    @Id
+    @GeneratedValue(generator = "uuid")
+    @GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column( name = "AUTH_CD")
+    private String authCd;
 
     @Column(name = "AUTH_TYPE")
     private String authType;

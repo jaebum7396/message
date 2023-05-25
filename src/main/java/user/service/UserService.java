@@ -13,15 +13,12 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import user.model.*;
 import user.repository.UserInfoRepository;
 import user.repository.UserProfileImageRepository;
@@ -110,7 +107,7 @@ public class UserService implements UserDetailsService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 
         Claims claim = getClaims(request);
-        UUID userCd = claim.get("userCd", UUID.class);
+        String userCd = claim.get("userCd", String.class);
         UserInfo userInfo = userInfoRepository.findByUserCd(userCd).orElseGet(() -> {
             return UserInfo.builder()
                 .userCd(userCd)
@@ -176,7 +173,7 @@ public class UserService implements UserDetailsService {
         List<User> userArr = new ArrayList<User>();
 
         Claims claim = getClaims(request);
-        UUID userCd = claim.get("userCd", UUID.class);
+        String userCd = claim.get("userCd", String.class);
 
         Page<User> usersPage = userRepository.findUsersWithPageable(userCd, page);
         userArr = usersPage.getContent();

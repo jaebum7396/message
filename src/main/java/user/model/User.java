@@ -10,7 +10,6 @@ import org.hibernate.annotations.GenericGenerator;
 import javax.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -21,10 +20,11 @@ import java.util.UUID;
 @DynamicUpdate
 @Entity(name = "USER")
 public class User extends BaseEntity {
-    @Id @GeneratedValue(generator = "uuid2")
-    @GenericGenerator(name = "uuid2", strategy = "uuid2")
-    @Column(columnDefinition = "BINARY(16)", name = "USER_CD")
-    private UUID userCd;
+    @Id
+    @GeneratedValue(generator = "uuid")
+    @GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column( name = "USER_CD")
+    private String userCd;
 
     @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL) @JoinColumn(name = "USER_CD")
     private UserInfo userInfo;

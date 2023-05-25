@@ -50,7 +50,7 @@ public abstract class BaseEntity {
 
     @JsonIgnore
     @Column(name = "DELETE_YN", length = 1, columnDefinition = "CHAR(1) DEFAULT 'N'")
-    protected char deleteYn;
+    private String deleteYn = "N";
 
     @JsonIgnore
     @Column(name = "DELETE_DT")
