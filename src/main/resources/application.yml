@@ -23,6 +23,9 @@ spring:
     username: ${AFLK_DB_USERNAME}
     password: ${AFLK_DB_PASSWORD}
     initialization-mode: always #import data
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true
   jpa:
     properties:
       hibernate:
