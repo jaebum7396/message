@@ -45,7 +45,7 @@ public class JwtProvider {
         Claims claims = Jwts.claims().setSubject(userId);
         claims.put("domainCd", domainCd);
         claims.put("userCd", userCd);
-        claims.put("roles", roles);
+        //claims.put("roles", roles);
         return Jwts.builder()
             .setClaims(claims)
             .setExpiration(new Date(System.currentTimeMillis()  + ACCESS_EXPIRED_TIME))

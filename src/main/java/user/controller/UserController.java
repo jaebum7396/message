@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import user.model.LoginRequest;
@@ -48,5 +49,11 @@ public class UserController {
     @Operation(summary="내 정보 보기", description="가입한 회원 정보를 가져오는 API(jwt 인증 요구)")
     public ResponseEntity getMyInfo(HttpServletRequest request) {
         return userService.getMyInfo(request);
+    }
+
+    @GetMapping(value = "/users")
+    @Operation(summary="유저 조회", description="유저 ID 유저닉네임 유저네임 유저핸드폰번호를 통해 유저정보를 조회한다")
+    public ResponseEntity getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
+        return userService.getUsersWithPageable(request, queryString, page);
     }
 }

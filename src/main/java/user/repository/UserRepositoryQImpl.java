@@ -26,7 +26,7 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
     private EntityManager entityManager;
 
     @Override
-    public Page<User> findUsersWithPageable(String userCd, Pageable pageable) {
+    public Page<User> findUsersWithPageable(String queryString, Pageable pageable) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
         QUser user = QUser.user;
@@ -37,29 +37,21 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
                 .selectFrom(user)
                 .join(user.userInfo, userInfo).fetchJoin()
                 .leftJoin(userInfo.userProfileImages, userProfileImage).fetchJoin()
-                .where(user.userCd.eq(userCd))
+                .where(user.userId.eq(queryString)
+                        .or(user.userNm.eq(queryString))
+                        .or(user.userPhoneNo.eq(queryString))
+                        .or(userInfo.userNickNm.eq(queryString)))
                 .orderBy(user.userCd.asc(), user.userInfo.userNickNm.asc())
-                //.offset(pageable.getOffset())
-                //.limit(pageable.getPageSize())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
                 ;
 
-        SubQueryExpression<LocalDateTime> maxInsertDTQuery = JPAExpressions
-                .select(userProfileImage.insertDt.max())
-                .from(user.userInfo)
-                .join(userInfo.userProfileImages, userProfileImage)
-                .where(userInfo.eq(user.userInfo));
+        List<User> users = query
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
 
-        BooleanExpression hasUserProfileImage = userProfileImage.insertDt.eq(maxInsertDTQuery);
-        BooleanExpression userProfileImageIsNull = user.userInfo.isNull().or(userInfo.userProfileImages.isEmpty());
-        query.where(hasUserProfileImage.or(userProfileImageIsNull));
-        List<User> users = query.fetch();
-
-        System.out.println("users : " + users);
-
-        long count = queryFactory
-                .select(user.userCd)
-                .from(user)
-                .where(user.userCd.eq(userCd))
+        long count = query
                 .fetchCount();
 
         return new PageImpl<>(users, pageable, count);

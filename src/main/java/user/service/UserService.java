@@ -166,7 +166,7 @@ public class UserService implements UserDetailsService {
         return ResponseEntity.ok().body(response);
     }
 
-    public ResponseEntity getUsersWithPageable(HttpServletRequest request, Pageable page) {
+    public ResponseEntity getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
         Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         HashMap<String, Object> paramMap = new HashMap<String, Object>();
@@ -175,7 +175,7 @@ public class UserService implements UserDetailsService {
         Claims claim = getClaims(request);
         String userCd = claim.get("userCd", String.class);
 
-        Page<User> usersPage = userRepository.findUsersWithPageable(userCd, page);
+        Page<User> usersPage = userRepository.findUsersWithPageable(queryString, page);
         userArr = usersPage.getContent();
 
         resultMap.put("userArr", userArr);
