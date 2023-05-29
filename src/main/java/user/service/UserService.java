@@ -67,6 +67,7 @@ public class UserService implements UserDetailsService {
     }
 
     public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
+        System.out.println("UserService.signup.params : " + signupRequest.toString());
         Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         //중복 아이디 검사
@@ -84,10 +85,28 @@ public class UserService implements UserDetailsService {
                 .userCd(userEntity.getUserCd())
                 .userNickNm(userEntity.getUserNm())
                 .build();
+        userInfo.setDeleteYn('N');
 
+        String userProfileImageCommon = "image/profile/common.png";
+        System.out.println("userGender : "+userEntity.getUserGender());
+        if(userEntity.getUserGender().equals("M")){
+            userProfileImageCommon = "image/profile/man_common.png";
+        }else if(userEntity.getUserGender().equals("W")){
+            userProfileImageCommon = "image/profile/woman_common.png";
+        }
+
+        userInfo.addUserProfileImage(UserProfileImage.builder()
+                .userCd(userEntity.getUserCd())
+                .profileImgUrl(userProfileImageCommon)
+                .build());
         userEntity.setUserInfo(userInfo);
 
         userRepository.save(userEntity);
+
+        //레디스를 통해 friendInfo 또한 저장 해준다
+        System.out.println("redis 전송 userInfo: " + userInfo.toString());
+        redisTemplate.convertAndSend("updateUserInfo", userInfo);
+        resultMap.put("userInfo", userInfo);
 
         resultMap.put("userId", userEntity.getUserId());
         resultMap.put("userNm", userEntity.getUserNm());

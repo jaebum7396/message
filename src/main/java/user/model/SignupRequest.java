@@ -19,6 +19,8 @@ public class SignupRequest {
     private String userNm;
     @ApiModelProperty(value="userPhoneNo", example="010-0000-0366", required=true)
     private String userPhoneNo;
+    @ApiModelProperty(value="userGender", example="M,W", required=true)
+    private String userGender;
 
     public User toEntity() {
         return User.builder()
@@ -26,6 +28,7 @@ public class SignupRequest {
                 .userPw(userPw)
                 .userNm(userNm)
                 .userPhoneNo(userPhoneNo)
+                .userGender(userGender)
                 .build();
     }
 }

@@ -1,6 +1,7 @@
 package user.model;
 
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -11,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
+@SuperBuilder
 @Builder
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER_INFO")
