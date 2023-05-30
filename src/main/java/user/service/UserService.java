@@ -173,7 +173,7 @@ public class UserService implements UserDetailsService {
 
         Claims claim = getClaims(request);
         String userId = claim.getSubject();
-        User userEntity = userRepository.findByUserId(userId).get();
+        User userEntity = userRepository.getMyInfo(userId).get();
         resultMap.put("user", userEntity);
 
         response = Response.builder()

@@ -9,15 +9,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
-import user.model.QUser;
-import user.model.QUserInfo;
-import user.model.QUserProfileImage;
-import user.model.User;
+import user.model.*;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class UserRepositoryQImpl implements UserRepositoryQ {
@@ -55,5 +54,30 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
                 .fetchCount();
 
         return new PageImpl<>(users, pageable, count);
+    }
+
+    @Override
+    public Optional<User> getMyInfo(String userId) {
+        JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
+
+        QUser user = QUser.user;
+        QUserInfo userInfo = QUserInfo.userInfo;
+        QUserProfileImage userProfileImage = QUserProfileImage.userProfileImage;
+
+        User userEntity = queryFactory
+                .selectFrom(user)
+                .leftJoin(user.userInfo, userInfo).fetchJoin()
+                .leftJoin(userInfo.userProfileImages, userProfileImage)
+                .where(user.userId.eq(userId))
+                .orderBy(userProfileImage.insertDt.desc())
+                .fetchFirst();
+
+        // userProfileImage가 없는 경우를 처리하기 위해 null 체크
+        if (userEntity != null && userEntity.getUserInfo() != null) {
+            UserProfileImage latestImage = userEntity.getUserInfo().getUserProfileImages().get(0);
+            userEntity.getUserInfo().setUserProfileImages(Collections.singletonList(latestImage));
+        }
+
+        return userEntity == null ? Optional.empty() : Optional.of(userEntity);
     }
 }
