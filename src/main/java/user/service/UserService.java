@@ -76,6 +76,7 @@ public class UserService implements UserDetailsService {
         }
         signupRequest.setUserPw(passwordEncoder.encode(signupRequest.getUserPw()));
         User userEntity = signupRequest.toEntity();
+        userEntity.setDeleteYn('N');
         //ROLE 설정
         userEntity.setRoles(Collections.singletonList(Auth.builder().authType("ROLE_USER").build()));
 
@@ -84,21 +85,26 @@ public class UserService implements UserDetailsService {
         UserInfo userInfo = UserInfo.builder()
                 .userCd(userEntity.getUserCd())
                 .userNickNm(userEntity.getUserNm())
+                .lookingForGender((userEntity.getUserGender().equals("M") ? "W" : "M"))
+                .deleteYn('N')
                 .build();
-        userInfo.setDeleteYn('N');
 
-        String userProfileImageCommon = "image/profile/common.png";
+        String profileImgUrlCommon = "image/profile/common.png";
         System.out.println("userGender : "+userEntity.getUserGender());
         if(userEntity.getUserGender().equals("M")){
-            userProfileImageCommon = "image/profile/man_common.png";
+            profileImgUrlCommon = "image/profile/man_common.png";
         }else if(userEntity.getUserGender().equals("W")){
-            userProfileImageCommon = "image/profile/woman_common.png";
+            profileImgUrlCommon = "image/profile/woman_common.png";
         }
 
-        userInfo.addUserProfileImage(UserProfileImage.builder()
+        UserProfileImage userProfileImageCommon =
+            UserProfileImage.builder()
                 .userCd(userEntity.getUserCd())
-                .profileImgUrl(userProfileImageCommon)
-                .build());
+                .profileImgUrl(profileImgUrlCommon)
+                .deleteYn('N')
+                .build();
+
+        userInfo.addUserProfileImage(userProfileImageCommon);
         userEntity.setUserInfo(userInfo);
 
         userRepository.save(userEntity);
@@ -138,6 +144,9 @@ public class UserService implements UserDetailsService {
         }
         if (updateUserInfo.getAboutMe() != null) {
             userInfo.setAboutMe(updateUserInfo.getAboutMe());
+        }
+        if (updateUserInfo.getLookingForGender() != null) {
+            userInfo.setLookingForGender(updateUserInfo.getLookingForGender());
         }
         if (updateUserInfo.getUserProfileImages().size() != 0) {
             for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){

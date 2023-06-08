@@ -8,12 +8,10 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Data
 @SuperBuilder
-@Builder
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER_INFO")
 public class UserInfo extends BaseEntity implements Serializable {
@@ -27,18 +25,22 @@ public class UserInfo extends BaseEntity implements Serializable {
     @Column(name = "ABOUT_ME", nullable = true)
     private String aboutMe;
 
+    @Column(name = "LOOKING_FOR_GENDER", nullable = true)
+    private String lookingForGender;
+
+    @Column(name = "USER_CHARACTER", nullable = true)
+    private String userCharacter;
+
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
     @JoinColumn(name = "USER_CD")
     private List<UserProfileImage> userProfileImages = new ArrayList<>();
 
     public void addUserProfileImage(UserProfileImage userProfileImage) {
         this.userProfileImages.add(userProfileImage);
-        //if (userProfileImage.getUserInfo() != this) {
-        //    userProfileImage.setUserInfo(this); // UserProfileImage와의 양방향 관계 설정
-        //}
     }
 
     public void setUserProfileImages(List<UserProfileImage> userProfileImages) {
         this.userProfileImages = userProfileImages;
     }
 }
+

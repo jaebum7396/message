@@ -2,6 +2,7 @@ package user.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
@@ -11,13 +12,13 @@ import javax.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
 
-@AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper=false)
+@AllArgsConstructor
 @Data
-@Builder
+@SuperBuilder
 @DynamicInsert
 @DynamicUpdate
+@EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER")
 public class User extends BaseEntity {
     @Id
