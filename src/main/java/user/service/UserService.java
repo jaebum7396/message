@@ -145,6 +145,9 @@ public class UserService implements UserDetailsService {
         if (updateUserInfo.getAboutMe() != null) {
             userInfo.setAboutMe(updateUserInfo.getAboutMe());
         }
+        if (updateUserInfo.getUserCharacter() != null) {
+            userInfo.setUserCharacter(updateUserInfo.getUserCharacter());
+        }
         if (updateUserInfo.getLookingForGender() != null) {
             userInfo.setLookingForGender(updateUserInfo.getLookingForGender());
         }
