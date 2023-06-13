@@ -73,10 +73,10 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
                 .fetchFirst();
 
         // userProfileImage가 없는 경우를 처리하기 위해 null 체크
-        if (userEntity != null && userEntity.getUserInfo() != null) {
-            UserProfileImage latestImage = userEntity.getUserInfo().getUserProfileImages().get(0);
-            userEntity.getUserInfo().setUserProfileImages(Collections.singletonList(latestImage));
-        }
+        //if (userEntity != null && userEntity.getUserInfo() != null) {
+        //    UserProfileImage latestImage = userEntity.getUserInfo().getUserProfileImages().get(0);
+        //    userEntity.getUserInfo().setUserProfileImages(Collections.singletonList(latestImage));
+        //}
 
         return userEntity == null ? Optional.empty() : Optional.of(userEntity);
     }
