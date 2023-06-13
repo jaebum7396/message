@@ -22,7 +22,7 @@ public class UserInfo extends BaseEntity implements Serializable {
     @Column(name = "USER_NICK_NM",nullable = true)
     private String userNickNm;
 
-    @Column(name = "ABOUT_ME", nullable = true)
+    @Column(name = "ABOUT_ME",length = 3000, nullable = true)
     private String aboutMe;
 
     @Column(name = "LOOKING_FOR_GENDER", nullable = true)
