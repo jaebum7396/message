@@ -72,6 +72,8 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
                 .orderBy(userProfileImage.insertDt.desc())
                 .fetchFirst();
 
+        System.out.println(userEntity.toString());
+
         // userProfileImage가 없는 경우를 처리하기 위해 null 체크
         //if (userEntity != null && userEntity.getUserInfo() != null) {
         //    UserProfileImage latestImage = userEntity.getUserInfo().getUserProfileImages().get(0);
