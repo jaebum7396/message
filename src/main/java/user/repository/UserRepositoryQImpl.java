@@ -67,7 +67,7 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
         User userEntity = queryFactory
                 .selectFrom(user)
                 .leftJoin(user.userInfo, userInfo).fetchJoin()
-                .leftJoin(userInfo.userProfileImages, userProfileImage)
+                .leftJoin(userInfo.userProfileImages, userProfileImage).fetchJoin()
                 .where(user.userId.eq(userId))
                 .orderBy(userProfileImage.insertDt.desc())
                 .limit(1)
