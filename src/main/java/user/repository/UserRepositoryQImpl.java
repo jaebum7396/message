@@ -69,6 +69,7 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
                 .leftJoin(user.userInfo, userInfo).fetchJoin()
                 .leftJoin(userInfo.userProfileImages, userProfileImage).fetchJoin()
                 .where(user.userId.eq(userId))
+                .where(userProfileImage.mainYn.eq("Y"))
                 .orderBy(userProfileImage.insertDt.desc())
                 .limit(1)
                 .fetchFirst();
