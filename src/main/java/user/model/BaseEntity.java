@@ -48,8 +48,8 @@ public abstract class BaseEntity {
     @Column(name = "UPDATE_USER_CD")
     private Long updateUserCd;
 
-    @Column(name = "DELETE_YN", length = 1, columnDefinition = "CHAR(1) DEFAULT 'N'")
-    protected char deleteYn;
+    @Column(name = "DELETE_YN")
+    private String deleteYn;
 
     @Column(name = "DELETE_DT")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Seoul")

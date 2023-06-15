@@ -28,7 +28,6 @@ public class SignupRequest {
                 .userPw(userPw)
                 .userNm(userNm)
                 .userPhoneNo(userPhoneNo)
-                .userGender(userGender)
                 .build();
     }
 }

@@ -30,4 +30,7 @@ public class UserProfileImage extends BaseEntity implements Serializable {
 
     @Column(name = "MAIN_YN", nullable = true)
     private String mainYn;
+
+    @Column(name = "DEFAULT_YN", nullable = true)
+    private String defaultYn;
 }

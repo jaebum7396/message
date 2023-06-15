@@ -76,7 +76,7 @@ public class UserService implements UserDetailsService {
         }
         signupRequest.setUserPw(passwordEncoder.encode(signupRequest.getUserPw()));
         User userEntity = signupRequest.toEntity();
-        userEntity.setDeleteYn('N');
+        userEntity.setDeleteYn("N");
         //ROLE 설정
         userEntity.setRoles(Collections.singletonList(Auth.builder().authType("ROLE_USER").build()));
 
@@ -85,15 +85,16 @@ public class UserService implements UserDetailsService {
         UserInfo userInfo = UserInfo.builder()
                 .userCd(userEntity.getUserCd())
                 .userNickNm(userEntity.getUserNm())
-                .lookingForGender((userEntity.getUserGender().equals("M") ? "W" : "M"))
-                .deleteYn('N')
+                .userGender(signupRequest.getUserGender())
+                .lookingForGender((signupRequest.getUserGender().equals("남자") ? "여자" : "남자"))
+                .deleteYn("N")
                 .build();
 
         String profileImgUrlCommon = "image/profile/common.png";
-        System.out.println("userGender : "+userEntity.getUserGender());
-        if(userEntity.getUserGender().equals("M")){
+        System.out.println("userGender : "+signupRequest.getUserGender());
+        if(signupRequest.getUserGender().equals("남자")){
             profileImgUrlCommon = "image/profile/man_common.png";
-        }else if(userEntity.getUserGender().equals("W")){
+        }else if(signupRequest.getUserGender().equals("여자")){
             profileImgUrlCommon = "image/profile/woman_common.png";
         }
 
@@ -101,7 +102,9 @@ public class UserService implements UserDetailsService {
             UserProfileImage.builder()
                 .userCd(userEntity.getUserCd())
                 .profileImgUrl(profileImgUrlCommon)
-                .deleteYn('N')
+                .mainYn("Y")
+                .defaultYn("Y")
+                .deleteYn("N")
                 .build();
 
         userInfo.addUserProfileImage(userProfileImageCommon);
@@ -152,11 +155,16 @@ public class UserService implements UserDetailsService {
             userInfo.setLookingForGender(updateUserInfo.getLookingForGender());
         }
         if (updateUserInfo.getUserProfileImages().size() != 0) {
+            for(UserProfileImage upi: userInfo.getUserProfileImages()){
+                upi.setMainYn("N");
+            }
             for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
                 //upi.setUserInfo(userInfo);
                 //userProfileImageRepository.save(upi);
-                System.out.println(upi);
                 upi.setUserCd(userCd);
+                upi.setDeleteYn("N");
+                upi.setDefaultYn("N");
+                upi.setMainYn("Y");
                 userInfo.addUserProfileImage(upi);
             }
         }

@@ -60,9 +60,6 @@ public class User extends BaseEntity {
     @Column(name = "USER_PHONE_NUMBER",nullable = false)
     private String userPhoneNo;
 
-    @Column(name = "USER_GENDER",nullable = true)
-    private String userGender;
-
     @Column(name = "USER_BIRTH",nullable = true)
     private String userBirth;
 }

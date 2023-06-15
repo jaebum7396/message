@@ -15,8 +15,7 @@ import java.util.List;
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "USER_INFO")
 public class UserInfo extends BaseEntity implements Serializable {
-    @Id
-    @Column(name = "USER_CD")
+    @Id @Column(name = "USER_CD")
     private String userCd;
 
     @Column(name = "USER_NICK_NM",nullable = true)
@@ -24,6 +23,9 @@ public class UserInfo extends BaseEntity implements Serializable {
 
     @Column(name = "ABOUT_ME",length = 3000, nullable = true)
     private String aboutMe;
+
+    @Column(name = "USER_GENDER",nullable = true)
+    private String userGender;
 
     @Column(name = "LOOKING_FOR_GENDER", nullable = true)
     private String lookingForGender;
