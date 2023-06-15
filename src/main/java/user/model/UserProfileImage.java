@@ -27,4 +27,7 @@ public class UserProfileImage extends BaseEntity implements Serializable {
 
     @Column(name = "PROFILE_IMG_URL", nullable = true)
     private String profileImgUrl;
+
+    @Column(name = "MAIN_YN", nullable = true)
+    private String mainYn;
 }
