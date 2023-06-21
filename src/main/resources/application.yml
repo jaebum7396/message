@@ -54,10 +54,10 @@ logging:
     root: warn
     org:
       hibernate:
-        SQL: debug
+        SQL: warn
         type:
           descriptor:
-            sql: trace
+            sql: warn
 
 #SECRET KEY
 jwt:

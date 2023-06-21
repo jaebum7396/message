@@ -22,10 +22,9 @@ public class Auth extends BaseEntity {
     @Column(name = "AUTH_TYPE")
     private String authType;
 
-    @JoinColumn(name = "USER_CD")
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JsonIgnore
+    @JoinColumn(name = "USER_CD") @ManyToOne(fetch = FetchType.LAZY) @JsonIgnore
     private User userEntity;
+
     public void setUser(User userEntity) {
         this.userEntity = userEntity;
     }

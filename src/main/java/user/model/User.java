@@ -10,7 +10,9 @@ import org.hibernate.annotations.GenericGenerator;
 
 import javax.persistence.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @NoArgsConstructor
 @AllArgsConstructor
@@ -31,12 +33,7 @@ public class User extends BaseEntity {
     private UserInfo userInfo;
 
     @OneToMany(mappedBy = "userEntity", fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
-    private List<Auth> roles = new ArrayList<>();
-
-    public void setRoles(List<Auth> roles) {
-        this.roles = new ArrayList<>(roles);
-        roles.forEach(o -> o.setUser(this));
-    }
+    private Set<Auth> roles = new HashSet<>();
 
     @Column(name = "DOMAIN_CD") @ColumnDefault("1")
     private String domainCd;
@@ -62,4 +59,9 @@ public class User extends BaseEntity {
 
     @Column(name = "USER_BIRTH",nullable = true)
     private String userBirth;
+
+    public void setRoles(Set<Auth> roles) {
+        this.roles = new HashSet<>(roles);
+        //roles.forEach(o -> o.setUser(this));
+    }
 }

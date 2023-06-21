@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -78,7 +79,9 @@ public class UserService implements UserDetailsService {
         User userEntity = signupRequest.toEntity();
         userEntity.setDeleteYn("N");
         //ROLE 설정
-        userEntity.setRoles(Collections.singletonList(Auth.builder().authType("ROLE_USER").build()));
+        Set<Auth> roles = new HashSet<>();
+        roles.add(Auth.builder().authType("ROLE_USER").build());
+        userEntity.setRoles(roles);
 
         userRepository.save(userEntity);
 
@@ -226,5 +229,45 @@ public class UserService implements UserDetailsService {
                 .message("요청 성공")
                 .result(resultMap).build();
         return ResponseEntity.ok().body(response);
+    }
+
+    public HashMap<String, Object> userGrid(HttpServletRequest request, HashMap<String, Object> mapParam) {
+        Claims claim = getClaims(request);
+        String userCd = claim.get("userCd", String.class);
+
+        Response response;
+        HashMap<String, Object> resultMap = new HashMap<String, Object>();
+        HashMap<String, Object> dataMap = new HashMap<String, Object>();
+        HashMap<String, Object> paginationMap = new HashMap<String, Object>();
+        List<User> userArr = new ArrayList<User>();
+
+        int page = mapParam.get("page").toString().isEmpty() ? 0 : Integer.parseInt(mapParam.get("page").toString());
+        int perPage = mapParam.get("perPage").toString().isEmpty() ? 10 : Integer.parseInt(mapParam.get("perPage").toString());
+        int offset = (page-1) * perPage;
+
+        System.out.println("page : "+ page + " ,perPage : " + perPage+ " ,offset : " + offset);
+        Pageable pageable = PageRequest.of(page-1, perPage);
+        mapParam.put("offset", offset);
+        Page<User> usersPage = userRepository.userGrid(mapParam, pageable);
+
+        paginationMap.put("page", page);
+        paginationMap.put("totalCount", usersPage.getTotalElements());
+        System.out.println("usersPage.getTotalElements() : " + usersPage.getTotalElements());
+
+        userArr = usersPage.getContent();
+
+        mapParam.put("offset", offset);
+        mapParam.put("delYn", 'N');
+
+        resultMap.put("result", "OK");
+        resultMap.put("result", true);
+
+        dataMap.put("contents", userArr);
+        dataMap.put("pagination", paginationMap);
+        resultMap.put("data", dataMap);
+
+        System.out.println("resultMap : " + resultMap.toString());
+
+        return resultMap;
     }
 }

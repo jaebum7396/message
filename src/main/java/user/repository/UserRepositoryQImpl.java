@@ -7,6 +7,7 @@ import com.querydsl.jpa.JPQLQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import user.model.*;
@@ -15,6 +16,7 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +25,35 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    @Override
+    public Optional<User> getMyInfo(String userId) {
+        JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
+
+        QUser user = QUser.user;
+        QUserInfo userInfo = QUserInfo.userInfo;
+        QUserProfileImage userProfileImage = QUserProfileImage.userProfileImage;
+
+        User userEntity = queryFactory
+                .selectFrom(user)
+                .leftJoin(user.userInfo, userInfo).fetchJoin()
+                .leftJoin(userInfo.userProfileImages, userProfileImage).fetchJoin()
+                .where(user.userId.eq(userId))
+                //.where(userProfileImage.mainYn.eq("Y"))
+                .orderBy(userProfileImage.mainYn.desc(), userProfileImage.insertDt.desc())
+                //.limit(1)
+                .fetchFirst();
+
+        //System.out.println(userEntity.toString());
+
+        // userProfileImage가 없는 경우를 처리하기 위해 null 체크
+        //if (userEntity != null && userEntity.getUserInfo() != null) {
+        //    UserProfileImage latestImage = userEntity.getUserInfo().getUserProfileImages().get(0);
+        //    userEntity.getUserInfo().setUserProfileImages(Collections.singletonList(latestImage));
+        //}
+
+        return userEntity == null ? Optional.empty() : Optional.of(userEntity);
+    }
 
     @Override
     public Page<User> findUsersWithPageable(String queryString, Pageable pageable) {
@@ -57,31 +88,39 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
     }
 
     @Override
-    public Optional<User> getMyInfo(String userId) {
+    public Page<User> userGrid(HashMap<String, Object> mapParam, Pageable pageable) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
         QUser user = QUser.user;
+        QAuth auth = QAuth.auth;
         QUserInfo userInfo = QUserInfo.userInfo;
         QUserProfileImage userProfileImage = QUserProfileImage.userProfileImage;
 
-        User userEntity = queryFactory
+        /*String userId = mapParam.get("userId").toString();
+        String userNm = mapParam.get("userNm").toString();
+        String userPhoneNo = mapParam.get("userPhoneNo").toString();
+        String userNickNm = mapParam.get("userNickNm").toString();*/
+
+        JPQLQuery<User> query = queryFactory
                 .selectFrom(user)
-                .leftJoin(user.userInfo, userInfo).fetchJoin()
+                .leftJoin(user.roles, auth).fetchJoin()
+                .join(user.userInfo, userInfo).fetchJoin()
                 .leftJoin(userInfo.userProfileImages, userProfileImage).fetchJoin()
-                .where(user.userId.eq(userId))
-                //.where(userProfileImage.mainYn.eq("Y"))
-                .orderBy(userProfileImage.mainYn.desc(), userProfileImage.insertDt.desc())
-                //.limit(1)
-                .fetchFirst();
+                // 수정된 코드
+                /*.where(user.userId.isNull().or(user.userId.eq(userId))
+                        .or(user.userNm.isNull().or(user.userNm.eq(userNm)))
+                        .or(user.userPhoneNo.isNull().or(user.userPhoneNo.eq(userPhoneNo)))
+                        .or(userInfo.userNickNm.isNull().or(userInfo.userNickNm.eq(userNickNm))))*/
+                .orderBy(user.userCd.asc(), user.userInfo.userNickNm.asc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize());
 
-        //System.out.println(userEntity.toString());
+        List<User> users = query.fetch();
+        long count = query.fetchCount();
 
-        // userProfileImage가 없는 경우를 처리하기 위해 null 체크
-        //if (userEntity != null && userEntity.getUserInfo() != null) {
-        //    UserProfileImage latestImage = userEntity.getUserInfo().getUserProfileImages().get(0);
-        //    userEntity.getUserInfo().setUserProfileImages(Collections.singletonList(latestImage));
-        //}
+        System.out.println("users.size : "+users.size()+" pageable : "+pageable.toString()+" ,count : " + count);
+        Page<User> page = new PageImpl<>(users, pageable, count);
 
-        return userEntity == null ? Optional.empty() : Optional.of(userEntity);
+        return page;
     }
 }

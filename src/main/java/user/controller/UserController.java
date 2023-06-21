@@ -19,6 +19,7 @@ import user.service.AuthService;
 import user.service.UserService;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
 
 @Slf4j
 @Api(tags = "UserController")
@@ -55,5 +56,11 @@ public class UserController {
     @Operation(summary="유저 조회", description="유저 ID 유저닉네임 유저네임 유저핸드폰번호를 통해 유저정보를 조회한다")
     public ResponseEntity getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
         return userService.getUsersWithPageable(request, queryString, page);
+    }
+
+    @GetMapping(value = "/user/grid")
+    @Operation(summary="유저 그리드", description="유저 그리드")
+    public HashMap<String, Object> userGrid(HttpServletRequest request, @RequestParam HashMap<String, Object> mapParam) {
+        return userService.userGrid(request, mapParam);
     }
 }
