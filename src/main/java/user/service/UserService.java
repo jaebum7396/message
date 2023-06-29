@@ -164,7 +164,7 @@ public class UserService implements UserDetailsService {
                     System.out.println("삭제할 이미지 객체 : "+upi.toString());
                     //upi.setUserInfo(userInfo);
                     //userProfileImageRepository.save(upi);
-                    for(UserProfileImage upi2 : updateUserInfo.getUserProfileImages()){
+                    for(UserProfileImage upi2 : userInfo.getUserProfileImages()){
                         System.out.println("삭제할 이미지 객체 : "+upi.getUserProfileImageCd()+" / "+upi2.getUserProfileImageCd());
                         if(upi2.getUserProfileImageCd().equals(upi.getUserProfileImageCd())){
                             upi2.setDeleteYn("Y");
