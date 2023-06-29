@@ -158,17 +158,28 @@ public class UserService implements UserDetailsService {
             userInfo.setLookingForGender(updateUserInfo.getLookingForGender());
         }
         if (updateUserInfo.getUserProfileImages().size() != 0) {
-            for(UserProfileImage upi: userInfo.getUserProfileImages()){
-                upi.setMainYn("N");
-            }
-            for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
-                //upi.setUserInfo(userInfo);
-                //userProfileImageRepository.save(upi);
-                upi.setUserCd(userCd);
-                upi.setDeleteYn("N");
-                upi.setDefaultYn("N");
-                upi.setMainYn("Y");
-                userInfo.addUserProfileImage(upi);
+            if("Y".equals(updateUserInfo.getUserProfileImages().get(0).getDeleteYn())){
+                for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
+                    //upi.setUserInfo(userInfo);
+                    //userProfileImageRepository.save(upi);
+                    upi.setUserCd(userCd);
+                    upi.setDeleteYn("Y");
+                    upi.setDefaultYn("N");
+                    upi.setMainYn("N");
+                }
+            }else{
+                for(UserProfileImage upi: userInfo.getUserProfileImages()){
+                    upi.setMainYn("N");
+                }
+                for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
+                    //upi.setUserInfo(userInfo);
+                    //userProfileImageRepository.save(upi);
+                    upi.setUserCd(userCd);
+                    upi.setDeleteYn("N");
+                    upi.setDefaultYn("N");
+                    upi.setMainYn("Y");
+                    userInfo.addUserProfileImage(upi);
+                }
             }
         }
         userInfo = userInfoRepository.save(userInfo);
