@@ -162,10 +162,13 @@ public class UserService implements UserDetailsService {
                 for(UserProfileImage upi : updateUserInfo.getUserProfileImages()){
                     //upi.setUserInfo(userInfo);
                     //userProfileImageRepository.save(upi);
-                    upi.setUserCd(userCd);
-                    upi.setDeleteYn("Y");
-                    upi.setDefaultYn("N");
-                    upi.setMainYn("N");
+                    for(UserProfileImage upi2 : updateUserInfo.getUserProfileImages()){
+                        if(upi2.getUserProfileImageCd().equals(upi.getUserProfileImageCd())){
+                            upi2.setDeleteYn("Y");
+                            upi2.setDefaultYn("N");
+                            upi2.setMainYn("N");
+                        }
+                    }
                 }
             }else{
                 for(UserProfileImage upi: userInfo.getUserProfileImages()){
