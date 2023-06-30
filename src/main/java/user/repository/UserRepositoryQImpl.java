@@ -1,5 +1,7 @@
 package user.repository;
 
+import user.model.*;
+
 import com.querydsl.core.types.SubQueryExpression;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.JPAExpressions;
@@ -7,15 +9,12 @@ import com.querydsl.jpa.JPQLQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
-import user.model.*;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -57,9 +56,10 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
 
     @Override
     public Page<User> findUsersWithPageable(String queryString, Pageable pageable) {
+        System.out.println("UserRepositoryQImpl.findUsersWithPageable");
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
-        QUser user = QUser.user;
+        QUser user = new QUser("QUser");
         QUserInfo userInfo = QUserInfo.userInfo;
         QUserProfileImage userProfileImage = QUserProfileImage.userProfileImage;
 
@@ -85,9 +85,12 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
         BooleanExpression hasUserProfileImage = userProfileImage.insertDt.eq(maxInsertDTQuery);
         BooleanExpression userProfileImageIsNull = user.userInfo.isNull().or(userInfo.userProfileImages.isEmpty());
 
-        query.where(hasUserProfileImage.or(userProfileImageIsNull));
-        List<User> users = query.fetch();
+        query.where(
+            hasUserProfileImage
+            .or(userProfileImageIsNull)
+        );
 
+        List<User> users = query.fetch();
         long count = query.fetchCount();
 
         return new PageImpl<>(users, pageable, count);

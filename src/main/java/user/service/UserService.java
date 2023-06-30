@@ -71,7 +71,6 @@ public class UserService implements UserDetailsService {
 
     public Map<String, Object> signup(SignupRequest signupRequest) throws Exception {
         System.out.println("UserService.signup.params : " + signupRequest.toString());
-        Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         //중복 아이디 검사
         if (duplicateIdValidate(signupRequest)) {
@@ -131,7 +130,6 @@ public class UserService implements UserDetailsService {
 
     public Map<String, Object> saveUserInfo(HttpServletRequest request, UserInfo updateUserInfo){
         System.out.println("UserService.saveUserInfo.params : " + updateUserInfo.toString());
-        Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 
         Claims claim = getClaims(request);
@@ -231,7 +229,6 @@ public class UserService implements UserDetailsService {
         Claims claim = getClaims(request);
         String userCd = claim.get("userCd", String.class);
 
-        Response response;
         HashMap<String, Object> resultMap = new HashMap<String, Object>();
         HashMap<String, Object> dataMap = new HashMap<String, Object>();
         HashMap<String, Object> paginationMap = new HashMap<String, Object>();
@@ -261,8 +258,6 @@ public class UserService implements UserDetailsService {
         dataMap.put("contents", userArr);
         dataMap.put("pagination", paginationMap);
         resultMap.put("data", dataMap);
-
-        System.out.println("resultMap : " + resultMap.toString());
 
         return resultMap;
     }
