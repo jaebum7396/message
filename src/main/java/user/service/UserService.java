@@ -51,7 +51,7 @@ public class UserService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String name) throws UsernameNotFoundException {
         User userEntity = userRepository.findByUserNm(name).orElseThrow(
-                () -> new UsernameNotFoundException("Invalid authentication!")
+            () -> new UsernameNotFoundException("Invalid authentication!")
         );
         return new CustomUserDetails(userEntity);
     }
@@ -69,7 +69,7 @@ public class UserService implements UserDetailsService {
         }
     }
 
-    public ResponseEntity signup(SignupRequest signupRequest) throws Exception {
+    public Map<String, Object> signup(SignupRequest signupRequest) throws Exception {
         System.out.println("UserService.signup.params : " + signupRequest.toString());
         Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
@@ -126,15 +126,10 @@ public class UserService implements UserDetailsService {
         resultMap.put("userNm", userEntity.getUserNm());
         resultMap.put("roles", userEntity.getRoles());
 
-        response = Response.builder()
-                .statusCode(HttpStatus.OK.value())
-                .status(HttpStatus.OK)
-                .message("가입 성공")
-                .result(resultMap).build();
-        return ResponseEntity.ok().body(response);
+        return resultMap;
     }
 
-    public ResponseEntity saveUserInfo(HttpServletRequest request, UserInfo updateUserInfo){
+    public Map<String, Object> saveUserInfo(HttpServletRequest request, UserInfo updateUserInfo){
         System.out.println("UserService.saveUserInfo.params : " + updateUserInfo.toString());
         Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
@@ -200,17 +195,10 @@ public class UserService implements UserDetailsService {
         redisTemplate.convertAndSend("updateUserInfo", userInfo);
         resultMap.put("userInfo", userInfo);
 
-        response = Response.builder()
-                .statusCode(HttpStatus.OK.value())
-                .status(HttpStatus.OK)
-                .message("유저 정보 업데이트 성공")
-                .result(resultMap).build();
-
-        return ResponseEntity.ok().body(response);
+        return resultMap;
     }
 
-    public ResponseEntity getMyInfo(HttpServletRequest request){
-        Response response;
+    public Map<String, Object> getMyInfo(HttpServletRequest request){
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 
         Claims claim = getClaims(request);
@@ -218,13 +206,7 @@ public class UserService implements UserDetailsService {
         User userEntity = userRepository.getMyInfo(userId).get();
         resultMap.put("user", userEntity);
 
-        response = Response.builder()
-            .statusCode(HttpStatus.OK.value())
-            .status(HttpStatus.OK)
-            .message("유저 정보 요청 성공")
-            .result(resultMap).build();
-
-        return ResponseEntity.ok().body(response);
+        return resultMap;
     }
 
     public Map<String, Object> getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {

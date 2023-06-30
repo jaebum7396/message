@@ -5,19 +5,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
+import user.model.Response;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Slf4j
 public class MyInterceptor implements HandlerInterceptor{
 	private Logger logger = LoggerFactory.getLogger(MyInterceptor.class);
 	private String GATEWAY_URI;
 	private String ACTIVE_PROFILE;
+
 	public MyInterceptor(String GATEWAY_URI, String ACTIVE_PROFILE) {
 		this.GATEWAY_URI = GATEWAY_URI;
 		this.ACTIVE_PROFILE = ACTIVE_PROFILE;

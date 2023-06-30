@@ -11,10 +11,6 @@ import java.util.Map;
 @Builder
 @AllArgsConstructor
 public class Response {
-    @ApiModelProperty(value="200", example="200")
-    int statusCode;
-    @ApiModelProperty(value="OK", example="OK")
-    HttpStatus status;
     @ApiModelProperty(value="성공하였습니다", example="성공")
     String message;
     @ApiModelProperty(value="{model}", example="model")

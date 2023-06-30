@@ -19,6 +19,7 @@ import user.service.UserService;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @Api(tags = "UserController")
@@ -29,37 +30,37 @@ public class UserController {
     @Autowired UserService userService;
     @Autowired AuthService authService;
 
+    public ResponseEntity<Response> okResponsePackaging(Map<String, Object> result) {
+        Response response = Response.builder()
+                .message("요청 성공")
+                .result(result).build();
+        return ResponseEntity.ok().body(response);
+    }
+
     @PostMapping(value = "/userInfo")
     @Operation(summary="회원 정보 갱신 API", description="회원 정보 갱신 API")
     public ResponseEntity UserInfo(HttpServletRequest request, @RequestBody UserInfo updateUserInfo) throws Exception {
-        System.out.println("UserController.userInfo.param : " + updateUserInfo);
-        return userService.saveUserInfo(request, updateUserInfo);
+        return okResponsePackaging(userService.saveUserInfo(request, updateUserInfo));
     }
     @PostMapping(value = "/signup")
     @Operation(summary="회원가입", description="회원 가입 API")
     public ResponseEntity signup(@RequestBody SignupRequest signupRequest) throws Exception {
-        return userService.signup(signupRequest);
+        return okResponsePackaging(userService.signup(signupRequest));
     }
     @PostMapping(value = "/login")
     @Operation(summary="로그인", description="가입한 회원을 로그인 하는 API")
     public ResponseEntity login(@RequestBody LoginRequest loginRequest) throws Exception {
-        return authService.login(loginRequest);
+        return okResponsePackaging(authService.login(loginRequest));
     }
     @GetMapping(value = "/me")
     @Operation(summary="내 정보 보기", description="가입한 회원 정보를 가져오는 API(jwt 인증 요구)")
     public ResponseEntity getMyInfo(HttpServletRequest request) {
-        return userService.getMyInfo(request);
+        return okResponsePackaging(userService.getMyInfo(request));
     }
     @GetMapping(value = "/users")
     @Operation(summary="유저 조회", description="유저 ID 유저닉네임 유저네임 유저핸드폰번호를 통해 유저정보를 조회한다")
     public ResponseEntity<Response> getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
-        Response response;
-        response = Response.builder()
-                .statusCode(HttpStatus.OK.value())
-                .status(HttpStatus.OK)
-                .message("요청 성공")
-                .result(userService.getUsersWithPageable(request, queryString, page)).build();
-        return ResponseEntity.ok().body(response);
+        return okResponsePackaging(userService.getUsersWithPageable(request, queryString, page));
     }
     @GetMapping(value = "/user/grid")
     @Operation(summary="유저 그리드", description="유저 그리드")

@@ -24,8 +24,6 @@ public class ErrorResponseAdvice {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 		e.printStackTrace();
         responseResult = Response.builder()
-                .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .message("서버쪽 오류가 발생했습니다. 관리자에게 문의하십시오")
                 .result(resultMap).build();
         return ResponseEntity.internalServerError().body(responseResult);
@@ -37,11 +35,9 @@ public class ErrorResponseAdvice {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 		e.printStackTrace();
         responseResult = Response.builder()
-                .statusCode(HttpStatus.UNAUTHORIZED.value())
-                .status(HttpStatus.UNAUTHORIZED)
                 .message("잘못된 접근입니다.")
                 .result(resultMap).build();
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED.value()).body(responseResult);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseResult);
 	}
 
 	@ExceptionHandler(ExpiredJwtException.class)
@@ -51,10 +47,8 @@ public class ErrorResponseAdvice {
 		Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 		e.printStackTrace();
 		responseResult = Response.builder()
-				.statusCode(HttpStatus.UNAUTHORIZED.value())
-				.status(HttpStatus.UNAUTHORIZED)
 				.message("로그인 시간이 만료되었습니다.")
 				.result(resultMap).build();
-		return ResponseEntity.status(HttpStatus.UNAUTHORIZED.value()).body(responseResult);
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseResult);
 	}
 }

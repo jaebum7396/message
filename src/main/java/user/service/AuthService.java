@@ -33,47 +33,23 @@ public class AuthService implements UserDetailsService {
     @Autowired
     JwtProvider jwtProvider;
     private final AES128Util aes128Util = new AES128Util();
-    public ResponseEntity login(LoginRequest loginRequest) throws Exception {
-        Response responseResult;
+    public Map<String, Object> login(LoginRequest loginRequest) throws Exception {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        try{
-            User userEntity = authRepository.findByUserId(loginRequest.getUserId()).orElseThrow(() ->
-                new BadCredentialsException(loginRequest.getUserId()+": 아이디가 존재하지 않습니다."));
-            if (!passwordEncoder.matches(loginRequest.getUserPw(), userEntity.getUserPw())) {
-                throw new BadCredentialsException("잘못된 비밀번호입니다.");
-            }
-            resultMap.put("userId", userEntity.getUserId());
-            resultMap.put("name", userEntity.getUserNm());
-            resultMap.put("roles", userEntity.getRoles());
-            resultMap.put("token", jwtProvider.createToken(
-                    userEntity.getDomainCd()
-                    , userEntity.getUserCd()
-                    , userEntity.getUserId()
-                    , userEntity.getRoles()));
-
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.OK.value())
-                    .status(HttpStatus.OK)
-                    .message("로그인 성공")
-                    .result(resultMap).build();
-            return ResponseEntity.ok().body(responseResult);
-        }catch(BadCredentialsException be){
-            System.out.println(be.getMessage());
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.BAD_REQUEST.value())
-                    .status(HttpStatus.BAD_REQUEST)
-                    .message(be.getMessage())
-                    .result(resultMap).build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(responseResult);
-        }catch(Exception e){
-            e.printStackTrace();
-            responseResult = Response.builder()
-                    .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .message("서버쪽 오류가 발생했습니다. 관리자에게 문의하십시오")
-                    .result(resultMap).build();
-            return ResponseEntity.internalServerError().body(responseResult);
+        User userEntity = authRepository.findByUserId(loginRequest.getUserId()).orElseThrow(() ->
+            new BadCredentialsException(loginRequest.getUserId()+": 아이디가 존재하지 않습니다."));
+        if (!passwordEncoder.matches(loginRequest.getUserPw(), userEntity.getUserPw())) {
+            throw new BadCredentialsException("잘못된 비밀번호입니다.");
         }
+        resultMap.put("userId", userEntity.getUserId());
+        resultMap.put("name", userEntity.getUserNm());
+        resultMap.put("roles", userEntity.getRoles());
+        resultMap.put("token", jwtProvider.createToken(
+                userEntity.getDomainCd()
+                , userEntity.getUserCd()
+                , userEntity.getUserId()
+                , userEntity.getRoles()));
+
+        return resultMap;
     }
     public boolean loginPasswordValidate(LoginRequest loginRequest, User userEntity) {
         boolean check = passwordEncoder.matches(loginRequest.getUserPw(), userEntity.getUserPw());
