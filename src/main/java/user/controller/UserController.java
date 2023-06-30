@@ -1,14 +1,13 @@
 package user.controller;
 
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import user.model.LoginRequest;
@@ -51,13 +50,17 @@ public class UserController {
     public ResponseEntity getMyInfo(HttpServletRequest request) {
         return userService.getMyInfo(request);
     }
-
     @GetMapping(value = "/users")
     @Operation(summary="유저 조회", description="유저 ID 유저닉네임 유저네임 유저핸드폰번호를 통해 유저정보를 조회한다")
-    public ResponseEntity getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
-        return userService.getUsersWithPageable(request, queryString, page);
+    public ResponseEntity<Response> getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
+        Response response;
+        response = Response.builder()
+                .statusCode(HttpStatus.OK.value())
+                .status(HttpStatus.OK)
+                .message("요청 성공")
+                .result(userService.getUsersWithPageable(request, queryString, page)).build();
+        return ResponseEntity.ok().body(response);
     }
-
     @GetMapping(value = "/user/grid")
     @Operation(summary="유저 그리드", description="유저 그리드")
     public HashMap<String, Object> userGrid(HttpServletRequest request, @RequestParam HashMap<String, Object> mapParam) {

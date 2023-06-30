@@ -73,16 +73,22 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
                         .or(userInfo.userNickNm.eq(queryString)))
                 .orderBy(user.userCd.asc(), user.userInfo.userNickNm.asc())
                 .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                ;
+                .limit(pageable.getPageSize());
 
-        List<User> users = query
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        SubQueryExpression<LocalDateTime> maxInsertDTQuery = JPAExpressions
+                .select(userProfileImage.insertDt.max())
+                .from(userInfo)
+                .join(userInfo.userProfileImages, userProfileImage)
+                .where(userProfileImage.deleteYn.eq("N"))
+                .where(userInfo.eq(user.userInfo));
 
-        long count = query
-                .fetchCount();
+        BooleanExpression hasUserProfileImage = userProfileImage.insertDt.eq(maxInsertDTQuery);
+        BooleanExpression userProfileImageIsNull = user.userInfo.isNull().or(userInfo.userProfileImages.isEmpty());
+
+        query.where(hasUserProfileImage.or(userProfileImageIsNull));
+        List<User> users = query.fetch();
+
+        long count = query.fetchCount();
 
         return new PageImpl<>(users, pageable, count);
     }

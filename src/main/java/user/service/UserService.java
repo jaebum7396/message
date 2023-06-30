@@ -64,6 +64,8 @@ public class UserService implements UserDetailsService {
             return claim;
         } catch (ExpiredJwtException e) {
             throw new ExpiredJwtException(null, null, "로그인 시간이 만료되었습니다.");
+        } catch (Exception e) {
+            throw new BadCredentialsException("인증 정보에 문제가 있어 세션을 종료합니다.");
         }
     }
 
@@ -225,7 +227,7 @@ public class UserService implements UserDetailsService {
         return ResponseEntity.ok().body(response);
     }
 
-    public ResponseEntity getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
+    public Map<String, Object> getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
         Response response;
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         HashMap<String, Object> paramMap = new HashMap<String, Object>();
@@ -240,12 +242,7 @@ public class UserService implements UserDetailsService {
         resultMap.put("userArr", userArr);
         resultMap.put("p_page", page.getPageNumber());
 
-        response = Response.builder()
-                .statusCode(HttpStatus.OK.value())
-                .status(HttpStatus.OK)
-                .message("요청 성공")
-                .result(resultMap).build();
-        return ResponseEntity.ok().body(response);
+        return resultMap;
     }
 
     public HashMap<String, Object> userGrid(HttpServletRequest request, HashMap<String, Object> mapParam) {
