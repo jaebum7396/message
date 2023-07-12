@@ -58,7 +58,7 @@ public class UserController {
         return okResponsePackaging(userService.getMyInfo(request));
     }
     @GetMapping(value = "/users")
-    @Operation(summary="유저 조회", description="유저 ID 유저닉네임 유저네임 유저핸드폰번호를 통해 유저정보를 조회한다")
+    @Operation(summary="유저 조회", description="유저 ID 유저닉네임 유저네임 유저 핸드폰 번호를 통해 유저정보를 조회한다")
     public ResponseEntity<Response> getUsersWithPageable(HttpServletRequest request, String queryString, Pageable page) {
         return okResponsePackaging(userService.getUsersWithPageable(request, queryString, page));
     }
