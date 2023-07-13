@@ -2,8 +2,8 @@ package user.repository;
 
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
-import user.model.RefreshToken;
+import user.model.Token;
 
 @Repository
-public interface RefreshTokenRepository extends CrudRepository<RefreshToken, String> {
+public interface TokenRepository extends CrudRepository<Token, String> {
 }

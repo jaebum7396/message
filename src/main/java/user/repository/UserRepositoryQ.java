@@ -10,5 +10,5 @@ import java.util.Optional;
 public interface UserRepositoryQ {
     Page<User> findUsersWithPageable(String query, Pageable pageable);
     Page<User> userGrid(HashMap<String, Object> mapParam, Pageable pageable);
-    Optional<User> getMyInfo(String userId);
+    Optional<User> getMyInfo(String userCd);
 }

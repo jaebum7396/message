@@ -16,10 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import user.model.*;
 import user.repository.AuthRepository;
-import user.repository.RefreshTokenRepository;
+import user.repository.TokenRepository;
 import user.utils.AES128Util;
 
 import javax.annotation.PostConstruct;
+import javax.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.*;
@@ -29,22 +30,23 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AuthService implements UserDetailsService {
     @Autowired AuthRepository authRepository;
-    @Autowired RefreshTokenRepository refreshTokenRepository;
+    @Autowired
+    TokenRepository tokenRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Value("${jwt.secret.key}") private String salt;
     private Key secretKey;
     // 만료시간
-    @Value("${token.access-expired-time}") private final long ACCESS_EXPIRED_TIME;
+    @Value("${token.access-expired-time}") private long ACCESS_EXPIRED_TIME;
     // 재발급 토큰 만료시간
-    @Value("${token.refresh-expired-time}") private final long REFRESH_EXPIRED_TIME;
+    @Value("${token.refresh-expired-time}") private long REFRESH_EXPIRED_TIME;
     private final AES128Util aes128Util = new AES128Util();
     @PostConstruct
     protected void init() {
         secretKey = Keys.hmacShaKeyFor(salt.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String createAccessToken(String domainCd, String userCd, String userId, Set<Auth> roles) {
-        Claims claims = Jwts.claims().setSubject(userId);
+    public String createAccessToken(String domainCd, String userCd, Set<Auth> roles) {
+        Claims claims = Jwts.claims().setSubject(userCd);
         claims.put("domainCd", domainCd);
         claims.put("userCd", userCd);
         //claims.put("roles", roles);
@@ -56,9 +58,10 @@ public class AuthService implements UserDetailsService {
                 .compact();
     }
 
-    public String createRefreshToken() {
+    public String createRefreshToken(String domainCd, String userCd) {
         Claims claims = Jwts.claims();
-        claims.put("value", UUID.randomUUID());
+        claims.put("domainCd", domainCd);
+        claims.put("userCd", userCd);
         return Jwts.builder()
                 .addClaims(claims)
                 .setExpiration(new Date(System.currentTimeMillis() + REFRESH_EXPIRED_TIME))
@@ -67,41 +70,53 @@ public class AuthService implements UserDetailsService {
                 .compact();
     }
 
-    public Map<String, Object> generateRefreshToken(LoginRequest loginRequest) {
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        User userEntity = authRepository.findByUserId(loginRequest.getUserId()).orElseThrow(() ->
-                new BadCredentialsException(loginRequest.getUserId()+" : 아이디가 존재하지 않습니다."));
-        if (!passwordEncoder.matches(loginRequest.getUserPw(), userEntity.getUserPw())) {
-            throw new BadCredentialsException("잘못된 비밀번호입니다.");
-        }
-        String userCd = userEntity.getUserCd();
-
-        RefreshToken refreshToken = new RefreshToken(UUID.randomUUID().toString(), userCd);
-        refreshTokenRepository.save(refreshToken);
-        resultMap.put("token", refreshToken);
-
-        return resultMap;
-    }
-
-    public Map<String, Object> login(LoginRequest loginRequest) throws Exception {
+    public Map<String, Object> generateToken(LoginRequest loginRequest){
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         User userEntity = authRepository.findByUserId(loginRequest.getUserId()).orElseThrow(() ->
             new BadCredentialsException(loginRequest.getUserId()+" : 아이디가 존재하지 않습니다."));
         if (!passwordEncoder.matches(loginRequest.getUserPw(), userEntity.getUserPw())) {
             throw new BadCredentialsException("잘못된 비밀번호입니다.");
         }
-        resultMap.put("userId", userEntity.getUserId());
-        resultMap.put("name", userEntity.getUserNm());
-        resultMap.put("roles", userEntity.getRoles());
-        resultMap.put("token", createAccessToken(
-            userEntity.getDomainCd()
-            , userEntity.getUserCd()
-            , userEntity.getUserId()
-            , userEntity.getRoles())
-        );
+        String domainCd = userEntity.getDomainCd();
+        String userCd = userEntity.getUserCd();
+        Set<Auth> roles = userEntity.getRoles();
 
+        String accessToken = createAccessToken(domainCd, userCd, roles);
+        String refreshToken = createRefreshToken(domainCd, userCd);
+        Token token = new Token(accessToken, refreshToken);
+        tokenRepository.save(token);
+
+        resultMap.put("token", accessToken);
         return resultMap;
     }
+
+    public Map<String, Object> refreshToken(HttpServletRequest request) {
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        request.getHeader("authorization");
+        Token token = tokenRepository.findById(request.getHeader("authorization")).orElseThrow(() ->
+            new BadCredentialsException("토큰이 존재하지 않습니다.")
+        );
+        String refreshToken = token.getRefreshToken();
+        Claims claim = Jwts.parserBuilder().setSigningKey(secretKey).build()
+                .parseClaimsJws(refreshToken).getBody();
+        User userEntity = authRepository.findByUserCd(claim.get("userCd").toString()).orElseThrow(() ->
+            new BadCredentialsException("유저가 존재하지 않습니다.")
+        );
+
+        String domainCd = userEntity.getDomainCd();
+        String userCd = userEntity.getUserCd();
+        Set<Auth> roles = userEntity.getRoles();
+
+        String accessToken = createAccessToken(domainCd, userCd, roles);
+        refreshToken = createRefreshToken(domainCd, userCd);
+        tokenRepository.delete(token);
+        token = new Token(accessToken, refreshToken);
+        tokenRepository.save(token);
+
+        resultMap.put("token", accessToken);
+        return resultMap;
+    }
+
     @Override
     public UserDetails loadUserByUsername(String userNm) throws UsernameNotFoundException {
         User userEntity = authRepository.findByUserNm(userNm).orElseThrow(

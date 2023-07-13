@@ -26,7 +26,7 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
     private EntityManager entityManager;
 
     @Override
-    public Optional<User> getMyInfo(String userId) {
+    public Optional<User> getMyInfo(String userCd) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
         QUser user = QUser.user;
@@ -37,7 +37,7 @@ public class UserRepositoryQImpl implements UserRepositoryQ {
                 .selectFrom(user)
                 .leftJoin(user.userInfo, userInfo).fetchJoin()
                 .leftJoin(userInfo.userProfileImages, userProfileImage).fetchJoin()
-                .where(user.userId.eq(userId))
+                .where(user.userCd.eq(userCd))
                 .where(userProfileImage.deleteYn.eq("N"))
                 .orderBy(userProfileImage.mainYn.desc(), userProfileImage.insertDt.desc())
                 //.limit(1)

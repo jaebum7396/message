@@ -50,9 +50,13 @@ public class UserController {
     @PostMapping(value = "/login")
     @Operation(summary="로그인", description="가입한 회원을 로그인 하는 API")
     public ResponseEntity login(@RequestBody LoginRequest loginRequest) throws Exception {
-        return okResponsePackaging(authService.login(loginRequest));
+        return okResponsePackaging(authService.generateToken(loginRequest));
     }
-
+    @PostMapping(value = "/login/refresh")
+    @Operation(summary="로그인갱신", description="로그인을 갱신 하는 API")
+    public ResponseEntity loginRefresh(HttpServletRequest request) throws Exception {
+        return okResponsePackaging(authService.refreshToken(request));
+    }
     @GetMapping(value = "/me")
     @Operation(summary="내 정보 보기", description="가입한 회원 정보를 가져오는 API(jwt 인증 요구)")
     public ResponseEntity getMyInfo(HttpServletRequest request) {

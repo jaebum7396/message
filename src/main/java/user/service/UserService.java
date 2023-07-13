@@ -200,8 +200,8 @@ public class UserService implements UserDetailsService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 
         Claims claim = getClaims(request);
-        String userId = claim.getSubject();
-        User userEntity = userRepository.getMyInfo(userId).get();
+        String userCd = claim.get("userCd", String.class);
+        User userEntity = userRepository.getMyInfo(userCd).get();
         resultMap.put("user", userEntity);
 
         return resultMap;
