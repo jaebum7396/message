@@ -5,7 +5,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
 
 @Data
-@RedisHash(value = "accessToken", timeToLive = 60)
+@RedisHash(value = "accessToken", timeToLive = 2629800000L)
 public class Token {
     @Id
     private String accessToken;
