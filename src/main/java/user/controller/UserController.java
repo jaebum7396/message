@@ -52,6 +52,7 @@ public class UserController {
     public ResponseEntity login(@RequestBody LoginRequest loginRequest) throws Exception {
         return okResponsePackaging(authService.login(loginRequest));
     }
+
     @GetMapping(value = "/me")
     @Operation(summary="내 정보 보기", description="가입한 회원 정보를 가져오는 API(jwt 인증 요구)")
     public ResponseEntity getMyInfo(HttpServletRequest request) {
