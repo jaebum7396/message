@@ -146,11 +146,14 @@ public class UserService implements UserDetailsService {
         if (updateUserInfo.getAboutMe() != null) {
             userInfo.setAboutMe(updateUserInfo.getAboutMe());
         }
+        if (updateUserInfo.getLookingForGender() != null) {
+            userInfo.setLookingForGender(updateUserInfo.getLookingForGender());
+        }
         if (updateUserInfo.getUserCharacter() != null) {
             userInfo.setUserCharacter(updateUserInfo.getUserCharacter());
         }
-        if (updateUserInfo.getLookingForGender() != null) {
-            userInfo.setLookingForGender(updateUserInfo.getLookingForGender());
+        if (updateUserInfo.getFcmToken() != null) {
+            userInfo.setFcmToken(updateUserInfo.getFcmToken());
         }
         if (updateUserInfo.getUserProfileImages().size() != 0) {
             if("Y".equals(updateUserInfo.getUserProfileImages().get(0).getDeleteYn())){
@@ -200,8 +203,8 @@ public class UserService implements UserDetailsService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
 
         Claims claim = getClaims(request);
-        String userCd = claim.get("userCd", String.class);
-        User userEntity = userRepository.getMyInfo(userCd).get();
+        String userId = claim.getSubject();
+        User userEntity = userRepository.getMyInfo(userId).get();
         resultMap.put("user", userEntity);
 
         return resultMap;
