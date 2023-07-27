@@ -21,7 +21,7 @@ public class UserInfo extends BaseEntity implements Serializable {
     @Column(name = "USER_NICK_NM",nullable = true)
     private String userNickNm;
 
-    @Column(name = "ABOUT_ME",length = 3000, nullable = true)
+    @Column(name = "ABOUT_ME", length = 3000, nullable = true)
     private String aboutMe;
 
     @Column(name = "USER_GENDER",nullable = true)
@@ -33,7 +33,7 @@ public class UserInfo extends BaseEntity implements Serializable {
     @Column(name = "USER_CHARACTER", nullable = true)
     private String userCharacter;
 
-    @Column(name = "FCM_TOKEN", nullable = true)
+    @Column(name = "FCM_TOKEN", length = 3000, nullable = true)
     private String fcmToken;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL) @Builder.Default
