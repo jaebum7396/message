@@ -22,19 +22,19 @@ public class SwaggerConfig {
     @Bean
     public Docket api() {
         return new Docket(DocumentationType.SWAGGER_2)
-                .select()
-                .apis(RequestHandlerSelectors.any())
-                .paths(PathSelectors.any())
-                .build()
-                .securityContexts(Arrays.asList(securityContext())) // 추가
-                .securitySchemes(Arrays.asList(apiKey())) // 추가
-                .consumes(getConsumeContentTypes())
-                .produces(getProduceContentTypes())
-                .apiInfo(apiInfo())
-                .globalResponses(HttpMethod.GET, getGlobalResponses())
-                .globalResponses(HttpMethod.POST, getGlobalResponses())
-                .globalResponses(HttpMethod.PUT, getGlobalResponses())
-                .globalResponses(HttpMethod.DELETE, getGlobalResponses());
+            .select()
+            .apis(RequestHandlerSelectors.any())
+            .paths(PathSelectors.any())
+            .build()
+            .securityContexts(Arrays.asList(securityContext())) // 추가
+            .securitySchemes(Arrays.asList(apiKey())) // 추가
+            .consumes(getConsumeContentTypes())
+            .produces(getProduceContentTypes())
+            .apiInfo(apiInfo())
+            .globalResponses(HttpMethod.GET, getGlobalResponses())
+            .globalResponses(HttpMethod.POST, getGlobalResponses())
+            .globalResponses(HttpMethod.PUT, getGlobalResponses())
+            .globalResponses(HttpMethod.DELETE, getGlobalResponses());
     }
     private List<Response> getGlobalResponses() {
         List<Response> globalResponses = new ArrayList<>();
@@ -59,11 +59,11 @@ public class SwaggerConfig {
 
     private ApiInfo apiInfo() {
         return new ApiInfoBuilder()
-                .title("MEMBER API DOCUMENTATION")
-                .description("MEMBER API 문서")
-                .version(version)
-                .contact(new Contact("주재범", "", "jaebum7396@naver.com"))
-                .build();
+            .title("MEMBER API DOCUMENTATION")
+            .description("MEMBER API 문서")
+            .version(version)
+            .contact(new Contact("주재범", "", "jaebum7396@naver.com"))
+            .build();
     }
 
     private SecurityContext securityContext() {
