@@ -10,10 +10,10 @@ eureka:
 
 spring:
   application:
-    name: user
+    name: trade
   profiles:
-    #active: local
-    active: deploy
+    active: local
+    #active: deploy
   redis:
     host: ${REDIS_URI}
     port: ${REDIS_PORT}

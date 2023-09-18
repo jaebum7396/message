@@ -87,9 +87,16 @@ dependencies {
 
 	//dateTime format 처리를 위한 종속성
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-hibernate5'
+
+	// stringUtils
+	implementation 'org.apache.commons:commons-lang3:3.0'
 
 	//test
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	//binance
+	implementation group: 'io.github.binance', name: 'binance-connector-java', version: '3.0.0rc3'
 }
 
 dependencyManagement {
