@@ -59,6 +59,15 @@ logging:
           descriptor:
             sql: warn
 
+binanace:
+  real:
+    api: ${BINANCE_REAL_API_KEY}
+    secret: ${BINANCE_REAL_SECRET_KEY}
+  testnet:
+    api: ${BINANCE_TESTNET_API_KEY}
+    secret: ${BINANCE_TESTNET_SECRET_KEY}
+
+
 #SECRET KEY
 jwt:
   secret:

@@ -22,6 +22,9 @@ public class MyInterceptor implements HandlerInterceptor{
 		this.ACTIVE_PROFILE = ACTIVE_PROFILE;
 	}
 
+	/**
+	 * <h3>요청이 들어올 때마다 실행되는 메서드입니다.</h3>
+	 */
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 		log.info("===============================================");
@@ -49,6 +52,9 @@ public class MyInterceptor implements HandlerInterceptor{
 		return HandlerInterceptor.super.preHandle(request, response, handler);
 	}
 
+	/**
+	 * <h3>요청이 끝날때 호출됩니다.</h3>
+	 */
 	@Override
 	public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
 		log.info("==================== END ======================");

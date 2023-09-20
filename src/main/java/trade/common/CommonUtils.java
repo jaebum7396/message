@@ -18,6 +18,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +32,9 @@ public class CommonUtils {
     @Value("${jwt.secret.key}")
     private String JWT_SECRET_KEY;
 
-    // 성공 응답을 포장하는 ResponseEntity를 생성합니다.
+    /**
+     * <h3>성공 응답을 포장하는 ResponseEntity를 생성합니다.</h3>
+     */
     public ResponseEntity<Response> okResponsePackaging(Map<String, Object> result) {
         Response response = Response.builder()
                 .message("요청 성공")
@@ -37,7 +42,9 @@ public class CommonUtils {
         return ResponseEntity.ok().body(response);
     }
 
-    // HttpServletRequest의 인증 헤더에서 JWT 클레임을 추출하고 파싱합니다.
+    /**
+     * <h3>HttpServletRequest의 인증 헤더에서 JWT 클레임을 추출하고 파싱합니다.</h3>
+     */
     public Claims getClaims(HttpServletRequest request){
         try{
             Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
@@ -51,7 +58,9 @@ public class CommonUtils {
         }
     }
 
-    // HttpServletRequest의 파라미터 맵을 변환합니다.
+    /**
+     * <h3>HttpServletRequest의 파라미터 맵을 변환합니다.</h3>
+     */
     public static HashMap<String, Object> convertRequestParameterMap(HttpServletRequest request) {
         HashMap<String, Object> mapParam = new HashMap<String, Object>();
         try {
@@ -69,7 +78,9 @@ public class CommonUtils {
         return mapParam;
     }
 
-    // 객체를 JSON 형태의 문자열로 반환합니다.
+    /**
+     * <h3>객체를 JSON 형태의 문자열로 반환합니다.</h3>
+     */
     public static String getJsonPretty(Object p_obj) {
         String strReturn = "";
         try {
@@ -82,7 +93,9 @@ public class CommonUtils {
         return strReturn;
     }
 
-    // 객체를 문자열로 변환합니다.
+    /**
+     * <h3>객체를 문자열로 변환합니다.</h3>
+     */
     public static String getString(Object p_Object) {
         String strReturn = "";
 
@@ -97,7 +110,9 @@ public class CommonUtils {
         return strReturn;
     }
 
-    // 요청 바디를 문자열로 읽어옵니다.
+    /**
+     * <h3>요청 바디를 문자열로 읽어옵니다.</h3>
+     */
     public static String readRequestBody(CachedBodyHttpServletWrapper requestWrapper) {
         try (BufferedReader reader = requestWrapper.getReader()) {
             return reader.lines().collect(Collectors.joining(System.lineSeparator()));
@@ -105,5 +120,13 @@ public class CommonUtils {
             e.printStackTrace();
             return "";
         }
+    }
+
+    /**
+     * <h3>타임스탬프를 LocalDateTime으로 변환합니다.</h3>
+     */
+    public static LocalDateTime convertTimestampToDateTime(long timestamp) {
+        Instant instant = Instant.ofEpochMilli(timestamp);
+        return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
     }
 }

@@ -18,6 +18,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
 			.addPathPatterns("/*")
 			.excludePathPatterns("/css/**", "/images/**", "/js/**");
 	}
+
+	/**
+	 * <h3>CORS 설정</h3>
+	 */
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
 		if(ACTIVE_PROFILE.equals("local")) {
