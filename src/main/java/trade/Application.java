@@ -16,17 +16,5 @@ public class Application {
 	private static final int waitTime = 3000;
 	public static void main(String[] args) throws InterruptedException {
 		SpringApplication.run(Application.class, args);
-
-		WebSocketApiClient client = new WebSocketApiClientImpl();
-		client.connect(((event) -> {
-			System.out.println(event);
-		}));
-
-		JSONObject params = new JSONObject();
-		params.put("requestId", "randomId");
-		client.general().ping(params);
-
-		Thread.sleep(waitTime);
-		client.close();
 	}
 }

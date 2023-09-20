@@ -97,6 +97,7 @@ dependencies {
 
 	//binance
 	implementation group: 'io.github.binance', name: 'binance-connector-java', version: '3.0.0rc3'
+	implementation 'io.github.binance:binance-futures-connector-java:3.0.2'
 }
 
 dependencyManagement {
