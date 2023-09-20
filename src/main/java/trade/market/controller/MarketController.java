@@ -12,12 +12,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import trade.common.CommonUtils;
 import trade.market.model.dto.TradeEventDTO;
 import trade.market.service.MarketService;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Slf4j
 @Api(tags = "MarketController")
@@ -29,10 +31,11 @@ public class MarketController {
     @Autowired CommonUtils commonUtils;
     private static WebSocketStreamClient client = new WebSocketStreamClientImpl();
 
-    @GetMapping(value = "/market/stream/open/trade/")
+    @GetMapping(value = "/market/trade/stream/open")
     @Operation(summary="거래추적 스트림을 오픈합니다.", description="거래추적 스트림을 오픈합니다.")
-    public void openTradeStream() {
-        client.tradeStream("btcusdt", ((event) -> {
+    public ResponseEntity tradeStreamOpen(@RequestParam String symbol) { //btcusdt
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        int streamId = client.tradeStream(symbol, ((event) -> {
             // ObjectMapper를 사용하여 JSON 문자열을 DTO로 변환
             ObjectMapper objectMapper = new ObjectMapper();
             try {
@@ -42,11 +45,13 @@ public class MarketController {
                 throw new RuntimeException(e);
             }
         }));
+        resultMap.put("streamId", streamId);
+        return commonUtils.okResponsePackaging(resultMap);
     }
 
-    @GetMapping(value = "/market/stream/close/trade/")
+    @GetMapping(value = "/market/trade/stream/close")
     @Operation(summary="거래추적 스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈합니다.")
-    public void closeTradeStream() {
-        client.closeAllConnections();
+    public void tradeStreamClose(@RequestParam int streamId) {
+        client.closeConnection(streamId);
     }
 }
