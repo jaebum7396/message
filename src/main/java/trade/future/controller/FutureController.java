@@ -28,8 +28,8 @@ public class FutureController {
 
     @GetMapping(value = "/future/stream/open/kline")
     @Operation(summary="캔들 스트림을 오픈합니다.", description="캔들 스트림을 오픈합니다.")
-    public ResponseEntity continuousKlineStreamOpen(@RequestParam String symbol, @RequestParam String interval, @RequestParam int goalPricePercent) {
-        return commonUtils.okResponsePackaging(futureService.klineStreamOpen(symbol, interval, goalPricePercent));
+    public ResponseEntity continuousKlineStreamOpen(@RequestParam String symbol, @RequestParam String interval, @RequestParam int leverage, @RequestParam int goalPricePercent) {
+        return commonUtils.okResponsePackaging(futureService.klineStreamOpen(symbol, interval, leverage, goalPricePercent));
     }
     @GetMapping(value = "/future/stock/selection")
     @Operation(summary="거래량과 변동폭 기준으로 종목을 가져옵니다.", description="거래량과 변동폭 기준으로 종목을 가져옵니다.")

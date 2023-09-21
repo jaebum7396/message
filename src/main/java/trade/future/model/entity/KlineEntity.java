@@ -1,9 +1,6 @@
 package trade.future.model.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.GenericGenerator;
 import trade.common.model.BaseEntity;
@@ -25,6 +22,9 @@ public class KlineEntity extends BaseEntity implements Serializable {
     @GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
     @Column( name = "KLINE_CD")
     private String kLineCd; // ID 필드 추가 (데이터베이스 식별자)
+    /*@OneToOne(cascade = CascadeType.ALL) // CascadeType.ALL을 사용하여 관련된 KlineEntity도 저장 및 업데이트
+    @JoinColumn(name = "KLINE_EVENT_CD") // KlineEntity와의 관계를 설정하는 외래 키
+    private KlineEventEntity klineEvent;*/
     @Column( name = "START_TIME")
     private LocalDateTime startTime; // Kline 시작 시간
     @Column( name = "END_TIME")
@@ -58,9 +58,11 @@ public class KlineEntity extends BaseEntity implements Serializable {
     @Column( name = "TAKER_BUY_QUOTE_ASSET_VOLUME")
     private BigDecimal takerBuyQuoteAssetVolume; // 종료 시기의 거래량 (Taker Buy Quote Asset Volume)
     @Column( name = "GOAL_PRICE_PLUS")
-    private boolean goalPricePlus; //상방으로 목표가 달성
+    @Builder.Default
+    private boolean goalPricePlus = false; //상방으로 목표가 달성
     @Column( name = "GOAL_PRICE_MINUS")
-    private boolean goalPriceMinus; //하방으로 목표가 달성 
+    @Builder.Default
+    private boolean goalPriceMinus = false; //하방으로 목표가 달성
     @Column( name = "IGNORE_FIELD")
     private int ignoreField;
 }

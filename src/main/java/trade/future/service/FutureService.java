@@ -33,16 +33,33 @@ public class FutureService {
         umWebSocketStreamClient.closeConnection(streamId);
     }
 
-    public Map<String, Object> klineStreamOpen(String symbol, String interval, int goalPricePercent) {
+    public Map<String, Object> klineStreamOpen(String symbol, String interval, int leverage, int goalPricePercent) {
         log.info("findOverlappingData >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         int streamId = umWebSocketStreamClient.klineStream(symbol, interval, ((event) -> {
             KlineEventEntity klineEventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
             klineEventEntity.setGoalPricePercent(goalPricePercent);
 
-            System.out.println(klineEventEntity);
+            klineEventEntity.setPlusGoalPrice(
+                CommonUtils.calculateGoalPrice(
+                    klineEventEntity.getKline().getClosePrice(), "LONG", leverage, klineEventEntity.getGoalPricePercent()));
+            klineEventEntity.setMinusGoalPrice(
+                CommonUtils.calculateGoalPrice(
+                    klineEventEntity.getKline().getClosePrice(), "SHORT", leverage, klineEventEntity.getGoalPricePercent()));
+
             klineEventRepository.save(klineEventEntity);
-            List<KlineEventEntity> noneCheckKlineEvent = klineEventRepository.getNoneCheckKlineEvent(false);
+            List<KlineEventEntity> goalAchievedPlusList = klineEventRepository.findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
+            goalAchievedPlusList.stream().forEach(goalAchievedPlus -> {
+                goalAchievedPlus.setGoalPriceCheck(true);
+                goalAchievedPlus.getKline().setGoalPricePlus(true);
+                klineEventRepository.save(goalAchievedPlus);
+            });
+            List<KlineEventEntity> goalAchievedMinusList = klineEventRepository.findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
+            goalAchievedMinusList.stream().forEach(goalAchievedMinus -> {
+                goalAchievedMinus.setGoalPriceCheck(true);
+                goalAchievedMinus.getKline().setGoalPriceMinus(true);
+                klineEventRepository.save(goalAchievedMinus);
+            });
         }));
         resultMap.put("streamId", streamId);
         return resultMap;

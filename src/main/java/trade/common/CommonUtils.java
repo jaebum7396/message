@@ -177,16 +177,51 @@ public class CommonUtils {
     // x배율 롱포지션에서 n% 이득을 보는 가격 계산
     public static BigDecimal calculateLongPositionGoalPrice(BigDecimal currentPrice, int leverage, int profitPercentage) {
         // n% 이득을 보려면 목표 가격(targetPrice)를 다음과 같이 계산할 수 있습니다.
+        // 이익 퍼센트를 실수로 변환
         BigDecimal profitMultiplier = BigDecimal.ONE.add(new BigDecimal(profitPercentage).divide(new BigDecimal(100)));
-        BigDecimal targetPrice = currentPrice.multiply(profitMultiplier).divide(new BigDecimal(leverage), 2, BigDecimal.ROUND_HALF_UP);
+        // 목표 이익 금액 계산
+        BigDecimal profitAmount = currentPrice.multiply(profitMultiplier).subtract(currentPrice);
+        // 목표 가격 계산
+        BigDecimal targetPrice = currentPrice.add(profitAmount);
+        // 레버리지로 나누어 목표 가격을 조정
+        targetPrice = targetPrice.divide(new BigDecimal(leverage), 2, BigDecimal.ROUND_HALF_UP);
+
         return targetPrice;
     }
 
     // x배율 숏포지션에서 n% 이득을 보는 가격 계산
     public static BigDecimal calculateShortPositionGoalPrice(BigDecimal currentPrice, int leverage, int profitPercentage) {
         // n% 이득을 보려면 목표 가격(targetPrice)를 다음과 같이 계산할 수 있습니다.
+        // 이익 퍼센트를 실수로 변환
         BigDecimal profitMultiplier = BigDecimal.ONE.subtract(new BigDecimal(profitPercentage).divide(new BigDecimal(100)));
-        BigDecimal targetPrice = currentPrice.multiply(profitMultiplier).divide(new BigDecimal(leverage), 2, BigDecimal.ROUND_HALF_UP);
+        // 목표 이익 금액 계산
+        BigDecimal profitAmount = currentPrice.subtract(currentPrice.multiply(profitMultiplier));
+        // 목표 가격 계산
+        BigDecimal targetPrice = currentPrice.subtract(profitAmount);
+        // 레버리지로 나누어 목표 가격을 조정
+        targetPrice = targetPrice.divide(new BigDecimal(leverage), 2, BigDecimal.ROUND_HALF_UP);
+
+        return targetPrice;
+    }
+
+    public static BigDecimal calculateGoalPrice(BigDecimal currentPrice, String positionSide, int leverage, int goalProfitPercentage) {
+        if (leverage <= 0) {
+            throw new IllegalArgumentException("레버리지는 0보다 커야 합니다.");
+        }
+
+        BigDecimal multiplier = new BigDecimal(goalProfitPercentage).divide(new BigDecimal(100));
+        BigDecimal targetPrice;
+
+        if ("LONG".equalsIgnoreCase(positionSide)) {
+            // 롱 포지션인 경우
+            targetPrice = currentPrice.add(currentPrice.multiply(multiplier).divide(new BigDecimal(leverage)));
+        } else if ("SHORT".equalsIgnoreCase(positionSide)) {
+            // 숏 포지션인 경우
+            targetPrice = currentPrice.subtract(currentPrice.multiply(multiplier).divide(new BigDecimal(leverage)));
+        } else {
+            throw new IllegalArgumentException("올바른 포지션 사이드를 입력하세요 (LONG 또는 SHORT).");
+        }
+
         return targetPrice;
     }
 }
