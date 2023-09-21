@@ -37,13 +37,13 @@ public class KlineEntity extends BaseEntity implements Serializable {
     private BigDecimal firstTradeId; // 첫 번째 거래 ID
     @Column( name = "LAST_TRADE_ID")
     private BigDecimal lastTradeId; // 마지막 거래 ID
-    @Column( name = "OPEN_PRICE")
+    @Column( name = "OPEN_PRICE", precision = 19, scale = 8)
     private BigDecimal openPrice; // 시가 (Open)
-    @Column( name = "CLOSE_PRICE")
+    @Column( name = "CLOSE_PRICE", precision = 19, scale = 8)
     private BigDecimal closePrice; // 종가 (Close)
-    @Column( name = "HIGH_PRICE")
+    @Column( name = "HIGH_PRICE", precision = 19, scale = 8)
     private BigDecimal highPrice; // 고가 (High)
-    @Column( name = "LOW_PRICE")
+    @Column( name = "LOW_PRICE", precision = 19, scale = 8)
     private BigDecimal lowPrice; // 저가 (Low)
     @Column( name = "VOLUME")
     private BigDecimal volume; // 거래량 (Volume)
@@ -51,11 +51,11 @@ public class KlineEntity extends BaseEntity implements Serializable {
     private int tradeCount; // 거래 횟수
     @Column( name = "IS_CLOSED")
     private boolean isClosed; // 종료 여부
-    @Column( name = "QUOTE_ASSET_VOLUME")
+    @Column( name = "QUOTE_ASSET_VOLUME", precision = 19, scale = 8)
     private BigDecimal quoteAssetVolume; // 종료 시기의 가중 평균 가격 (Quote Asset Volume)
-    @Column( name = "TAKER_BUY_BASE_ASSET_VOLUME")
+    @Column( name = "TAKER_BUY_BASE_ASSET_VOLUME", precision = 19, scale = 8)
     private BigDecimal takerBuyBaseAssetVolume; // 종료 시기의 거래량 (Taker Buy Base Asset Volume)
-    @Column( name = "TAKER_BUY_QUOTE_ASSET_VOLUME")
+    @Column( name = "TAKER_BUY_QUOTE_ASSET_VOLUME", precision = 19, scale = 8)
     private BigDecimal takerBuyQuoteAssetVolume; // 종료 시기의 거래량 (Taker Buy Quote Asset Volume)
     @Column( name = "GOAL_PRICE_PLUS")
     @Builder.Default

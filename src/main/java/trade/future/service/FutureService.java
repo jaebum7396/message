@@ -37,7 +37,10 @@ public class FutureService {
         log.info("findOverlappingData >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         int streamId = umWebSocketStreamClient.klineStream(symbol, interval, ((event) -> {
+            System.out.println(event);
+            System.out.println(CommonUtils.convertKlineEventDTO(event));
             KlineEventEntity klineEventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
+            System.out.println(klineEventEntity);
             klineEventEntity.setGoalPricePercent(goalPricePercent);
 
             klineEventEntity.setPlusGoalPrice(

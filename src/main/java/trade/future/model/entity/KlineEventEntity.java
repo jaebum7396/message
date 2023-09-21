@@ -32,10 +32,10 @@ public class KlineEventEntity extends BaseEntity implements Serializable {
     @Column( name = "GOAL_PRICE_CHECK")
     @Builder.Default
     private boolean goalPriceCheck = false; // 목표가 도달 여부
-    @Column( name = "PLUS_GOAL_PRICE")
+    @Column( name = "PLUS_GOAL_PRICE", precision = 19, scale = 8)
     private BigDecimal plusGoalPrice;
-    @Column( name = "MINUS_GOAL_PRICE")
+    @Column( name = "MINUS_GOAL_PRICE", precision = 19, scale = 8)
     private BigDecimal minusGoalPrice;
-    @Column( name = "GOAL_PRICE_PERCENT")
+    @Column( name = "GOAL_PRICE_PERCENT", precision = 19, scale = 8)
     private int goalPricePercent;
 }
