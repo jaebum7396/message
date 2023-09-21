@@ -1,5 +1,6 @@
 package trade.common;
 
+import org.json.JSONObject;
 import trade.common.model.Response;
 import trade.configuration.JacksonConfig;
 import io.jsonwebtoken.Claims;
@@ -12,12 +13,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
+import trade.future.model.dto.KlineDTO;
+import trade.future.model.dto.KlineEventDTO;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -128,5 +133,60 @@ public class CommonUtils {
     public static LocalDateTime convertTimestampToDateTime(long timestamp) {
         Instant instant = Instant.ofEpochMilli(timestamp);
         return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+    }
+
+    /**
+     * <h3>BigDecimal dollar 포맷.</h3>
+     */
+    public static String getDollarFormat(String amount) {
+        // 숫자 포맷 지정
+        DecimalFormat df = new DecimalFormat("#,###.##");
+        return "$" + df.format(Double.parseDouble(amount));
+    }
+
+    public static KlineEventDTO convertKlineEventDTO(String event) {
+        JSONObject klineEventObj = new JSONObject(event);
+        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
+        KlineEventDTO klineEventDTO = KlineEventDTO.builder()
+            .e(klineEventObj.get("e").toString())
+            .E(Long.parseLong(klineEventObj.get("E").toString()))
+            .s(klineEventObj.get("s").toString())
+            .k(KlineDTO.builder()
+                .t(Long.parseLong(klineObj.get("t").toString()))
+                .T(Long.parseLong(klineObj.get("T").toString()))
+                .s(klineObj.get("s").toString())
+                .i(klineObj.get("i").toString())
+                .f(new BigDecimal(klineObj.get("f").toString()))
+                .L(new BigDecimal(klineObj.get("L").toString()))
+                .o(new BigDecimal(klineObj.get("o").toString()))
+                .c(new BigDecimal(klineObj.get("c").toString()))
+                .h(new BigDecimal(klineObj.get("h").toString()))
+                .l(new BigDecimal(klineObj.get("l").toString()))
+                .v(new BigDecimal(klineObj.get("v").toString()))
+                .n(Integer.parseInt(klineObj.get("n").toString()))
+                .x(Boolean.parseBoolean(klineObj.get("x").toString()))
+                .q(new BigDecimal(klineObj.get("q").toString()))
+                .V(new BigDecimal(klineObj.get("V").toString()))
+                .Q(new BigDecimal(klineObj.get("Q").toString()))
+                .B(Integer.parseInt(klineObj.get("B").toString()))
+                .build()
+            ).build();
+        return klineEventDTO;
+    }
+
+    // x배율 롱포지션에서 n% 이득을 보는 가격 계산
+    public static BigDecimal calculateLongPositionGoalPrice(BigDecimal currentPrice, int leverage, int profitPercentage) {
+        // n% 이득을 보려면 목표 가격(targetPrice)를 다음과 같이 계산할 수 있습니다.
+        BigDecimal profitMultiplier = BigDecimal.ONE.add(new BigDecimal(profitPercentage).divide(new BigDecimal(100)));
+        BigDecimal targetPrice = currentPrice.multiply(profitMultiplier).divide(new BigDecimal(leverage), 2, BigDecimal.ROUND_HALF_UP);
+        return targetPrice;
+    }
+
+    // x배율 숏포지션에서 n% 이득을 보는 가격 계산
+    public static BigDecimal calculateShortPositionGoalPrice(BigDecimal currentPrice, int leverage, int profitPercentage) {
+        // n% 이득을 보려면 목표 가격(targetPrice)를 다음과 같이 계산할 수 있습니다.
+        BigDecimal profitMultiplier = BigDecimal.ONE.subtract(new BigDecimal(profitPercentage).divide(new BigDecimal(100)));
+        BigDecimal targetPrice = currentPrice.multiply(profitMultiplier).divide(new BigDecimal(leverage), 2, BigDecimal.ROUND_HALF_UP);
+        return targetPrice;
     }
 }
