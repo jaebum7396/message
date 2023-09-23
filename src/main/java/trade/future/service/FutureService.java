@@ -28,44 +28,54 @@ public class FutureService {
     UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
 
-
     public void streamClose(int streamId) {
         umWebSocketStreamClient.closeConnection(streamId);
     }
 
     public Map<String, Object> klineStreamOpen(String symbol, String interval, int leverage, int goalPricePercent) {
-        log.info("findOverlappingData >>>>>");
+        log.info("klineStreamOpen >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         int streamId = umWebSocketStreamClient.klineStream(symbol, interval, ((event) -> {
-            System.out.println(event);
-            System.out.println(CommonUtils.convertKlineEventDTO(event));
-            KlineEventEntity klineEventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
-            System.out.println(klineEventEntity);
-            klineEventEntity.setGoalPricePercent(goalPricePercent);
-
-            klineEventEntity.setPlusGoalPrice(
-                CommonUtils.calculateGoalPrice(
-                    klineEventEntity.getKline().getClosePrice(), "LONG", leverage, klineEventEntity.getGoalPricePercent()));
-            klineEventEntity.setMinusGoalPrice(
-                CommonUtils.calculateGoalPrice(
-                    klineEventEntity.getKline().getClosePrice(), "SHORT", leverage, klineEventEntity.getGoalPricePercent()));
-
-            klineEventRepository.save(klineEventEntity);
-            List<KlineEventEntity> goalAchievedPlusList = klineEventRepository.findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
-            goalAchievedPlusList.stream().forEach(goalAchievedPlus -> {
-                goalAchievedPlus.setGoalPriceCheck(true);
-                goalAchievedPlus.getKline().setGoalPricePlus(true);
-                klineEventRepository.save(goalAchievedPlus);
-            });
-            List<KlineEventEntity> goalAchievedMinusList = klineEventRepository.findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
-            goalAchievedMinusList.stream().forEach(goalAchievedMinus -> {
-                goalAchievedMinus.setGoalPriceCheck(true);
-                goalAchievedMinus.getKline().setGoalPriceMinus(true);
-                klineEventRepository.save(goalAchievedMinus);
-            });
+            // klineEvent를 역직렬화하여 데이터베이스에 저장
+            KlineEventEntity klineEventEntity = saveKlineEvent(event, leverage, goalPricePercent);
+            // 목표가에 도달한 KlineEvent들을 업데이트
+            updateGoalAchievedKlineEvent(klineEventEntity);
         }));
         resultMap.put("streamId", streamId);
         return resultMap;
+    }
+
+    public void klineStreamCallback(String event){
+
+    }
+
+    public KlineEventEntity saveKlineEvent(String event, int leverage, int goalPricePercent) {
+        KlineEventEntity klineEventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
+        klineEventEntity.setGoalPricePercent(goalPricePercent);
+
+        klineEventEntity.setPlusGoalPrice(
+                CommonUtils.calculateGoalPrice(
+                        klineEventEntity.getKline().getClosePrice(), "LONG", leverage, klineEventEntity.getGoalPricePercent()));
+        klineEventEntity.setMinusGoalPrice(
+                CommonUtils.calculateGoalPrice(
+                        klineEventEntity.getKline().getClosePrice(), "SHORT", leverage, klineEventEntity.getGoalPricePercent()));
+
+        return klineEventRepository.save(klineEventEntity);
+    }
+
+    public void updateGoalAchievedKlineEvent(KlineEventEntity klineEventEntity) {
+        List<KlineEventEntity> goalAchievedPlusList = klineEventRepository.findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
+        goalAchievedPlusList.stream().forEach(goalAchievedPlus -> {
+            goalAchievedPlus.setGoalPriceCheck(true);
+            goalAchievedPlus.getKline().setGoalPricePlus(true);
+            klineEventRepository.save(goalAchievedPlus);
+        });
+        List<KlineEventEntity> goalAchievedMinusList = klineEventRepository.findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
+        goalAchievedMinusList.stream().forEach(goalAchievedMinus -> {
+            goalAchievedMinus.setGoalPriceCheck(true);
+            goalAchievedMinus.getKline().setGoalPriceMinus(true);
+            klineEventRepository.save(goalAchievedMinus);
+        });
     }
 
     public Map<String, Object> getStockSelection(int limit) throws Exception {
