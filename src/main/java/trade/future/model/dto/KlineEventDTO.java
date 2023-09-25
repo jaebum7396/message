@@ -3,6 +3,7 @@ package trade.future.model.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 import trade.common.CommonUtils;
+import trade.future.model.entity.KlineEntity;
 import trade.future.model.entity.KlineEventEntity;
 
 @Builder
@@ -20,7 +21,9 @@ public class KlineEventDTO {
         KlineEventEntity entity = new KlineEventEntity();
         entity.setEventType(this.e);
         entity.setEventTime(CommonUtils.convertTimestampToDateTime(this.E));
-        entity.setKline(this.k.toEntity());
+        KlineEntity kEntity = this.k.toEntity();
+        kEntity.setKlineEvent(entity);
+        entity.setKline(kEntity);
         return entity;
     }
 }

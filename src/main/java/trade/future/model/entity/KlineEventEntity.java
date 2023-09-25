@@ -38,4 +38,5 @@ public class KlineEventEntity extends BaseEntity implements Serializable {
     private BigDecimal minusGoalPrice;
     @Column( name = "GOAL_PRICE_PERCENT", precision = 19, scale = 8)
     private int goalPricePercent;
+
 }

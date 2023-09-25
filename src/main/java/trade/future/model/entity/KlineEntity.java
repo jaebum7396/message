@@ -1,5 +1,6 @@
 package trade.future.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.GenericGenerator;
@@ -22,9 +23,16 @@ public class KlineEntity extends BaseEntity implements Serializable {
     @GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
     @Column( name = "KLINE_CD")
     private String kLineCd; // ID 필드 추가 (데이터베이스 식별자)
-    /*@OneToOne(cascade = CascadeType.ALL) // CascadeType.ALL을 사용하여 관련된 KlineEntity도 저장 및 업데이트
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "POSITION_CD")
+    private PositionEntity position;
+
+    @OneToOne(fetch = FetchType.LAZY) // CascadeType.ALL을 사용하여 관련된 KlineEntity도 저장 및 업데이트
     @JoinColumn(name = "KLINE_EVENT_CD") // KlineEntity와의 관계를 설정하는 외래 키
-    private KlineEventEntity klineEvent;*/
+    @JsonIgnore
+    private KlineEventEntity klineEvent;
+
     @Column( name = "START_TIME")
     private LocalDateTime startTime; // Kline 시작 시간
     @Column( name = "END_TIME")
@@ -65,4 +73,29 @@ public class KlineEntity extends BaseEntity implements Serializable {
     private boolean goalPriceMinus = false; //하방으로 목표가 달성
     @Column( name = "IGNORE_FIELD")
     private int ignoreField;
+    @Override
+    public String toString() {
+        return "KlineEntity{" +
+                "kLineCd='" + kLineCd + '\'' +
+                ", startTime=" + startTime +
+                ", endTime=" + endTime +
+                ", symbol='" + symbol + '\'' +
+                ", candleInterval='" + candleInterval + '\'' +
+                ", firstTradeId=" + firstTradeId +
+                ", lastTradeId=" + lastTradeId +
+                ", openPrice=" + openPrice +
+                ", closePrice=" + closePrice +
+                ", highPrice=" + highPrice +
+                ", lowPrice=" + lowPrice +
+                ", volume=" + volume +
+                ", tradeCount=" + tradeCount +
+                ", isClosed=" + isClosed +
+                ", quoteAssetVolume=" + quoteAssetVolume +
+                ", takerBuyBaseAssetVolume=" + takerBuyBaseAssetVolume +
+                ", takerBuyQuoteAssetVolume=" + takerBuyQuoteAssetVolume +
+                ", goalPricePlus=" + goalPricePlus +
+                ", goalPriceMinus=" + goalPriceMinus +
+                ", ignoreField=" + ignoreField +
+                '}';
+    }
 }

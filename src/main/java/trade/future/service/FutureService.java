@@ -2,8 +2,6 @@ package trade.future.service;
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
@@ -13,9 +11,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import trade.common.CommonUtils;
 import trade.future.model.entity.KlineEventEntity;
+import trade.future.model.entity.PositionEntity;
 import trade.future.repository.KlineEventRepository;
+import trade.future.repository.PositionRepository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,28 +26,60 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FutureService {
     @Autowired KlineEventRepository klineEventRepository;
+    @Autowired PositionRepository positionRepository;
     UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
+
+    public Map<String, Object> autoTrade(String symbol, String interval, int leverage, int goalPricePercent, BigDecimal QuoteAssetVolumeStandard) {
+        log.info("autoTrade >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+
+        return resultMap;
+    }
 
     public void streamClose(int streamId) {
         umWebSocketStreamClient.closeConnection(streamId);
     }
 
-    public Map<String, Object> klineStreamOpen(String symbol, String interval, int leverage, int goalPricePercent) {
+    public Map<String, Object> autoTradeStreamOpen(String symbol, String interval, int leverage, int goalPricePercent, BigDecimal QuoteAssetVolumeStandard) {
         log.info("klineStreamOpen >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        //임시 - 모든 데이터 초기화
+        klineEventRepository.deleteAll();
+
+        // 500개의 캔들을 가져와서 평균 거래량을 구함
+        BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume((JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
         int streamId = umWebSocketStreamClient.klineStream(symbol, interval, ((event) -> {
             // klineEvent를 역직렬화하여 데이터베이스에 저장
             KlineEventEntity klineEventEntity = saveKlineEvent(event, leverage, goalPricePercent);
+            BigDecimal quoteAssetVolume = klineEventEntity.getKline().getQuoteAssetVolume();
+            if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
+                if(positionRepository.getPositionByKlineEndTime(klineEventEntity.getKline().getEndTime(), "OPEN").isEmpty()){
+                    System.out.println("거래량("+quoteAssetVolume+")이 " +
+                            "평균 거래량("+averageQuoteAssetVolume+")의 "+
+                            quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
+                            "(기준치 : "+QuoteAssetVolumeStandard+")배 보다 큽니다.");
+                    PositionEntity newPosition = PositionEntity.builder()
+                            .kline(klineEventEntity.getKline())
+                            .positionSide("LONG")
+                            .positionStatus("OPEN")
+                            .build();
+                    klineEventEntity.getKline().setPosition(newPosition);
+                    klineEventEntity = klineEventRepository.save(klineEventEntity);
+                    System.out.println("포지션을 진입합니다. <<<<<");
+                    System.out.println(
+                            "진입가("+klineEventEntity.getKline().getClosePrice()+"), "+
+                            "목표가(LONG:"+klineEventEntity.getPlusGoalPrice()+
+                            "/SHORT:"+klineEventEntity.getMinusGoalPrice()+")"
+                            );
+                    System.out.println("포지션 : "+klineEventEntity.getKline().getPosition().toString());
+                };
+            }
             // 목표가에 도달한 KlineEvent들을 업데이트
             updateGoalAchievedKlineEvent(klineEventEntity);
         }));
         resultMap.put("streamId", streamId);
         return resultMap;
-    }
-
-    public void klineStreamCallback(String event){
-
     }
 
     public KlineEventEntity saveKlineEvent(String event, int leverage, int goalPricePercent) {
@@ -63,19 +96,89 @@ public class FutureService {
         return klineEventRepository.save(klineEventEntity);
     }
 
+    public Map<String, Object> klineStreamOpen(String symbol, String interval, int leverage, int goalPricePercent) {
+        log.info("klineStreamOpen >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+
+        int streamId = umWebSocketStreamClient.klineStream(symbol, interval, ((event) -> {
+            // klineEvent를 역직렬화하여 데이터베이스에 저장
+            KlineEventEntity klineEventEntity = saveKlineEvent(event, leverage, goalPricePercent);
+            // 목표가에 도달한 KlineEvent들을 업데이트
+            updateGoalAchievedKlineEvent(klineEventEntity);
+        }));
+        resultMap.put("streamId", streamId);
+        return resultMap;
+    }
+
     public void updateGoalAchievedKlineEvent(KlineEventEntity klineEventEntity) {
         List<KlineEventEntity> goalAchievedPlusList = klineEventRepository.findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
         goalAchievedPlusList.stream().forEach(goalAchievedPlus -> {
             goalAchievedPlus.setGoalPriceCheck(true);
             goalAchievedPlus.getKline().setGoalPricePlus(true);
+
+            Optional<PositionEntity> currentPositionOpt = Optional.ofNullable(goalAchievedPlus.getKline().getPosition());
+
+            if(currentPositionOpt.isPresent()){
+                System.out.println("목표가 도달(long) : " + goalAchievedPlus.getKline().getSymbol() + " 현재가 : " + goalAchievedPlus.getKline().getClosePrice() + "/ 목표가 : " + goalAchievedPlus.getPlusGoalPrice());
+                PositionEntity currentPosition = currentPositionOpt.get();
+                currentPosition.setPositionStatus("CLOSE");
+                System.out.println(">>>>> 포지션을 종료합니다. ");
+                System.out.println(currentPosition.toString());
+            }
             klineEventRepository.save(goalAchievedPlus);
         });
         List<KlineEventEntity> goalAchievedMinusList = klineEventRepository.findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(klineEventEntity.getKline().getSymbol(), klineEventEntity.getKline().getClosePrice());
         goalAchievedMinusList.stream().forEach(goalAchievedMinus -> {
             goalAchievedMinus.setGoalPriceCheck(true);
             goalAchievedMinus.getKline().setGoalPriceMinus(true);
+
+            Optional<PositionEntity> currentPositionOpt = Optional.ofNullable(goalAchievedMinus.getKline().getPosition());
+
+            if(currentPositionOpt.isPresent()){
+                System.out.println("목표가 도달(short) : " + goalAchievedMinus.getKline().getSymbol() + " 현재가 : " + goalAchievedMinus.getKline().getClosePrice() + "/ 목표가 : " + goalAchievedMinus.getMinusGoalPrice());
+                PositionEntity currentPosition = currentPositionOpt.get();
+                currentPosition.setPositionStatus("CLOSE");
+                System.out.println(">>>>> 포지션을 종료합니다. ");
+                System.out.println(currentPosition.toString());
+            }
             klineEventRepository.save(goalAchievedMinus);
         });
+    }
+
+    public BigDecimal getKlinesAverageQuoteAssetVolume(JSONArray klineArray, String interval) {
+        log.info("getKlinesAverageQuoteAssetVolume >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        // BigDecimal을 사용하여 8번째 데이터인 "quoteAssetVolume"의 합계를 저장할 변수
+        BigDecimal totalQuoteAssetVolume = BigDecimal.ZERO;
+
+        // JSONArray를 순회하며 객체를 추출
+        for (int i = 0; i < klineArray.length(); i++) {
+            JSONArray row = klineArray.getJSONArray(i);
+            //0: Open time, 1: Open, 2: High, 3: Low, 4: Close, 5: Volume, 6: Close time, 7: Quote asset volume, 8: Number of trades, 9: Taker buy base asset volume, 10: Taker buy quote asset volume, 11: Ignore
+            BigDecimal quoteAssetVolume = new BigDecimal(row.getString(7));
+            totalQuoteAssetVolume = totalQuoteAssetVolume.add(quoteAssetVolume);
+        }
+
+        // 평균 계산 (totalQuoteAssetVolume / arrayLength)
+        BigDecimal averageQuoteAssetVolume = totalQuoteAssetVolume.divide(new BigDecimal(klineArray.length()));
+        System.out.println(interval+"("+klineArray.length()+") 평균 거래량 : " + averageQuoteAssetVolume);
+        return averageQuoteAssetVolume;
+    }
+
+    public Map<String, Object> getKlines(String symbol, String interval, int limit) {
+        log.info("getKline >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+
+        UMFuturesClientImpl client = new UMFuturesClientImpl();
+
+        paramMap.put("symbol", symbol);
+        paramMap.put("interval", interval);
+
+        String resultStr = client.market().klines(paramMap);
+        JSONArray resultArray = new JSONArray(resultStr);
+        resultMap.put("result", resultArray);
+        return resultMap;
     }
 
     public Map<String, Object> getStockSelection(int limit) throws Exception {

@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface KlineEventRepositoryQ {
-    List<KlineEventEntity> getNoneCheckKlineEvent(boolean goalPriceCheck);
     List<KlineEventEntity> findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(String symbol, BigDecimal currentPrice);
     List<KlineEventEntity> findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(String symbol, BigDecimal currentPrice);
 }
