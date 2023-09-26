@@ -22,14 +22,15 @@ public class FutureController {
     @Autowired FutureService futureService;
     @Autowired CommonUtils commonUtils;
 
-    @GetMapping(value = "/future/stream/close")
+    @GetMapping(value = "/future/auto/close")
     @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
-    public void streamClose(@RequestParam int streamId) {
-        futureService.streamClose(streamId);
+    public void autoTradingClose() {
+        futureService.autoTradingClose();
     }
-    @GetMapping(value = "/future/auto/trading")
+
+    @GetMapping(value = "/future/auto/open")
     @Operation(summary="자동매매 스트림을 오픈합니다.", description="자동매매 스트림을 오픈합니다.")
-    public ResponseEntity autoTrading(
+    public ResponseEntity autoTradingOpen(
             @RequestParam String interval
             , @RequestParam int leverage
             , @RequestParam int goalPricePercent
@@ -37,7 +38,14 @@ public class FutureController {
             , @RequestParam BigDecimal quoteAssetVolumeStandard) throws Exception {
         return commonUtils.okResponsePackaging(futureService.autoTrading(interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
     }
-   /* @GetMapping(value = "/future/stream/open/autotrade")
+
+    @GetMapping(value = "/future/stream/close")
+    @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
+    public void streamClose(@RequestParam int streamId) {
+        futureService.streamClose(streamId);
+    }
+
+    /* @GetMapping(value = "/future/stream/open/autotrade")
     @Operation(summary="자동매매 스트림을 오픈합니다.", description="자동매매 스트림을 오픈합니다.")
     public ResponseEntity autoTradeStreamOpen(@RequestParam String symbol
             , @RequestParam String interval

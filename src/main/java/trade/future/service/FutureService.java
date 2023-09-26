@@ -33,8 +33,15 @@ public class FutureService {
     UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
 
-    public void streamClose(int streamId) {
-        umWebSocketStreamClient.closeConnection(streamId);
+    public void autoTradingClose() {
+        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
+        tradingEntityList.stream().forEach(tradingEntity -> {
+            if(tradingEntity.getTradingStatus().equals("OPEN")){
+                streamClose(tradingEntity.getStreamId());
+                tradingEntity.setTradingStatus("CLOSE");
+                tradingRepository.save(tradingEntity);
+            }
+        });
     }
     public Map<String, Object> autoTrading(String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
         log.info("autoTrading >>>>>");
@@ -330,5 +337,9 @@ public class FutureService {
             }
         }
         return overlappingData;
+    }
+
+    public void streamClose(int streamId) {
+        umWebSocketStreamClient.closeConnection(streamId);
     }
 }
