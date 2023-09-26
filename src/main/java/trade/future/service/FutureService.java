@@ -12,8 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import trade.common.CommonUtils;
 import trade.future.model.entity.KlineEventEntity;
 import trade.future.model.entity.PositionEntity;
+import trade.future.model.entity.TradingEntity;
 import trade.future.repository.KlineEventRepository;
 import trade.future.repository.PositionRepository;
+import trade.future.repository.TradingRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -27,25 +29,45 @@ import java.util.stream.Collectors;
 public class FutureService {
     @Autowired KlineEventRepository klineEventRepository;
     @Autowired PositionRepository positionRepository;
+    @Autowired TradingRepository tradingRepository;
     UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
 
-    public Map<String, Object> autoTrade(String symbol, String interval, int leverage, int goalPricePercent, BigDecimal QuoteAssetVolumeStandard) {
-        log.info("autoTrade >>>>>");
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-
-        return resultMap;
-    }
-
     public void streamClose(int streamId) {
         umWebSocketStreamClient.closeConnection(streamId);
+    }
+    public Map<String, Object> autoTrading(String interval, int leverage, int goalPricePercent, BigDecimal QuoteAssetVolumeStandard) throws Exception {
+        log.info("autoTrading >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockSelection(10).get("overlappingData");
+        for(Map<String, Object> selectedStock : selectedStockList){
+            String symbol = String.valueOf(selectedStock.get("symbol"));
+            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+
+            // 해당 심볼의 트레이딩이 없으면 트레이딩을 시작합니다.
+            if(!tradingEntityOpt.isPresent()) {
+                int streamId = (int) autoTradeStreamOpen(symbol, interval, leverage, goalPricePercent, QuoteAssetVolumeStandard).get("streamId");
+                // 해당 페어의 평균 거래량을 구합니다.
+                BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume((JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
+                TradingEntity tradingEntity = TradingEntity.builder()
+                        .symbol(symbol)
+                        .streamId(streamId)
+                        .tradingStatus("OPEN")
+                        .candleInterval(interval)
+                        .leverage(leverage)
+                        .goalPricePercent(goalPricePercent)
+                        .quoteAssetVolumeStandard(QuoteAssetVolumeStandard)
+                        .averageQuoteAssetVolume(averageQuoteAssetVolume)
+                        .build();
+                tradingRepository.save(tradingEntity);
+            }
+        }
+        return resultMap;
     }
 
     public Map<String, Object> autoTradeStreamOpen(String symbol, String interval, int leverage, int goalPricePercent, BigDecimal QuoteAssetVolumeStandard) {
         log.info("klineStreamOpen >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        //임시 - 모든 데이터 초기화
-        klineEventRepository.deleteAll();
 
         // 500개의 캔들을 가져와서 평균 거래량을 구함
         BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume((JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
@@ -55,6 +77,8 @@ public class FutureService {
             BigDecimal quoteAssetVolume = klineEventEntity.getKline().getQuoteAssetVolume();
             if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
                 if(positionRepository.getPositionByKlineEndTime(klineEventEntity.getKline().getEndTime(), "OPEN").isEmpty()){
+                    Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+                    TradingEntity tradingEntity = tradingEntityOpt.orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
                     System.out.println("거래량("+quoteAssetVolume+")이 " +
                             "평균 거래량("+averageQuoteAssetVolume+")의 "+
                             quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
@@ -63,10 +87,12 @@ public class FutureService {
                             .kline(klineEventEntity.getKline())
                             .positionSide("LONG")
                             .positionStatus("OPEN")
+                            .tradingEntity(tradingEntity)
                             .build();
                     klineEventEntity.getKline().setPosition(newPosition);
                     klineEventEntity = klineEventRepository.save(klineEventEntity);
-                    System.out.println("포지션을 진입합니다. <<<<<");
+
+                    System.out.println("포지션을 진입합니다. <<<<< " + klineEventEntity.getKline().getSymbol());
                     System.out.println(
                             "진입가("+klineEventEntity.getKline().getClosePrice()+"), "+
                             "목표가(LONG:"+klineEventEntity.getPlusGoalPrice()+
@@ -122,8 +148,23 @@ public class FutureService {
                 System.out.println("목표가 도달(long) : " + goalAchievedPlus.getKline().getSymbol() + " 현재가 : " + goalAchievedPlus.getKline().getClosePrice() + "/ 목표가 : " + goalAchievedPlus.getPlusGoalPrice());
                 PositionEntity currentPosition = currentPositionOpt.get();
                 currentPosition.setPositionStatus("CLOSE");
-                System.out.println(">>>>> 포지션을 종료합니다. ");
-                System.out.println(currentPosition.toString());
+                //System.out.println(currentPosition.toString());
+                System.out.println(">>>>> 포지션을 종료합니다. " + klineEventEntity.getKline().getSymbol());
+
+                // 트레이딩을 닫습니다.
+                TradingEntity tradingEntity = currentPosition.getTradingEntity();
+                tradingEntity.setTradingStatus("CLOSE");
+                tradingRepository.save(tradingEntity);
+
+                //소켓 스트림을 닫습니다.
+                streamClose(tradingEntity.getStreamId());
+                
+                //트레이딩을 다시 시작합니다.
+                try {
+                    autoTrading(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getQuoteAssetVolumeStandard());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
             }
             klineEventRepository.save(goalAchievedPlus);
         });
@@ -138,8 +179,16 @@ public class FutureService {
                 System.out.println("목표가 도달(short) : " + goalAchievedMinus.getKline().getSymbol() + " 현재가 : " + goalAchievedMinus.getKline().getClosePrice() + "/ 목표가 : " + goalAchievedMinus.getMinusGoalPrice());
                 PositionEntity currentPosition = currentPositionOpt.get();
                 currentPosition.setPositionStatus("CLOSE");
-                System.out.println(">>>>> 포지션을 종료합니다. ");
+                System.out.println(">>>>> 포지션을 종료합니다. " + klineEventEntity.getKline().getSymbol());
                 System.out.println(currentPosition.toString());
+
+                // 트레이딩을 닫습니다.
+                TradingEntity tradingEntity = currentPosition.getTradingEntity();
+                tradingEntity.setTradingStatus("CLOSE");
+                tradingRepository.save(tradingEntity);
+
+                // 소켓 스트림을 닫습니다.
+                streamClose(tradingEntity.getStreamId());
             }
             klineEventRepository.save(goalAchievedMinus);
         });

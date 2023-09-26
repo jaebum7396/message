@@ -23,10 +23,15 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Column( name = "POSITION_CD")
     private String positionCd; // ID 필드 추가 (데이터베이스 식별자)
 
-    @OneToOne(fetch = FetchType.LAZY) // CascadeType.ALL을 사용하여 관련된 KlineEntity도 저장 및 업데이트
-    @JoinColumn(name = "KLINE_CD") // KlineEntity와의 관계를 설정하는 외래 키
     @JsonIgnore
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "KLINE_CD")
     private KlineEntity kline;
+
+    @JsonIgnore
+    @OneToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "TRADING_CD")
+    private TradingEntity tradingEntity;
 
     @Column( name = "POSITION_SIDE")
     private String positionSide; // 포지션 사이드

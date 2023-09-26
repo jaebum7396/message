@@ -27,10 +27,14 @@ public class FutureController {
     public void streamClose(@RequestParam int streamId) {
         futureService.streamClose(streamId);
     }
-    @GetMapping(value = "/future/stream/open/kline")
-    @Operation(summary="캔들 스트림을 오픈합니다.", description="캔들 스트림을 오픈합니다.")
-    public ResponseEntity klineStreamOpen(@RequestParam String symbol, @RequestParam String interval, @RequestParam int leverage, @RequestParam int goalPricePercent) {
-        return commonUtils.okResponsePackaging(futureService.klineStreamOpen(symbol, interval, leverage, goalPricePercent));
+    @GetMapping(value = "/future/auto/trading")
+    @Operation(summary="자동매매 스트림을 오픈합니다.", description="자동매매 스트림을 오픈합니다.")
+    public ResponseEntity autoTrading(
+            @RequestParam String interval
+            , @RequestParam int leverage
+            , @RequestParam int goalPricePercent
+            , @RequestParam BigDecimal QuoteAssetVolumeStandard) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.autoTrading(interval, leverage, goalPricePercent, QuoteAssetVolumeStandard));
     }
     @GetMapping(value = "/future/stream/open/autotrade")
     @Operation(summary="자동매매 스트림을 오픈합니다.", description="자동매매 스트림을 오픈합니다.")
