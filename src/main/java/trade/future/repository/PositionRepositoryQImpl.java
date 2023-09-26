@@ -6,7 +6,6 @@ import trade.future.model.entity.*;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,13 +22,12 @@ public class PositionRepositoryQImpl implements PositionRepositoryQ {
         QKlineEntity qKline = QKlineEntity.klineEntity;
 
         List<PositionEntity> result = queryFactory
-                .selectFrom(qPosition)
-                .join(qPosition.kline, qKline).fetchJoin()
-                .where(
-                    qPosition.kline.endTime.eq(endTime).or(qPosition.positionStatus.eq(positionStatus))
-                )
-                .fetch();
-        //System.out.println(result);
+            .selectFrom(qPosition)
+            .join(qPosition.klineEntity, qKline).fetchJoin()
+            .where(
+                qPosition.klineEntity.endTime.eq(endTime).or(qPosition.positionStatus.eq(positionStatus))
+            )
+            .fetch();
         return result;
     }
 }

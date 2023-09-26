@@ -23,7 +23,7 @@ public class KlineEventDTO {
         entity.setEventTime(CommonUtils.convertTimestampToDateTime(this.E));
         KlineEntity kEntity = this.k.toEntity();
         kEntity.setKlineEvent(entity);
-        entity.setKline(kEntity);
+        entity.setKlineEntity(kEntity);
         return entity;
     }
 }

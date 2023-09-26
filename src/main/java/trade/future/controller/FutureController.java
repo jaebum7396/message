@@ -33,10 +33,11 @@ public class FutureController {
             @RequestParam String interval
             , @RequestParam int leverage
             , @RequestParam int goalPricePercent
+            , @RequestParam int stockSelectionCount
             , @RequestParam BigDecimal QuoteAssetVolumeStandard) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.autoTrading(interval, leverage, goalPricePercent, QuoteAssetVolumeStandard));
+        return commonUtils.okResponsePackaging(futureService.autoTrading(interval, leverage, goalPricePercent, stockSelectionCount, QuoteAssetVolumeStandard));
     }
-    @GetMapping(value = "/future/stream/open/autotrade")
+   /* @GetMapping(value = "/future/stream/open/autotrade")
     @Operation(summary="자동매매 스트림을 오픈합니다.", description="자동매매 스트림을 오픈합니다.")
     public ResponseEntity autoTradeStreamOpen(@RequestParam String symbol
             , @RequestParam String interval
@@ -44,7 +45,7 @@ public class FutureController {
             , @RequestParam int goalPricePercent
             , @RequestParam BigDecimal QuoteAssetVolumeStandard) {
         return commonUtils.okResponsePackaging(futureService.autoTradeStreamOpen(symbol, interval, leverage, goalPricePercent, QuoteAssetVolumeStandard));
-    }
+    }*/
     @GetMapping(value = "/future/stock/selection")
     @Operation(summary="거래량과 변동폭 기준으로 종목을 가져옵니다.", description="거래량과 변동폭 기준으로 종목을 가져옵니다.")
     public ResponseEntity getStockSelection(@RequestParam int limit) throws Exception {

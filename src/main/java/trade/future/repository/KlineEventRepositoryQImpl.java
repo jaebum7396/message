@@ -5,15 +5,12 @@ import org.springframework.stereotype.Repository;
 import trade.future.model.entity.KlineEventEntity;
 import trade.future.model.entity.QKlineEntity;
 import trade.future.model.entity.QKlineEventEntity;
+import trade.future.model.entity.QPositionEntity;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
-import javax.persistence.Query;
-import javax.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
-
-import static trade.future.model.entity.QKlineEventEntity.klineEventEntity;
 
 @Repository
 public class KlineEventRepositoryQImpl implements KlineEventRepositoryQ {
@@ -25,14 +22,16 @@ public class KlineEventRepositoryQImpl implements KlineEventRepositoryQ {
 
         QKlineEventEntity qKlineEvent = QKlineEventEntity.klineEventEntity;
         QKlineEntity qKline = QKlineEntity.klineEntity;
+        QPositionEntity qPosition = QPositionEntity.positionEntity;
 
         List<KlineEventEntity> result = queryFactory
             .selectFrom(qKlineEvent)
-            .join(qKlineEvent.kline, qKline).fetchJoin()
+            .join(qKlineEvent.klineEntity, qKline).fetchJoin()
+            .join(qKline.positionEntity, qPosition).fetchJoin()
             .where(
-                qKlineEvent.kline.symbol.eq(symbol),
-                qKlineEvent.goalPriceCheck.eq(false),
-                qKlineEvent.plusGoalPrice.lt(currentPrice)
+                qKlineEvent.klineEntity.symbol.eq(symbol),
+                qPosition.goalPriceCheck.eq(false),
+                qPosition.plusGoalPrice.lt(currentPrice)
             )
             .fetch();
         return result;
@@ -43,14 +42,16 @@ public class KlineEventRepositoryQImpl implements KlineEventRepositoryQ {
 
         QKlineEventEntity qKlineEvent = QKlineEventEntity.klineEventEntity;
         QKlineEntity qKline = QKlineEntity.klineEntity;
+        QPositionEntity qPosition = QPositionEntity.positionEntity;
 
         List<KlineEventEntity> result = queryFactory
             .selectFrom(qKlineEvent)
-            .join(qKlineEvent.kline, qKline).fetchJoin()
+            .join(qKlineEvent.klineEntity, qKline).fetchJoin()
+            .join(qKline.positionEntity, qPosition).fetchJoin()
             .where(
-                qKlineEvent.kline.symbol.eq(symbol),
-                qKlineEvent.goalPriceCheck.eq(false),
-                qKlineEvent.minusGoalPrice.gt(currentPrice)
+                qKlineEvent.klineEntity.symbol.eq(symbol),
+                qPosition.goalPriceCheck.eq(false),
+                qPosition.minusGoalPrice.gt(currentPrice)
             )
             .fetch();
 

@@ -27,10 +27,6 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "TRADING_CD")
     private String tradingCd; // ID 필드 추가 (데이터베이스 식별자)
 
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "POSITION_CD")
-    private PositionEntity positionEntity;
-
     @Column( name = "SYMBOL")
     private String symbol; // 포지션 사이드
 
@@ -49,9 +45,18 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "GOAL_PRICE_PERCENT")
     int goalPricePercent;
 
+    @Column( name = "STOCK_SELECTION_COUNT")
+    int stockSelectionCount;
+
     @Column( name = "QUOTE_ASSET_VOLUME_STANDARD")
     BigDecimal quoteAssetVolumeStandard; // 평균거래량 기준
 
     @Column( name = "AVERAGE_QUOTE_ASSET_VOLUME")
     BigDecimal averageQuoteAssetVolume; // 평균거래량
+
+    @Column( name = "COLLATERAL")
+    BigDecimal collateral; // 할당된 담보금
+    
+    @Column( name = "COLLATERAL_RATE")
+    BigDecimal collateralRate; // 할당된 담보금 비율
 }
