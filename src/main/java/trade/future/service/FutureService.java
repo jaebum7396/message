@@ -158,10 +158,10 @@ public class FutureService {
                             + "/ 목표가 : " + goalAchievedPlus.getKlineEntity().getPositionEntity().getPlusGoalPrice());
                     currentPosition.setPositionStatus("CLOSE");
                     //System.out.println(currentPosition.toString());
-                    System.out.println(">>>>> 포지션을 종료합니다. " + klineEventEntity.getKlineEntity().getSymbol());
+                    System.out.println(">>>>> 포지션을 종료합니다. " + goalAchievedPlus.getKlineEntity().getSymbol());
 
                     // 트레이딩을 닫습니다.
-                    TradingEntity tradingEntity = klineEventEntity.getTradingEntity();
+                    TradingEntity tradingEntity = goalAchievedPlus.getTradingEntity();
                     tradingEntity.setTradingStatus("CLOSE");
                     klineEventRepository.save(goalAchievedPlus);
                     //소켓 스트림을 닫습니다.
@@ -196,11 +196,11 @@ public class FutureService {
                             + " 현재가 : " + goalAchievedMinus.getKlineEntity().getClosePrice()
                             + "/ 목표가 : " + goalAchievedMinus.getKlineEntity().getPositionEntity().getMinusGoalPrice());
                     currentPosition.setPositionStatus("CLOSE");
-                    System.out.println(">>>>> 포지션을 종료합니다. " + klineEventEntity.getKlineEntity().getSymbol());
+                    System.out.println(">>>>> 포지션을 종료합니다. " + goalAchievedMinus.getKlineEntity().getSymbol());
                     System.out.println(currentPosition.toString());
 
                     // 트레이딩을 닫습니다.
-                    TradingEntity tradingEntity = klineEventEntity.getTradingEntity();
+                    TradingEntity tradingEntity = goalAchievedMinus.getTradingEntity();
                     tradingEntity.setTradingStatus("CLOSE");
                     tradingRepository.save(tradingEntity);
 
