@@ -25,7 +25,8 @@ public class PositionRepositoryQImpl implements PositionRepositoryQ {
             .selectFrom(qPosition)
             .join(qPosition.klineEntity, qKline).fetchJoin()
             .where(
-                qPosition.klineEntity.endTime.eq(endTime).or(qPosition.positionStatus.eq(positionStatus))
+                qPosition.klineEntity.endTime.eq(endTime)
+                .and(qPosition.positionStatus.notIn(positionStatus))
             )
             .fetch();
         return result;

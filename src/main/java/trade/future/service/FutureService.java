@@ -84,10 +84,10 @@ public class FutureService {
             BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
 
             // 현재 캔들의 거래량이 기준치가 되는 거래량(기준치 비율 * 평균 거래량 = 평균거래량의 N배) 보다 높다면
-            System.out.println("현재거래량 : " + quoteAssetVolume+" / 기준거래량 : "+averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard));
+            System.out.println(symbol + "(현재거래량 : " + quoteAssetVolume+" / 기준거래량 : "+averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)+")");
             if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
                 // 현재 캔들에 오픈된 포지션이 없다면
-                if(positionRepository.getPositionByKlineEndTime(klineEventEntity.getKlineEntity().getEndTime(), "OPEN").isEmpty()) {
+                if(positionRepository.getPositionByKlineEndTime(klineEventEntity.getKlineEntity().getEndTime(), "NONE").isEmpty()) {
                     System.out.println("거래량("+quoteAssetVolume+")이 " +
                             "평균 거래량("+averageQuoteAssetVolume+")의 "+
                             quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
