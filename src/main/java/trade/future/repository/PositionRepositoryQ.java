@@ -8,5 +8,5 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface PositionRepositoryQ {
-    List<PositionEntity> getPositionByKlineEndTime(LocalDateTime endTime, String positionStatus);
+    List<PositionEntity> getPositionByKlineEndTime(String symbol, LocalDateTime endTime, String positionStatus);
 }

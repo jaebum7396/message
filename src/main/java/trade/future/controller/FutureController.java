@@ -34,8 +34,8 @@ public class FutureController {
             , @RequestParam int leverage
             , @RequestParam int goalPricePercent
             , @RequestParam int stockSelectionCount
-            , @RequestParam BigDecimal QuoteAssetVolumeStandard) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.autoTrading(interval, leverage, goalPricePercent, stockSelectionCount, QuoteAssetVolumeStandard));
+            , @RequestParam BigDecimal quoteAssetVolumeStandard) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.autoTrading(interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
     }
    /* @GetMapping(value = "/future/stream/open/autotrade")
     @Operation(summary="자동매매 스트림을 오픈합니다.", description="자동매매 스트림을 오픈합니다.")

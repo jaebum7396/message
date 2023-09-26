@@ -36,7 +36,7 @@ public class FutureService {
     public void streamClose(int streamId) {
         umWebSocketStreamClient.closeConnection(streamId);
     }
-    public Map<String, Object> autoTrading(String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal QuoteAssetVolumeStandard) throws Exception {
+    public Map<String, Object> autoTrading(String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
         log.info("autoTrading >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
@@ -54,7 +54,8 @@ public class FutureService {
                         .candleInterval(interval)
                         .leverage(leverage)
                         .goalPricePercent(goalPricePercent)
-                        .quoteAssetVolumeStandard(QuoteAssetVolumeStandard)
+                        .stockSelectionCount(stockSelectionCount)
+                        .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
                         .averageQuoteAssetVolume(averageQuoteAssetVolume)
                         .build();
 
@@ -87,7 +88,10 @@ public class FutureService {
             System.out.println(symbol + "(현재거래량 : " + quoteAssetVolume+" / 기준거래량 : "+averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)+")");
             if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
                 // 현재 캔들에 오픈된 포지션이 없다면
-                if(positionRepository.getPositionByKlineEndTime(klineEventEntity.getKlineEntity().getEndTime(), "NONE").isEmpty()) {
+                if(positionRepository.getPositionByKlineEndTime(
+                        klineEventEntity.getKlineEntity().getSymbol()
+                        , klineEventEntity.getKlineEntity().getEndTime()
+                        , "OPEN").isEmpty()) {
                     System.out.println("거래량("+quoteAssetVolume+")이 " +
                             "평균 거래량("+averageQuoteAssetVolume+")의 "+
                             quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
@@ -159,8 +163,7 @@ public class FutureService {
                     // 트레이딩을 닫습니다.
                     TradingEntity tradingEntity = klineEventEntity.getTradingEntity();
                     tradingEntity.setTradingStatus("CLOSE");
-                    tradingRepository.save(tradingEntity);
-
+                    klineEventRepository.save(goalAchievedPlus);
                     //소켓 스트림을 닫습니다.
                     streamClose(tradingEntity.getStreamId());
 

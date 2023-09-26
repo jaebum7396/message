@@ -15,7 +15,7 @@ public class PositionRepositoryQImpl implements PositionRepositoryQ {
     private EntityManager entityManager;
 
     @Override
-    public List<PositionEntity> getPositionByKlineEndTime(LocalDateTime endTime, String positionStatus) {
+    public List<PositionEntity> getPositionByKlineEndTime(String symbol, LocalDateTime endTime, String positionStatus) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
         QPositionEntity qPosition = QPositionEntity.positionEntity;
@@ -25,8 +25,9 @@ public class PositionRepositoryQImpl implements PositionRepositoryQ {
             .selectFrom(qPosition)
             .join(qPosition.klineEntity, qKline).fetchJoin()
             .where(
-                qPosition.klineEntity.endTime.eq(endTime)
-                .and(qPosition.positionStatus.notIn(positionStatus))
+                qPosition.klineEntity.symbol.eq(symbol)
+                .and(qPosition.positionStatus.eq(positionStatus)
+                    .or(qPosition.klineEntity.endTime.eq(endTime).and(qPosition.positionStatus.ne("NONE"))))
             )
             .fetch();
         return result;
