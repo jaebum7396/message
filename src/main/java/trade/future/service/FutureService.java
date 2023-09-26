@@ -189,6 +189,13 @@ public class FutureService {
 
                 // 소켓 스트림을 닫습니다.
                 streamClose(tradingEntity.getStreamId());
+
+                //트레이딩을 다시 시작합니다.
+                try {
+                    autoTrading(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getQuoteAssetVolumeStandard());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
             }
             klineEventRepository.save(goalAchievedMinus);
         });
