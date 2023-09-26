@@ -163,7 +163,7 @@ public class FutureService {
                     // 트레이딩을 닫습니다.
                     TradingEntity tradingEntity = goalAchievedPlus.getTradingEntity();
                     tradingEntity.setTradingStatus("CLOSE");
-                    klineEventRepository.save(goalAchievedPlus);
+                    tradingRepository.save(tradingEntity);
                     //소켓 스트림을 닫습니다.
                     streamClose(tradingEntity.getStreamId());
 

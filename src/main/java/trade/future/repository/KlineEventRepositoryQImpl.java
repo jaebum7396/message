@@ -2,10 +2,7 @@ package trade.future.repository;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.stereotype.Repository;
-import trade.future.model.entity.KlineEventEntity;
-import trade.future.model.entity.QKlineEntity;
-import trade.future.model.entity.QKlineEventEntity;
-import trade.future.model.entity.QPositionEntity;
+import trade.future.model.entity.*;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
@@ -21,12 +18,14 @@ public class KlineEventRepositoryQImpl implements KlineEventRepositoryQ {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
         QKlineEventEntity qKlineEvent = QKlineEventEntity.klineEventEntity;
+        QTradingEntity qTradingEntity = QTradingEntity.tradingEntity;
         QKlineEntity qKline = QKlineEntity.klineEntity;
         QPositionEntity qPosition = QPositionEntity.positionEntity;
 
         List<KlineEventEntity> result = queryFactory
             .selectFrom(qKlineEvent)
             .join(qKlineEvent.klineEntity, qKline).fetchJoin()
+            .join(qKlineEvent.tradingEntity, qTradingEntity).fetchJoin()
             .join(qKline.positionEntity, qPosition).fetchJoin()
             .where(
                 qKlineEvent.klineEntity.symbol.eq(symbol),
@@ -41,12 +40,14 @@ public class KlineEventRepositoryQImpl implements KlineEventRepositoryQ {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
         QKlineEventEntity qKlineEvent = QKlineEventEntity.klineEventEntity;
+        QTradingEntity qTradingEntity = QTradingEntity.tradingEntity;
         QKlineEntity qKline = QKlineEntity.klineEntity;
         QPositionEntity qPosition = QPositionEntity.positionEntity;
 
         List<KlineEventEntity> result = queryFactory
             .selectFrom(qKlineEvent)
             .join(qKlineEvent.klineEntity, qKline).fetchJoin()
+            .join(qKlineEvent.tradingEntity, qTradingEntity).fetchJoin()
             .join(qKline.positionEntity, qPosition).fetchJoin()
             .where(
                 qKlineEvent.klineEntity.symbol.eq(symbol),
