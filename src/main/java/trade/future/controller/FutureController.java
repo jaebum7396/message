@@ -27,7 +27,6 @@ public class FutureController {
     public void autoTradingClose() {
         futureService.autoTradingClose();
     }
-
     @GetMapping(value = "/future/auto/open")
     @Operation(summary="자동매매 스트림을 오픈합니다.", description="자동매매 스트림을 오픈합니다.")
     public ResponseEntity autoTradingOpen(
@@ -36,7 +35,12 @@ public class FutureController {
             , @RequestParam int goalPricePercent
             , @RequestParam int stockSelectionCount
             , @RequestParam BigDecimal quoteAssetVolumeStandard) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.autoTrading(interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
+        return commonUtils.okResponsePackaging(futureService.autoTradingOpen(interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
+    }
+    @GetMapping(value = "/future/auto/info")
+    @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
+    public ResponseEntity autoTradingInfo() throws Exception {
+        return commonUtils.okResponsePackaging(futureService.autoTradingInfo());
     }
 
     @GetMapping(value = "/future/stream/close")

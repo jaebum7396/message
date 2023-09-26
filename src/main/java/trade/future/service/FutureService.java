@@ -33,6 +33,15 @@ public class FutureService {
     UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
 
+    public Map<String, Object> autoTradingInfo() throws Exception {
+        log.info("autoTradingInfo >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
+        tradingEntityList = tradingEntityList.stream().filter(tradingEntity -> tradingEntity.getTradingStatus().equals("OPEN")).collect(Collectors.toList());
+        resultMap.put("tradingEntityList", tradingEntityList);
+        return resultMap;
+    }
+
     public void autoTradingClose() {
         List<TradingEntity> tradingEntityList = tradingRepository.findAll();
         tradingEntityList.stream().forEach(tradingEntity -> {
@@ -43,7 +52,7 @@ public class FutureService {
             }
         });
     }
-    public Map<String, Object> autoTrading(String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
+    public Map<String, Object> autoTradingOpen(String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
         log.info("autoTrading >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
@@ -64,6 +73,7 @@ public class FutureService {
                         .stockSelectionCount(stockSelectionCount)
                         .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
                         .averageQuoteAssetVolume(averageQuoteAssetVolume)
+                        .fluctuationRate(new BigDecimal(String.valueOf(selectedStock.get("priceChangePercent"))))
                         .build();
 
                 int streamId = (int) autoTradeStreamOpen(tradingEntity).get("streamId");
@@ -104,6 +114,11 @@ public class FutureService {
                             quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
                             "(기준치 : "+QuoteAssetVolumeStandard+")배 보다 큽니다.");
                     PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
+                    if(klineEventEntity.getTradingEntity().getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
+                        entryPosition.setPositionSide("SHORT");
+                    }else{
+                        entryPosition.setPositionSide("LONG");
+                    }
                     entryPosition.setPositionStatus("OPEN");
                     klineEventEntity = klineEventRepository.save(klineEventEntity);
 
@@ -176,7 +191,7 @@ public class FutureService {
 
                     //트레이딩을 다시 시작합니다.
                     try {
-                        autoTrading(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+                        autoTradingOpen(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -216,7 +231,7 @@ public class FutureService {
 
                     //트레이딩을 다시 시작합니다.
                     try {
-                        autoTrading(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+                        autoTradingOpen(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }

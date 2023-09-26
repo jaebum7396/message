@@ -54,6 +54,9 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "AVERAGE_QUOTE_ASSET_VOLUME")
     BigDecimal averageQuoteAssetVolume; // 평균거래량
 
+    @Column( name = "FLUCTUATION_RATE")
+    BigDecimal fluctuationRate; // 변동률
+
     @Column( name = "COLLATERAL")
     BigDecimal collateral; // 할당된 담보금
     
