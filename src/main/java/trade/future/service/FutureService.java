@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import trade.common.CommonUtils;
+import trade.configuration.MyWebSocketClientImpl;
 import trade.future.model.entity.KlineEventEntity;
 import trade.future.model.entity.PositionEntity;
 import trade.future.model.entity.TradingEntity;
@@ -31,17 +32,17 @@ public class FutureService {
     @Autowired KlineEventRepository klineEventRepository;
     @Autowired PositionRepository positionRepository;
     @Autowired TradingRepository tradingRepository;
-    UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
+    UMWebsocketClientImpl umWebSocketStreamClient = new MyWebSocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     private final WebSocketCallback noopCallback = msg -> {};
-    private final WebSocketCallback openCallback = msg -> {
-        System.out.println("스트림을 오픈합니다. " + msg);
+    private final WebSocketCallback openCallback = data -> {
+        System.out.println("스트림을 오픈합니다. " + data);
     };
-    private final WebSocketCallback closeCallback = msg -> {
-        System.out.println("스트림을 클로즈합니다. " + msg);
+    private final WebSocketCallback closeCallback = data -> {
+        System.out.println("스트림을 클로즈합니다. " + data);
     };
-    private final WebSocketCallback failureCallback = msg -> {
-        System.out.println("예기치 못하게 스트림이 실패하였습니다. " + msg);
+    private final WebSocketCallback failureCallback = data -> {
+        System.out.println("예기치 못하게 스트림이 실패하였습니다. " + data);
     };
 
     public Map<String, Object> autoTradingInfo() throws Exception {
@@ -57,9 +58,10 @@ public class FutureService {
         List<TradingEntity> tradingEntityList = tradingRepository.findAll();
         tradingEntityList.stream().forEach(tradingEntity -> {
             if(tradingEntity.getTradingStatus().equals("OPEN")){
-                streamClose(tradingEntity.getStreamId());
                 tradingEntity.setTradingStatus("CLOSE");
                 tradingRepository.save(tradingEntity);
+                //streamClose(tradingEntity.getStreamId());
+                umWebSocketStreamClient.closeConnection(tradingEntity.getStreamId());
             }
         });
     }
