@@ -2,6 +2,7 @@ package trade.future.service;
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
+import com.binance.connector.futures.client.utils.WebSocketCallback;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
@@ -32,6 +33,16 @@ public class FutureService {
     @Autowired TradingRepository tradingRepository;
     UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
+    private final WebSocketCallback noopCallback = msg -> {};
+    private final WebSocketCallback openCallback = msg -> {
+        System.out.println("스트림을 오픈합니다. " + msg);
+    };
+    private final WebSocketCallback closeCallback = msg -> {
+        System.out.println("스트림을 클로즈합니다. " + msg);
+    };
+    private final WebSocketCallback failureCallback = msg -> {
+        System.out.println("예기치 못하게 스트림이 실패하였습니다. " + msg);
+    };
 
     public Map<String, Object> autoTradingInfo() throws Exception {
         log.info("autoTradingInfo >>>>>");
@@ -96,7 +107,7 @@ public class FutureService {
         BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
         BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
 
-        int streamId = umWebSocketStreamClient.klineStream(symbol, interval, ((event) -> {
+        int streamId = umWebSocketStreamClient.klineStream(symbol, interval, openCallback, ((event) -> {
             // klineEvent를 역직렬화하여 데이터베이스에 저장
             KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
             BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
@@ -125,15 +136,15 @@ public class FutureService {
                     System.out.println("포지션을 진입합니다. <<<<< " + klineEventEntity.getKlineEntity().getSymbol());
                     System.out.println(
                             "진입가("+klineEventEntity.getKlineEntity().getClosePrice()+"), "+
-                            "목표가(LONG:"+entryPosition.getPlusGoalPrice()+
-                            "/SHORT:"+entryPosition.getMinusGoalPrice()+")"
-                            );
+                                    "목표가(LONG:"+entryPosition.getPlusGoalPrice()+
+                                    "/SHORT:"+entryPosition.getMinusGoalPrice()+")"
+                    );
                     System.out.println("포지션 : "+klineEventEntity.getKlineEntity().getPositionEntity().toString());
                 };
             }
             // 목표가에 도달한 KlineEvent들을 업데이트
             updateGoalAchievedKlineEvent(klineEventEntity);
-        }));
+        }), closeCallback, failureCallback);
         resultMap.put("streamId", streamId);
         return resultMap;
     }
