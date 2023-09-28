@@ -48,8 +48,8 @@ public class FutureService {
         TradingEntity tradingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
         System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
-        tradingEntity.setTradingStatus("CLOSE");
-        tradingRepository.save(tradingEntity);
+        //tradingEntity.setTradingStatus("CLOSE");
+        //tradingRepository.save(tradingEntity);
     }
 
     public void onFailureCallback(String streamId) {
@@ -209,6 +209,9 @@ public class FutureService {
 
                     // 트레이딩을 닫습니다.
                     TradingEntity tradingEntity = goalAchievedPlus.getTradingEntity();
+                    System.out.println("[CLOSE] >>>>> " + tradingEntity.getStreamId() + " 번 스트림을 클로즈합니다. ");
+                    tradingEntity.setTradingStatus("CLOSE");
+                    tradingRepository.save(tradingEntity);
                     streamClose(tradingEntity.getStreamId());
 
                     //트레이딩을 다시 시작합니다.
