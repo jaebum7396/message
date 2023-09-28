@@ -38,9 +38,22 @@ public class FutureService {
     private final WebSocketCallback openCallback = streamId -> onOpenCallback(streamId);
     private final WebSocketCallback onMessageCallback = event -> onMessageCallback(event);
     private final WebSocketCallback closeCallback = streamId -> onCloseCallback(streamId);
-    private final WebSocketCallback failureCallback = streamId -> {
-        System.out.println("예기치 못하게 스트림이 실패하였습니다. " + streamId);
-    };
+    private final WebSocketCallback failureCallback = streamId -> onFailureCallback(streamId);
+
+    public void onOpenCallback(String streamId) {
+        System.out.println("[OPEN] >>>>> " + streamId + "번 스트림을 오픈합니다.");
+    }
+
+    public void onCloseCallback(String streamId) {
+        TradingEntity tredingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
+                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+        System.out.println("[CLOSE] >>>>> " + streamId + "번 스트림을 클로즈합니다. " + streamId);
+        tredingEntity.setTradingStatus("CLOSE");
+    }
+
+    public void onFailureCallback(String streamId) {
+        System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
+    }
 
     public Map<String, Object> autoTradingInfo() throws Exception {
         log.info("autoTradingInfo >>>>>");
@@ -98,21 +111,6 @@ public class FutureService {
         tradingRepository.save(tradingEntity);
         resultMap.put("tradingEntity", tradingEntity);
         return resultMap;
-    }
-
-    public void onFailureCallback(String streamId) {
-        System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
-    }
-
-    public void onOpenCallback(String streamId) {
-        System.out.println("[OPEN] >>>>> " + streamId + "번 스트림을 오픈합니다.");
-    }
-
-    public void onCloseCallback(String streamId) {
-        TradingEntity tredingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
-                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
-        System.out.println("[CLOSE] >>>>> " + streamId + "번 스트림을 클로즈합니다. " + streamId);
-        tredingEntity.setTradingStatus("CLOSE");
     }
 
     public void onMessageCallback(String event){
