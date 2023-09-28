@@ -32,17 +32,14 @@ public class FutureService {
     @Autowired KlineEventRepository klineEventRepository;
     @Autowired PositionRepository positionRepository;
     @Autowired TradingRepository tradingRepository;
-    UMWebsocketClientImpl umWebSocketStreamClient = new MyWebSocketClientImpl();
+    MyWebSocketClientImpl umWebSocketStreamClient = new MyWebSocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     private final WebSocketCallback noopCallback = msg -> {};
-    private final WebSocketCallback openCallback = data -> {
-        System.out.println("스트림을 오픈합니다. " + data);
-    };
-    private final WebSocketCallback closeCallback = data -> {
-        System.out.println("스트림을 클로즈합니다. " + data);
-    };
-    private final WebSocketCallback failureCallback = data -> {
-        System.out.println("예기치 못하게 스트림이 실패하였습니다. " + data);
+    private final WebSocketCallback openCallback = streamId -> onOpenCallback(streamId);
+    private final WebSocketCallback onMessageCallback = event -> onMessageCallback(event);
+    private final WebSocketCallback closeCallback = streamId -> onCloseCallback(streamId);
+    private final WebSocketCallback failureCallback = streamId -> {
+        System.out.println("예기치 못하게 스트림이 실패하였습니다. " + streamId);
     };
 
     public Map<String, Object> autoTradingInfo() throws Exception {
@@ -88,11 +85,7 @@ public class FutureService {
                         .averageQuoteAssetVolume(averageQuoteAssetVolume)
                         .fluctuationRate(new BigDecimal(String.valueOf(selectedStock.get("priceChangePercent"))))
                         .build();
-
-                int streamId = (int) autoTradeStreamOpen(tradingEntity).get("streamId");
-                tradingRepository.save(tradingEntity);
-                tradingEntity.setStreamId(streamId);
-                tradingRepository.save(tradingEntity);
+                autoTradeStreamOpen(tradingEntity);
             }
         }
         return resultMap;
@@ -101,54 +94,72 @@ public class FutureService {
     public Map<String, Object> autoTradeStreamOpen(TradingEntity tradingEntity) {
         log.info("klineStreamOpen >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
+        tradingRepository.save(tradingEntity);
+        resultMap.put("tradingEntity", tradingEntity);
+        return resultMap;
+    }
 
-        String symbol = tradingEntity.getSymbol();
-        String interval = tradingEntity.getCandleInterval();
-        int leverage = tradingEntity.getLeverage();
-        int goalPricePercent = tradingEntity.getGoalPricePercent();
+    public void onFailureCallback(String streamId) {
+        System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
+    }
+
+    public void onOpenCallback(String streamId) {
+        System.out.println("[OPEN] >>>>> " + streamId + "번 스트림을 오픈합니다.");
+    }
+
+    public void onCloseCallback(String streamId) {
+        TradingEntity tredingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
+                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+        System.out.println("[CLOSE] >>>>> " + streamId + "번 스트림을 클로즈합니다. " + streamId);
+        tredingEntity.setTradingStatus("CLOSE");
+    }
+
+    public void onMessageCallback(String event){
+        KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
+        String symbol = klineEvent.getKlineEntity().getSymbol();
+        Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+        TradingEntity tradingEntity = tradingEntityOpt.orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+
         BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
         BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
 
-        int streamId = umWebSocketStreamClient.klineStream(symbol, interval, openCallback, ((event) -> {
-            // klineEvent를 역직렬화하여 데이터베이스에 저장
-            KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
-            BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
+        // klineEvent를 역직렬화하여 데이터베이스에 저장
+        KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
+        BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
 
-            // 현재 캔들의 거래량이 기준치가 되는 거래량(기준치 비율 * 평균 거래량 = 평균거래량의 N배) 보다 높다면
-            System.out.println(symbol + "(현재거래량 : " + quoteAssetVolume+" / 기준거래량 : "+averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)+")");
-            if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
-                // 현재 캔들에 오픈된 포지션이 없다면
-                if(positionRepository.getPositionByKlineEndTime(
-                        klineEventEntity.getKlineEntity().getSymbol()
-                        , klineEventEntity.getKlineEntity().getEndTime()
-                        , "OPEN").isEmpty()) {
-                    System.out.println("거래량("+quoteAssetVolume+")이 " +
-                            "평균 거래량("+averageQuoteAssetVolume+")의 "+
-                            quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
-                            "(기준치 : "+QuoteAssetVolumeStandard+")배 보다 큽니다.");
-                    PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
-                    if(klineEventEntity.getTradingEntity().getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
-                        entryPosition.setPositionSide("SHORT");
-                    }else{
-                        entryPosition.setPositionSide("LONG");
-                    }
-                    entryPosition.setPositionStatus("OPEN");
-                    klineEventEntity = klineEventRepository.save(klineEventEntity);
+        // 현재 캔들의 거래량이 기준치가 되는 거래량(기준치 비율 * 평균 거래량 = 평균거래량의 N배) 보다 높다면
+        System.out.println(symbol + "(현재거래량 : " + quoteAssetVolume+" / 기준거래량 : "+averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)+")");
+        if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
+            // 현재 캔들에 오픈된 포지션이 없다면
+            if(positionRepository.getPositionByKlineEndTime(
+                    klineEventEntity.getKlineEntity().getSymbol()
+                    , klineEventEntity.getKlineEntity().getEndTime()
+                    , "OPEN").isEmpty()) {
+                System.out.println("거래량("+quoteAssetVolume+")이 " +
+                        "평균 거래량("+averageQuoteAssetVolume+")의 "+
+                        quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
+                        "(기준치 : "+QuoteAssetVolumeStandard+")배 보다 큽니다.");
+                PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
+                if(klineEventEntity.getTradingEntity().getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
+                    entryPosition.setPositionSide("SHORT");
+                }else{
+                    entryPosition.setPositionSide("LONG");
+                }
+                entryPosition.setPositionStatus("OPEN");
+                klineEventEntity = klineEventRepository.save(klineEventEntity);
 
-                    System.out.println("포지션을 진입합니다. <<<<< " + klineEventEntity.getKlineEntity().getSymbol());
-                    System.out.println(
-                            "진입가("+klineEventEntity.getKlineEntity().getClosePrice()+"), "+
-                                    "목표가(LONG:"+entryPosition.getPlusGoalPrice()+
-                                    "/SHORT:"+entryPosition.getMinusGoalPrice()+")"
-                    );
-                    System.out.println("포지션 : "+klineEventEntity.getKlineEntity().getPositionEntity().toString());
-                };
-            }
-            // 목표가에 도달한 KlineEvent들을 업데이트
-            updateGoalAchievedKlineEvent(klineEventEntity);
-        }), closeCallback, failureCallback);
-        resultMap.put("streamId", streamId);
-        return resultMap;
+                System.out.println("포지션을 진입합니다. <<<<< " + klineEventEntity.getKlineEntity().getSymbol());
+                System.out.println(
+                        "진입가("+klineEventEntity.getKlineEntity().getClosePrice()+"), "+
+                                "목표가(LONG:"+entryPosition.getPlusGoalPrice()+
+                                "/SHORT:"+entryPosition.getMinusGoalPrice()+")"
+                );
+                System.out.println("포지션 : "+klineEventEntity.getKlineEntity().getPositionEntity().toString());
+            };
+        }
+        // 목표가에 도달한 KlineEvent들을 업데이트
+        updateGoalAchievedKlineEvent(klineEventEntity);
     }
 
     public KlineEventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
@@ -197,9 +208,6 @@ public class FutureService {
 
                     // 트레이딩을 닫습니다.
                     TradingEntity tradingEntity = goalAchievedPlus.getTradingEntity();
-                    tradingEntity.setTradingStatus("CLOSE");
-                    tradingRepository.save(tradingEntity);
-                    //소켓 스트림을 닫습니다.
                     streamClose(tradingEntity.getStreamId());
 
                     //트레이딩을 다시 시작합니다.

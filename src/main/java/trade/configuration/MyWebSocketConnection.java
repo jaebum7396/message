@@ -13,7 +13,12 @@ public class MyWebSocketConnection extends WebSocketConnection {
     private final WebSocketCallback onClosingCallback;
     private final WebSocketCallback onFailureCallback;
 
-    public MyWebSocketConnection(WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback, Request request) {
+    public MyWebSocketConnection(
+            WebSocketCallback onOpenCallback
+            , WebSocketCallback onMessageCallback
+            , WebSocketCallback onClosingCallback
+            , WebSocketCallback onFailureCallback
+            , Request request) {
         super(onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
         this.onOpenCallback = onOpenCallback;
         this.onMessageCallback = onMessageCallback;
@@ -23,12 +28,12 @@ public class MyWebSocketConnection extends WebSocketConnection {
 
     @Override
     public void onOpen(WebSocket ws, Response response) {
-        onOpenCallback.onReceive(response.toString());
+        onOpenCallback.onReceive(String.valueOf(super.getConnectionId()));
     }
 
     @Override
     public void onClosing(WebSocket ws, int code, String reason) {
-        onClosingCallback.onReceive(reason);
+        onClosingCallback.onReceive(String.valueOf(super.getConnectionId()));
     }
 
     @Override
@@ -38,7 +43,7 @@ public class MyWebSocketConnection extends WebSocketConnection {
 
     @Override
     public void onFailure(WebSocket ws, Throwable t, Response response) {
-        System.out.println("failure : " + response);
-        //onFailureCallback.onReceive(response);
+        System.out.println("failure : " + super.getConnectionId() + " : " + t.getMessage());
+        onFailureCallback.onReceive(String.valueOf(super.getConnectionId()));
     }
 }

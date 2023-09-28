@@ -1,21 +1,25 @@
 package trade.configuration;
 
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
-import com.binance.connector.futures.client.impl.WebsocketClientImpl;
+import com.binance.connector.futures.client.utils.ParameterChecker;
+import com.binance.connector.futures.client.utils.RequestBuilder;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
 import com.binance.connector.futures.client.utils.WebSocketConnection;
 import okhttp3.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import trade.future.model.entity.TradingEntity;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class MyWebSocketClientImpl extends UMWebsocketClientImpl {
+public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWebSocketClient {
     private final Map<Integer, WebSocketConnection> connections = new HashMap<>();
+    public static TradingEntity tradingEntity;
     private static final Logger logger = LoggerFactory.getLogger(MyWebSocketClientImpl.class);
     @Override
-    public int createConnection(
+    public TradingEntity createConnection(
+            TradingEntity tradingEntity,
             WebSocketCallback onOpenCallback,
             WebSocketCallback onMessageCallback,
             WebSocketCallback onClosingCallback,
@@ -26,7 +30,8 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl {
         connection.connect();
         int connectionId = connection.getConnectionId();
         connections.put(connectionId, connection);
-        return connectionId;
+        tradingEntity.setStreamId(connectionId);
+        return tradingEntity;
     }
 
     @Override
@@ -38,5 +43,13 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl {
         } else {
             logger.info("Connection ID {} does not exist!", connectionId);
         }
+    }
+
+    @Override
+    public TradingEntity klineStream(TradingEntity tradingEntity, WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback) {
+        this.tradingEntity = tradingEntity;
+        ParameterChecker.checkParameterType(tradingEntity.getSymbol(), String.class, "symbol");
+        Request request = RequestBuilder.buildWebsocketRequest(String.format("%s/ws/%s@kline_%s", super.getBaseUrl(), tradingEntity.getSymbol().toLowerCase(), tradingEntity.getCandleInterval()));
+        return createConnection(tradingEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
     }
 }
