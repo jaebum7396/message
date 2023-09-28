@@ -41,27 +41,27 @@ public class FutureService {
     private final WebSocketCallback failureCallback = streamId -> onFailureCallback(streamId);
 
     public void onOpenCallback(String streamId) {
-        System.out.println("[OPEN] >>>>> " + streamId + "번 스트림을 오픈합니다.");
+        System.out.println("[OPEN] >>>>> " + streamId + " 번 스트림을 오픈합니다.");
     }
 
     public void onCloseCallback(String streamId) {
-        TradingEntity tredingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
+        TradingEntity tradingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
                 .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
-        System.out.println("[CLOSE] >>>>> " + streamId + "번 스트림을 클로즈합니다. " + streamId);
-        tredingEntity.setTradingStatus("CLOSE");
+        System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
+        tradingEntity.setTradingStatus("CLOSE");
+        tradingRepository.save(tradingEntity);
     }
 
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
+        TradingEntity tradingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
+                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+
+        System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
     }
 
-    public Map<String, Object> autoTradingInfo() throws Exception {
-        log.info("autoTradingInfo >>>>>");
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
-        tradingEntityList = tradingEntityList.stream().filter(tradingEntity -> tradingEntity.getTradingStatus().equals("OPEN")).collect(Collectors.toList());
-        resultMap.put("tradingEntityList", tradingEntityList);
-        return resultMap;
+    public void streamClose(int streamId) {
+        umWebSocketStreamClient.closeConnection(streamId);
     }
 
     public void autoTradingClose() {
@@ -70,8 +70,7 @@ public class FutureService {
             if(tradingEntity.getTradingStatus().equals("OPEN")){
                 tradingEntity.setTradingStatus("CLOSE");
                 tradingRepository.save(tradingEntity);
-                //streamClose(tradingEntity.getStreamId());
-                umWebSocketStreamClient.closeConnection(tradingEntity.getStreamId());
+                streamClose(tradingEntity.getStreamId());
             }
         });
     }
@@ -86,7 +85,7 @@ public class FutureService {
             // 해당 심볼의 트레이딩이 없으면 트레이딩을 시작합니다.
             if(!tradingEntityOpt.isPresent()) {
                 // 해당 페어의 평균 거래량을 구합니다.
-                BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume((JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
+                BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
                 TradingEntity tradingEntity = TradingEntity.builder()
                         .symbol(symbol)
                         .tradingStatus("OPEN")
@@ -104,13 +103,12 @@ public class FutureService {
         return resultMap;
     }
 
-    public Map<String, Object> autoTradeStreamOpen(TradingEntity tradingEntity) {
+    public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
         log.info("klineStreamOpen >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
         tradingRepository.save(tradingEntity);
-        resultMap.put("tradingEntity", tradingEntity);
-        return resultMap;
+        return tradingEntity;
     }
 
     public void onMessageCallback(String event){
@@ -373,7 +371,12 @@ public class FutureService {
         return overlappingData;
     }
 
-    public void streamClose(int streamId) {
-        umWebSocketStreamClient.closeConnection(streamId);
+    public Map<String, Object> autoTradingInfo() throws Exception {
+        log.info("autoTradingInfo >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
+        tradingEntityList = tradingEntityList.stream().filter(tradingEntity -> tradingEntity.getTradingStatus().equals("OPEN")).collect(Collectors.toList());
+        resultMap.put("tradingEntityList", tradingEntityList);
+        return resultMap;
     }
 }
