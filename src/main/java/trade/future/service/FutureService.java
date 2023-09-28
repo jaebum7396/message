@@ -56,7 +56,6 @@ public class FutureService {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         TradingEntity tradingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
                 .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
-
         System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
     }
 
@@ -171,7 +170,7 @@ public class FutureService {
                     klineEventEntity.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
             .build();
 
-        if(klineEventEntity.getTradingEntity().getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
+        if(tradingEntity.getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
             positionEntity.setPositionSide("LONG");
         }else{
             positionEntity.setPositionSide("SHORT");

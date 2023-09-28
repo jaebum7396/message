@@ -43,7 +43,7 @@ public class MyWebSocketConnection extends WebSocketConnection {
 
     @Override
     public void onFailure(WebSocket ws, Throwable t, Response response) {
-        System.out.println("failure : " + super.getConnectionId() + " : " + t.getMessage());
+        //System.out.println("failure : " + super.getConnectionId() + " : " + t.getMessage());
         onFailureCallback.onReceive(String.valueOf(super.getConnectionId()));
     }
 }
