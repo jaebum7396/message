@@ -46,7 +46,7 @@ public class FutureService {
 
     public void onCloseCallback(String streamId) {
         TradingEntity tradingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
-                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+                .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
         System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
         tradingEntity.setTradingStatus("CLOSE");
         tradingRepository.save(tradingEntity);
@@ -54,9 +54,14 @@ public class FutureService {
 
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
-        TradingEntity tradingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
-                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
-        System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
+        Optional<TradingEntity> tradingEntityOpt = tradingRepository.findByStreamId(Integer.parseInt(streamId));
+        if(tradingEntityOpt.isPresent()){
+            TradingEntity tradingEntity = tradingEntityOpt.get();
+            System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
+        } else {
+            System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
+            onFailureCallback(streamId);
+        }
     }
 
     public void streamClose(int streamId) {
