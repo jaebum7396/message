@@ -137,11 +137,6 @@ public class FutureService {
                         quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
                         "(기준치 : "+QuoteAssetVolumeStandard+")배 보다 큽니다.");
                 PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
-                if(klineEventEntity.getTradingEntity().getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
-                    entryPosition.setPositionSide("SHORT");
-                }else{
-                    entryPosition.setPositionSide("LONG");
-                }
                 entryPosition.setPositionStatus("OPEN");
                 klineEventEntity = klineEventRepository.save(klineEventEntity);
 
@@ -175,6 +170,13 @@ public class FutureService {
                 CommonUtils.calculateGoalPrice(
                     klineEventEntity.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
             .build();
+
+        if(klineEventEntity.getTradingEntity().getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
+            positionEntity.setPositionSide("LONG");
+        }else{
+            positionEntity.setPositionSide("SHORT");
+        }
+
         klineEventEntity.setTradingEntity(tradingEntity);
         klineEventEntity.getKlineEntity().setPositionEntity(positionEntity);
         return klineEventRepository.save(klineEventEntity);
