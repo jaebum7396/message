@@ -112,7 +112,7 @@ public class FutureService {
         log.info("klineStreamOpen >>>>> ");
         tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
         tradingRepository.save(tradingEntity);
-        log.info("tradingSaved >>>>> " + tradingEntity.getSymbol() + " : " + tradingEntity.getStreamId());
+        log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
         return tradingEntity;
     }
 
