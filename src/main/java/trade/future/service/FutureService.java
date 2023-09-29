@@ -55,14 +55,14 @@ public class FutureService {
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = tradingRepository.findByStreamId(Integer.parseInt(streamId));
-        //if(tradingEntityOpt.isPresent()){
+        if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
             streamClose(tradingEntity.getStreamId());
             System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
-        /*} else {
+        } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
-            onFailureCallback(streamId);
-        }*/
+            //onFailureCallback(streamId);
+        }
     }
 
     public void streamClose(int streamId) {
@@ -109,9 +109,10 @@ public class FutureService {
     }
 
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
-        log.info("klineStreamOpen >>>>>");
+        log.info("klineStreamOpen >>>>> ");
         tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
         tradingRepository.save(tradingEntity);
+        log.info("tradingSaved >>>>> " + tradingEntity.getSymbol() + " : " + tradingEntity.getStreamId());
         return tradingEntity;
     }
 
