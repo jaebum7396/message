@@ -15,7 +15,7 @@ import java.util.Map;
 
 public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWebSocketClient {
     private final Map<Integer, WebSocketConnection> connections = new HashMap<>();
-    public static TradingEntity tradingEntity;
+    private final Map<Integer, TradingEntity> TradingEntitys = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(MyWebSocketClientImpl.class);
     @Override
     public TradingEntity createConnection(
@@ -26,12 +26,17 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
             WebSocketCallback onFailureCallback,
             Request request
     ) {
-        WebSocketConnection connection = new MyWebSocketConnection(onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
+        WebSocketConnection connection = new MyWebSocketConnection(tradingEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
         connection.connect();
         int connectionId = connection.getConnectionId();
         connections.put(connectionId, connection);
         tradingEntity.setStreamId(connectionId);
+        TradingEntitys.put(connectionId, tradingEntity);
         return tradingEntity;
+    }
+
+    public TradingEntity getTradingEntity(int connectionId) {
+        return TradingEntitys.get(connectionId);
     }
 
     @Override
@@ -47,7 +52,6 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
 
     @Override
     public TradingEntity klineStream(TradingEntity tradingEntity, WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback) {
-        this.tradingEntity = tradingEntity;
         ParameterChecker.checkParameterType(tradingEntity.getSymbol(), String.class, "symbol");
         Request request = RequestBuilder.buildWebsocketRequest(String.format("%s/ws/%s@kline_%s", super.getBaseUrl(), tradingEntity.getSymbol().toLowerCase(), tradingEntity.getCandleInterval()));
         return createConnection(tradingEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);

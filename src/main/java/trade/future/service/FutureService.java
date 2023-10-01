@@ -45,7 +45,7 @@ public class FutureService {
     }
 
     public void onCloseCallback(String streamId) {
-        TradingEntity tradingEntity = tradingRepository.findByStreamId(Integer.parseInt(streamId))
+        TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
         System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
         //tradingEntity.setTradingStatus("CLOSE");
@@ -54,7 +54,8 @@ public class FutureService {
 
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
-        Optional<TradingEntity> tradingEntityOpt = tradingRepository.findByStreamId(Integer.parseInt(streamId));
+        Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
+        System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
         if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
             streamClose(tradingEntity.getStreamId());

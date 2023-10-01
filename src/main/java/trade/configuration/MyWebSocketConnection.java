@@ -6,24 +6,34 @@ import com.binance.connector.futures.client.utils.WebSocketConnection;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.WebSocket;
+import trade.future.model.entity.TradingEntity;
+
 
 public class MyWebSocketConnection extends WebSocketConnection {
+    private final TradingEntity tradingEntity;
     private final WebSocketCallback onOpenCallback;
     private final WebSocketCallback onMessageCallback;
     private final WebSocketCallback onClosingCallback;
     private final WebSocketCallback onFailureCallback;
 
     public MyWebSocketConnection(
-            WebSocketCallback onOpenCallback
+            TradingEntity tradingEntity
+            , WebSocketCallback onOpenCallback
             , WebSocketCallback onMessageCallback
             , WebSocketCallback onClosingCallback
             , WebSocketCallback onFailureCallback
             , Request request) {
         super(onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
+        tradingEntity.setStreamId(super.getConnectionId());
+        this.tradingEntity = tradingEntity;
         this.onOpenCallback = onOpenCallback;
         this.onMessageCallback = onMessageCallback;
         this.onClosingCallback = onClosingCallback;
         this.onFailureCallback = onFailureCallback;
+    }
+
+    public TradingEntity getTradingEntity() {
+        return tradingEntity;
     }
 
     @Override
