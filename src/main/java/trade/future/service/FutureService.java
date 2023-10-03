@@ -120,6 +120,7 @@ public class FutureService {
     public void onMessageCallback(String event){
         KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
         String symbol = klineEvent.getKlineEntity().getSymbol();
+
         Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
         TradingEntity tradingEntity = tradingEntityOpt.orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
 
