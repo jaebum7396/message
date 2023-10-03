@@ -53,25 +53,16 @@ public class FutureService {
     }
 
     public void onFailureCallback(String streamId) {
-        long now = System.currentTimeMillis();
-        System.out.println("check"+now);
-        long currentTime = 0;
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = tradingRepository.findByStreamId(Integer.parseInt(streamId));
         System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
         if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
             streamClose(tradingEntity.getStreamId());
-            while( currentTime - now< 1000){
-                // currentTime  = System.currentTimeMillis();
-                System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
-            }
+            //System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
-            while( currentTime - now< 1000){
-               // currentTime  = System.currentTimeMillis();
-                onFailureCallback(streamId);
-            }
+            //onFailureCallback(streamId);
         }
     }
 
@@ -147,15 +138,15 @@ public class FutureService {
                     klineEventEntity.getKlineEntity().getSymbol()
                     , klineEventEntity.getKlineEntity().getEndTime()
                     , "OPEN").isEmpty()) {
-                System.out.println(symbol + "거래량("+quoteAssetVolume+")이 " +
-                        "평균 거래량("+averageQuoteAssetVolume+")의 "+
+                System.out.println("["+symbol + "] 거래량("+quoteAssetVolume+")이 " +
+                        "평균 거래량("+averageQuoteAssetVolume+") 의 "+
                         quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
-                        "(기준치 : "+QuoteAssetVolumeStandard+")배 보다 큽니다.");
+                        "(기준치 : "+QuoteAssetVolumeStandard+") 배 보다 큽니다.");
                 PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
                 entryPosition.setPositionStatus("OPEN");
                 klineEventEntity = klineEventRepository.save(klineEventEntity);
 
-                System.out.println("포지션을 진입합니다. <<<<< " + klineEventEntity.getKlineEntity().getSymbol());
+                System.out.println("["+symbol + "] 포지션을 진입합니다. <<<<< ");
                 System.out.println(
                         "진입가("+klineEventEntity.getKlineEntity().getClosePrice()+"), "+
                                 "목표가(LONG:"+entryPosition.getPlusGoalPrice()+
