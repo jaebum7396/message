@@ -41,25 +41,30 @@ public class FutureService {
     private final WebSocketCallback failureCallback = streamId -> onFailureCallback(streamId);
 
     public void onOpenCallback(String streamId) {
+        TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
+                .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
         System.out.println("[OPEN] >>>>> " + streamId + " 번 스트림을 오픈합니다.");
+        tradingRepository.save(tradingEntity);
+        log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
     }
 
     public void onCloseCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
         System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
-        //tradingEntity.setTradingStatus("CLOSE");
-        //tradingRepository.save(tradingEntity);
+        tradingEntity.setTradingStatus("CLOSE");
+        tradingRepository.save(tradingEntity);
     }
 
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
-        Optional<TradingEntity> tradingEntityOpt = tradingRepository.findByStreamId(Integer.parseInt(streamId));
+        Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
         System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
         if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
-            streamClose(tradingEntity.getStreamId());
-            //System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
+            System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
+            tradingEntity.setTradingStatus("CLOSE");
+            System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
             //onFailureCallback(streamId);
@@ -112,8 +117,6 @@ public class FutureService {
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
         log.info("klineStreamOpen >>>>> ");
         tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
-        tradingRepository.save(tradingEntity);
-        log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
         return tradingEntity;
     }
 
@@ -205,7 +208,7 @@ public class FutureService {
                 PositionEntity currentPosition = currentPositionOpt.get();
                 if(currentPosition.getPositionStatus().equals("OPEN")) {
                     System.out.println("목표가 도달(long) : " + goalAchievedPlus.getKlineEntity().getSymbol()
-                            + " 현재가 : " + goalAchievedPlus.getKlineEntity().getClosePrice()
+                            + " 현재가 : " + klineEventEntity.getKlineEntity().getClosePrice()
                             + "/ 목표가 : " + goalAchievedPlus.getKlineEntity().getPositionEntity().getPlusGoalPrice());
                     currentPosition.setPositionStatus("CLOSE");
                     //System.out.println(currentPosition.toString());
@@ -213,10 +216,9 @@ public class FutureService {
 
                     // 트레이딩을 닫습니다.
                     TradingEntity tradingEntity = goalAchievedPlus.getTradingEntity();
-                    System.out.println("[CLOSE] >>>>> " + tradingEntity.getStreamId() + " 번 스트림을 클로즈합니다. ");
-                    tradingEntity.setTradingStatus("CLOSE");
-                    tradingRepository.save(tradingEntity);
                     streamClose(tradingEntity.getStreamId());
+                    //tradingEntity.setTradingStatus("CLOSE");
+                    //tradingRepository.save(tradingEntity);
 
                     //트레이딩을 다시 시작합니다.
                     try {
@@ -244,7 +246,7 @@ public class FutureService {
                 PositionEntity currentPosition = currentPositionOpt.get();
                 if(currentPosition.getPositionStatus().equals("OPEN")){
                     System.out.println("목표가 도달(short) : " + goalAchievedMinus.getKlineEntity().getSymbol()
-                            + " 현재가 : " + goalAchievedMinus.getKlineEntity().getClosePrice()
+                            + " 현재가 : " + klineEventEntity.getKlineEntity().getClosePrice()
                             + "/ 목표가 : " + goalAchievedMinus.getKlineEntity().getPositionEntity().getMinusGoalPrice());
                     currentPosition.setPositionStatus("CLOSE");
                     System.out.println(">>>>> 포지션을 종료합니다. " + goalAchievedMinus.getKlineEntity().getSymbol());
