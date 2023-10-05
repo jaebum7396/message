@@ -64,6 +64,7 @@ public class FutureService {
             TradingEntity tradingEntity = tradingEntityOpt.get();
             System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
             tradingEntity.setTradingStatus("CLOSE");
+            tradingRepository.save(tradingEntity);
             System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
