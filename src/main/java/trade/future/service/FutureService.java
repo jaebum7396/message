@@ -32,13 +32,13 @@ public class FutureService {
     @Autowired KlineEventRepository klineEventRepository;
     @Autowired PositionRepository positionRepository;
     @Autowired TradingRepository tradingRepository;
-    MyWebSocketClientImpl umWebSocketStreamClient = new MyWebSocketClientImpl();
+    @Autowired MyWebSocketClientImpl umWebSocketStreamClient;
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     private final WebSocketCallback noopCallback = msg -> {};
-    private final WebSocketCallback openCallback = streamId -> onOpenCallback(streamId);
-    private final WebSocketCallback onMessageCallback = event -> onMessageCallback(event);
-    private final WebSocketCallback closeCallback = streamId -> onCloseCallback(streamId);
-    private final WebSocketCallback failureCallback = streamId -> onFailureCallback(streamId);
+    private final WebSocketCallback openCallback = this::onOpenCallback;
+    private final WebSocketCallback onMessageCallback = this::onMessageCallback;
+    private final WebSocketCallback closeCallback = this::onCloseCallback;
+    private final WebSocketCallback failureCallback = this::onFailureCallback;
 
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
@@ -95,7 +95,7 @@ public class FutureService {
             Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
 
             // 해당 심볼의 트레이딩이 없으면 트레이딩을 시작합니다.
-            if(!tradingEntityOpt.isPresent()) {
+            if(tradingEntityOpt.isEmpty()) {
                 // 해당 페어의 평균 거래량을 구합니다.
                 BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
                 TradingEntity tradingEntity = TradingEntity.builder()

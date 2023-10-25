@@ -8,15 +8,18 @@ import com.binance.connector.futures.client.utils.WebSocketConnection;
 import okhttp3.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 import trade.future.model.entity.TradingEntity;
 
 import java.util.HashMap;
 import java.util.Map;
 
+@Component
 public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWebSocketClient {
     private final Map<Integer, WebSocketConnection> connections = new HashMap<>();
     private final Map<Integer, TradingEntity> TradingEntitys = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(MyWebSocketClientImpl.class);
+
     @Override
     public TradingEntity createConnection(
             TradingEntity tradingEntity,
