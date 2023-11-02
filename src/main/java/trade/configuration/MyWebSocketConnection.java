@@ -54,7 +54,22 @@ public class MyWebSocketConnection extends WebSocketConnection {
 
     @Override
     public void onFailure(WebSocket ws, Throwable t, Response response) {
-        //System.out.println("onFailure : "+super.getConnectionId()+ "/" + response.message());
+        // 에러 로그 기록
+        if (response != null) {
+            System.err.println("WebSocket failure - Response: " + response.toString());
+        } else {
+            System.err.println("WebSocket failure - No response available");
+        }
+        t.printStackTrace();  // 에러 스택 트레이스 출력
+
+        // 자원 정리
+        cleanUpResources();
         onFailureCallback.onReceive(String.valueOf(super.getConnectionId()));
+    }
+
+    // 자원 정리 메서드
+    private void cleanUpResources() {
+        // 필요 시 사용한 자원을 정리하는 로직 추가
+        System.out.println("Cleaning up resources...");
     }
 }

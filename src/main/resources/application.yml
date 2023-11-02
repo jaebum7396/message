@@ -12,8 +12,8 @@ spring:
   application:
     name: trade
   profiles:
-    #active: local
-    active: deploy
+    active: local
+    #active: deploy
   redis:
     host: ${REDIS_URI}
     port: ${REDIS_PORT}
@@ -59,7 +59,7 @@ logging:
           descriptor:
             sql: warn
 
-binanace:
+binance:
   real:
     api: ${BINANCE_REAL_API_KEY}
     secret: ${BINANCE_REAL_SECRET_KEY}

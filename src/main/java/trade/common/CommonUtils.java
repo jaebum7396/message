@@ -20,6 +20,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.text.DecimalFormat;
@@ -205,8 +206,8 @@ public class CommonUtils {
     }
 
     public static BigDecimal calculateGoalPrice(BigDecimal currentPrice, String positionSide, int leverage, int goalProfitPercentage) {
-        if (leverage <= 0) {
-            throw new IllegalArgumentException("레버리지는 0보다 커야 합니다.");
+        if (leverage < 1) {
+            throw new IllegalArgumentException("레버리지는 1보다 커야 합니다.");
         }
 
         BigDecimal multiplier = new BigDecimal(goalProfitPercentage).divide(new BigDecimal(100));
@@ -214,10 +215,10 @@ public class CommonUtils {
 
         if ("LONG".equalsIgnoreCase(positionSide)) {
             // 롱 포지션인 경우
-            targetPrice = currentPrice.add(currentPrice.multiply(multiplier).divide(new BigDecimal(leverage)));
+            targetPrice = currentPrice.add(currentPrice.multiply(multiplier).divide(new BigDecimal(leverage), 8, RoundingMode.HALF_UP));
         } else if ("SHORT".equalsIgnoreCase(positionSide)) {
             // 숏 포지션인 경우
-            targetPrice = currentPrice.subtract(currentPrice.multiply(multiplier).divide(new BigDecimal(leverage)));
+            targetPrice = currentPrice.subtract(currentPrice.multiply(multiplier).divide(new BigDecimal(leverage), 8, RoundingMode.HALF_UP));
         } else {
             throw new IllegalArgumentException("올바른 포지션 사이드를 입력하세요 (LONG 또는 SHORT).");
         }

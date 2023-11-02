@@ -1,5 +1,9 @@
 package trade.future.service;
 
+import com.binance.connector.client.WebSocketApiClient;
+import com.binance.connector.client.enums.DefaultUrls;
+import com.binance.connector.client.impl.WebSocketApiClientImpl;
+import com.binance.connector.client.utils.signaturegenerator.HmacSignatureGenerator;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
@@ -8,10 +12,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
+import trade.configuration.PrivateConfig;
 import trade.future.model.entity.KlineEventEntity;
 import trade.future.model.entity.PositionEntity;
 import trade.future.model.entity.TradingEntity;
@@ -22,7 +28,12 @@ import trade.future.repository.TradingRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static trade.configuration.PrivateConfig.BASE_URL;
 
 @Slf4j
 @Service
@@ -33,12 +44,24 @@ public class FutureService {
     @Autowired PositionRepository positionRepository;
     @Autowired TradingRepository tradingRepository;
     @Autowired MyWebSocketClientImpl umWebSocketStreamClient;
+
+    @Value("${binance.real.api}")
+    public String BINANCE_REAL_API_KEY;
+    @Value("${binance.real.secret}")
+    public String BINANCE_REAL_SECRET_KEY;
+    @Value("${binance.testnet.api}")
+    public String BINANCE_TEST_API_KEY;
+    @Value("${binance.testnet.secret}")
+    public String BINANCE_TEST_SECRET_KEY;
+    public static final String BASE_URL = "https://testnet.binance.vision";
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     private final WebSocketCallback noopCallback = msg -> {};
     private final WebSocketCallback openCallback = this::onOpenCallback;
     private final WebSocketCallback onMessageCallback = this::onMessageCallback;
     private final WebSocketCallback closeCallback = this::onCloseCallback;
     private final WebSocketCallback failureCallback = this::onFailureCallback;
+
+    int failureCount = 0;
 
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
@@ -62,10 +85,22 @@ public class FutureService {
         System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
         if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
-            System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
             tradingEntity.setTradingStatus("CLOSE");
             tradingRepository.save(tradingEntity);
-            System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+autoTradeStreamOpen(tradingEntity).getStreamId() + " 번으로 복구 합니다.");
+            //System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
+            failureCount++;
+            if(failureCount>4){
+                System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
+                //onFailureCallback(streamId);
+            }else{
+                ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+                Runnable task = () -> {
+                    TradingEntity currentTrading = autoTradeStreamOpen(tradingEntity);
+                    System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+currentTrading.getStreamId() + " 번으로 복구 합니다.");
+                };
+                // 5초 후에 task 실행
+                scheduler.schedule(task, 5, TimeUnit.SECONDS);
+            }
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
             //onFailureCallback(streamId);
@@ -77,21 +112,23 @@ public class FutureService {
     }
 
     public void autoTradingClose() {
-        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
-        tradingEntityList.stream().forEach(tradingEntity -> {
-            if(tradingEntity.getTradingStatus().equals("OPEN")){
-                tradingEntity.setTradingStatus("CLOSE");
-                tradingRepository.save(tradingEntity);
-                streamClose(tradingEntity.getStreamId());
-            }
-        });
+        //List<TradingEntity> tradingEntityList = tradingRepository.findAll();
+        //tradingEntityList.stream().forEach(tradingEntity -> {
+        //    if(tradingEntity.getTradingStatus().equals("OPEN")){
+        //        tradingEntity.setTradingStatus("CLOSE");
+        //        tradingRepository.save(tradingEntity);
+        //        streamClose(tradingEntity.getStreamId());
+        //    }
+        //});
+        umWebSocketStreamClient.closeAllConnections();
     }
-    public Map<String, Object> autoTradingOpen(String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
+    public Map<String, Object> autoTradingOpen(String symbolParam, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
         log.info("autoTrading >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
         for(Map<String, Object> selectedStock : selectedStockList){
             String symbol = String.valueOf(selectedStock.get("symbol"));
+            //String symbol = symbolParam;
             Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
 
             // 해당 심볼의 트레이딩이 없으면 트레이딩을 시작합니다.
@@ -108,6 +145,7 @@ public class FutureService {
                         .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
                         .averageQuoteAssetVolume(averageQuoteAssetVolume)
                         .fluctuationRate(new BigDecimal(String.valueOf(selectedStock.get("priceChangePercent"))))
+                        //.fluctuationRate(new BigDecimal(2))
                         .build();
                 autoTradeStreamOpen(tradingEntity);
             }
@@ -170,7 +208,6 @@ public class FutureService {
         int leverage = tradingEntity.getLeverage();
 
         PositionEntity positionEntity = PositionEntity.builder()
-            .positionSide("LONG")
             .positionStatus("NONE")
             .goalPricePercent(goalPricePercent)
             .klineEntity(klineEventEntity.getKlineEntity())
@@ -182,10 +219,12 @@ public class FutureService {
                     klineEventEntity.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
             .build();
 
-        if(tradingEntity.getFluctuationRate().compareTo(BigDecimal.ZERO)<0){
+        if(tradingEntity.getFluctuationRate().compareTo(BigDecimal.ZERO)>0){
             positionEntity.setPositionSide("LONG");
+            //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : LONG");
         }else{
             positionEntity.setPositionSide("SHORT");
+            //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : SHORT");
         }
 
         klineEventEntity.setTradingEntity(tradingEntity);
@@ -223,7 +262,7 @@ public class FutureService {
 
                     //트레이딩을 다시 시작합니다.
                     try {
-                        autoTradingOpen(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+                        autoTradingOpen(tradingEntity.getSymbol(),tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -263,7 +302,7 @@ public class FutureService {
 
                     //트레이딩을 다시 시작합니다.
                     try {
-                        autoTradingOpen(tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+                        autoTradingOpen(tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -392,6 +431,21 @@ public class FutureService {
         List<TradingEntity> tradingEntityList = tradingRepository.findAll();
         tradingEntityList = tradingEntityList.stream().filter(tradingEntity -> tradingEntity.getTradingStatus().equals("OPEN")).collect(Collectors.toList());
         resultMap.put("tradingEntityList", tradingEntityList);
+        return resultMap;
+    }
+
+    public Map<String, Object> accountInfo() throws Exception {
+        log.info("accountInfo >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        //System.out.println(umFuturesClientImpl.account().accountInformation());
+
+        System.out.println(BINANCE_TEST_SECRET_KEY + " " + BINANCE_TEST_API_KEY + " " + BASE_URL);
+        HmacSignatureGenerator signatureGenerator = new HmacSignatureGenerator(BINANCE_TEST_SECRET_KEY);
+        WebSocketApiClient client = new WebSocketApiClientImpl(BINANCE_TEST_API_KEY, signatureGenerator, BASE_URL);
+
+        client.connect(((event) -> {
+            System.out.println(event + "\n");
+        }));
         return resultMap;
     }
 }

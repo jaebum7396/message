@@ -1,15 +1,17 @@
 package trade.configuration;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 
-public final class PrivateConfig {
-    @Value("${binanace.real.api}")
+@Configuration
+public class PrivateConfig {
+    @Value("${binance.real.api}")
     public static String BINANCE_REAL_API_KEY;
-    @Value("${binanace.real.secret}")
+    @Value("${binance.real.secret}")
     public static String BINANCE_REAL_SECRET_KEY;
-    @Value("${binanace.test.api}")
+    @Value("${binance.testnet.api}")
     public static String BINANCE_TEST_API_KEY;
-    @Value("${binanace.test.secret}")
+    @Value("${binance.testnet.secret}")
     public static String BINANCE_TEST_SECRET_KEY;
 
     public static final String BASE_URL = "https://testnet.binance.vision";

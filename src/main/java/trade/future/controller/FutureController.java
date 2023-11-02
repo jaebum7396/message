@@ -30,12 +30,13 @@ public class FutureController {
     @GetMapping(value = "/future/auto/open")
     @Operation(summary="자동매매를 시작합니다.", description="자동매매를 시작합니다.")
     public ResponseEntity autoTradingOpen(
-            @RequestParam String interval
+              @RequestParam(required = false) String symbol
+            , @RequestParam String interval
             , @RequestParam int leverage
             , @RequestParam int goalPricePercent
             , @RequestParam int stockSelectionCount
             , @RequestParam BigDecimal quoteAssetVolumeStandard) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.autoTradingOpen(interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
+        return commonUtils.okResponsePackaging(futureService.autoTradingOpen(symbol, interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
     }
     @GetMapping(value = "/future/stream/close")
     @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
@@ -59,5 +60,11 @@ public class FutureController {
     @Operation(summary="스트림 정보를 가져옵니다.", description="스트림 정보를 가져옵니다.")
     public ResponseEntity autoTradingInfo() throws Exception {
         return commonUtils.okResponsePackaging(futureService.autoTradingInfo());
+    }
+
+    @GetMapping(value = "/future/account/info")
+    @Operation(summary="계좌 정보를 가져옵니다.", description="계좌 정보를 가져옵니다.")
+    public ResponseEntity accountInfo() throws Exception {
+        return commonUtils.okResponsePackaging(futureService.accountInfo());
     }
 }
