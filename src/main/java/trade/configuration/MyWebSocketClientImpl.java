@@ -1,16 +1,14 @@
 package trade.configuration;
 
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
-import com.binance.connector.futures.client.utils.ParameterChecker;
-import com.binance.connector.futures.client.utils.RequestBuilder;
-import com.binance.connector.futures.client.utils.WebSocketCallback;
-import com.binance.connector.futures.client.utils.WebSocketConnection;
+import com.binance.connector.futures.client.utils.*;
 import okhttp3.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import trade.future.model.entity.TradingEntity;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -57,6 +55,13 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
     public TradingEntity klineStream(TradingEntity tradingEntity, WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback) {
         ParameterChecker.checkParameterType(tradingEntity.getSymbol(), String.class, "symbol");
         Request request = RequestBuilder.buildWebsocketRequest(String.format("%s/ws/%s@kline_%s", super.getBaseUrl(), tradingEntity.getSymbol().toLowerCase(), tradingEntity.getCandleInterval()));
+        return createConnection(tradingEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
+    }
+
+    @Override
+    public TradingEntity combineStreams(TradingEntity tradingEntity, ArrayList<String> streams, WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback) {
+        String url = UrlBuilder.buildStreamUrl(String.format("%s/stream", super.getBaseUrl()), streams);
+        Request request = RequestBuilder.buildWebsocketRequest(url);
         return createConnection(tradingEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
     }
 }

@@ -23,6 +23,11 @@ spring:
     username: ${AFLK_DB_USERNAME}
     password: ${AFLK_DB_PASSWORD}
     initialization-mode: always #import data
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jackson:
     serialization:
       write-dates-as-timestamps: true
@@ -31,12 +36,15 @@ spring:
       hibernate:
         use_sql_comments: 'false'
         format_sql: 'true'
-        show_sql: 'false'
+        show_sql: 'true'
+        cache:
+          use_second_level_cache: 'false'
+          use_query_cache: 'false'
     hibernate:
       naming:
         implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-      ddl-auto: 'create'
+      ddl-auto: 'update'
       #ddl-auto=none:
     #show-sql: 'true'
     defer-datasource-initialization: 'true' #import data
@@ -61,11 +69,15 @@ logging:
 
 binance:
   real:
-    api: ${BINANCE_REAL_API_KEY}
-    secret: ${BINANCE_REAL_SECRET_KEY}
+    api:
+      key: ${BINANCE_REAL_API_KEY}
+    secret:
+      key: ${BINANCE_REAL_SECRET_KEY}
   testnet:
-    api: ${BINANCE_TESTNET_API_KEY}
-    secret: ${BINANCE_TESTNET_SECRET_KEY}
+    api:
+      key: ${BINANCE_TESTNET_API_KEY}
+    secret:
+      key: ${BINANCE_TESTNET_SECRET_KEY}
 
 
 #SECRET KEY

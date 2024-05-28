@@ -1,23 +1,20 @@
 package trade.future.service;
 
 import com.binance.connector.client.WebSocketApiClient;
-import com.binance.connector.client.enums.DefaultUrls;
 import com.binance.connector.client.impl.WebSocketApiClientImpl;
 import com.binance.connector.client.utils.signaturegenerator.HmacSignatureGenerator;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
-import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
-import trade.configuration.PrivateConfig;
 import trade.future.model.entity.KlineEventEntity;
 import trade.future.model.entity.PositionEntity;
 import trade.future.model.entity.TradingEntity;
@@ -33,27 +30,37 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static trade.configuration.PrivateConfig.BASE_URL;
-
 @Slf4j
 @Service
-@Transactional
-@RequiredArgsConstructor
 public class FutureService {
+    public FutureService(
+          @Value("${binance.real.api.key}") String BINANCE_REAL_API_KEY
+        , @Value("${binance.real.secret.key}") String BINANCE_REAL_SECRET_KEY
+        , @Value("${binance.testnet.api.key}") String BINANCE_TEST_API_KEY
+        , @Value("${binance.testnet.secret.key}") String BINANCE_TEST_SECRET_KEY) {
+        boolean DEV_MODE = false;
+        if(DEV_MODE){
+            this.BINANCE_API_KEY = BINANCE_TEST_API_KEY;
+            this.BINANCE_SECRET_KEY = BINANCE_TEST_SECRET_KEY;
+            this.BASE_URL = BASE_URL_TEST;
+        }else{
+            this.BINANCE_API_KEY = BINANCE_REAL_API_KEY;
+            this.BINANCE_SECRET_KEY = BINANCE_REAL_SECRET_KEY;
+            this.BASE_URL = BASE_URL_REAL;
+        }
+        System.out.println(BINANCE_API_KEY + " " + BINANCE_SECRET_KEY);
+    }
+    public String BINANCE_API_KEY;
+    public String BINANCE_SECRET_KEY;
+
+    public String BASE_URL;
+    public static final String BASE_URL_TEST = "https://testnet.binance.vision";
+    public static final String BASE_URL_REAL = "wss://ws-api.binance.com:443/ws-api/v3";
+
     @Autowired KlineEventRepository klineEventRepository;
     @Autowired PositionRepository positionRepository;
     @Autowired TradingRepository tradingRepository;
     @Autowired MyWebSocketClientImpl umWebSocketStreamClient;
-
-    @Value("${binance.real.api}")
-    public String BINANCE_REAL_API_KEY;
-    @Value("${binance.real.secret}")
-    public String BINANCE_REAL_SECRET_KEY;
-    @Value("${binance.testnet.api}")
-    public String BINANCE_TEST_API_KEY;
-    @Value("${binance.testnet.secret}")
-    public String BINANCE_TEST_SECRET_KEY;
-    public static final String BASE_URL = "https://testnet.binance.vision";
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     private final WebSocketCallback noopCallback = msg -> {};
     private final WebSocketCallback openCallback = this::onOpenCallback;
@@ -63,6 +70,7 @@ public class FutureService {
 
     int failureCount = 0;
 
+    @Transactional
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
@@ -71,6 +79,7 @@ public class FutureService {
         log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
     }
 
+    @Transactional
     public void onCloseCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
@@ -79,6 +88,7 @@ public class FutureService {
         tradingRepository.save(tradingEntity);
     }
 
+    @Transactional
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
@@ -107,21 +117,121 @@ public class FutureService {
         }
     }
 
+    @Transactional
+    public void onMessageCallback(String event){
+        // 최대 재시도 횟수와 초기 재시도 간격 설정
+        int maxRetries = 3;
+        int initialDelayMillis = 1000;
+
+        for (int retry = 0; retry < maxRetries; retry++) {
+            try {
+                // 트랜잭션 시작
+                // ...
+
+                // 트랜잭션 내에서 수행할 작업들
+                KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
+                String symbol = klineEvent.getKlineEntity().getSymbol();
+
+                // 트레이딩 엔티티 조회
+                TradingEntity tradingEntity = getTradingEntity(symbol);
+                BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
+                BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
+
+                // klineEvent를 역직렬화하여 데이터베이스에 저장
+                KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
+                BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
+
+                // 포지션 확인 및 저장
+                checkAndSavePosition(klineEventEntity, tradingEntity, QuoteAssetVolumeStandard, averageQuoteAssetVolume, quoteAssetVolume);
+
+                // 목표가에 도달한 KlineEvent들을 업데이트
+                updateGoalAchievedKlineEvent(klineEventEntity);
+
+                // 트랜잭션 커밋
+                // ...
+
+                // 트랜잭션 성공 시 반복문 종료
+                break;
+            } catch (Exception e) {
+                e.printStackTrace();
+                if (retry >= maxRetries - 1) {
+                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
+                    throw e;
+                }
+
+                // 재시도 간격을 설정한 시간만큼 대기
+                try {
+                    Thread.sleep(initialDelayMillis);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+
+                // 재시도 간격을 증가시킴 (예: 백오프 전략)
+                initialDelayMillis *= 2;
+            }
+        }
+    }
+
+    private TradingEntity getTradingEntity(String symbol) {
+        return tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN")
+                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+    }
+
+    @Transactional
+    public void checkAndSavePosition(KlineEventEntity klineEventEntity, TradingEntity tradingEntity, BigDecimal QuoteAssetVolumeStandard, BigDecimal averageQuoteAssetVolume, BigDecimal quoteAssetVolume) {
+        // 최대 재시도 횟수와 초기 재시도 간격 설정
+        int maxRetries = 3;
+        int initialDelayMillis = 1000;
+        for (int retry = 0; retry < maxRetries; retry++) {
+            try {
+                if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
+                    if (positionRepository.getPositionByKlineEndTime(klineEventEntity.getKlineEntity().getSymbol(), klineEventEntity.getKlineEntity().getEndTime(), "OPEN").isEmpty()) {
+                        System.out.println("[" + klineEventEntity.getKlineEntity().getSymbol() + "] 거래량(" + quoteAssetVolume + ")이 평균 거래량(" + averageQuoteAssetVolume + ") 의 " + quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR) + "(기준치 : " + QuoteAssetVolumeStandard + ") 배 보다 큽니다.");
+                        PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
+                        entryPosition.setPositionStatus("OPEN");
+                        klineEventRepository.save(klineEventEntity);
+                        System.out.println("[" + klineEventEntity.getKlineEntity().getSymbol() + "] 포지션을 진입합니다. <<<<< ");
+                        System.out.println("진입가(" + klineEventEntity.getKlineEntity().getClosePrice() + "), 목표가(LONG:" + entryPosition.getPlusGoalPrice() + "/SHORT:" + entryPosition.getMinusGoalPrice() + ")");
+                        System.out.println("포지션 : " + klineEventEntity.getKlineEntity().getPositionEntity().toString());
+                    }
+                }
+            } catch (Exception e) {
+                if (retry >= maxRetries - 1) {
+                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
+                    throw e;
+                }
+
+                // 재시도 간격을 설정한 시간만큼 대기
+                try {
+                    Thread.sleep(initialDelayMillis);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+
+                // 재시도 간격을 증가시킴 (예: 백오프 전략)
+                initialDelayMillis *= 2;
+            }
+        }
+    }
+
     public void streamClose(int streamId) {
         umWebSocketStreamClient.closeConnection(streamId);
     }
 
+    @Transactional
     public void autoTradingClose() {
-        //List<TradingEntity> tradingEntityList = tradingRepository.findAll();
-        //tradingEntityList.stream().forEach(tradingEntity -> {
-        //    if(tradingEntity.getTradingStatus().equals("OPEN")){
-        //        tradingEntity.setTradingStatus("CLOSE");
-        //        tradingRepository.save(tradingEntity);
-        //        streamClose(tradingEntity.getStreamId());
-        //    }
-        //});
+        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
+        tradingEntityList.stream().forEach(tradingEntity -> {
+            if(tradingEntity.getTradingStatus().equals("OPEN")){
+                tradingEntity.setTradingStatus("CLOSE");
+                tradingRepository.save(tradingEntity);
+                streamClose(tradingEntity.getStreamId());
+            }
+        });
         umWebSocketStreamClient.closeAllConnections();
     }
+
+    @Transactional
     public Map<String, Object> autoTradingOpen(String symbolParam, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
         log.info("autoTrading >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
@@ -155,83 +265,77 @@ public class FutureService {
 
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
         log.info("klineStreamOpen >>>>> ");
-        tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
+        ArrayList<String> streams = new ArrayList<>();
+        //streams.add("btcusdt@trade");
+        //streams.add("btcusdt@bookTicker");
+
+        String klineStreamName = tradingEntity.getSymbol().toLowerCase() + "@kline_" + tradingEntity.getCandleInterval();
+        System.out.println("klineStreamName : " + klineStreamName);
+        streams.add(klineStreamName);
+        //String orderStreamName = "btcusdt@trade";
+        //streams.add(orderStreamName);
+
+        tradingEntity = umWebSocketStreamClient.combineStreams(tradingEntity, streams, openCallback, onMessageCallback, closeCallback, failureCallback);
+        //tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
         return tradingEntity;
     }
 
-    public void onMessageCallback(String event){
-        KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
-        String symbol = klineEvent.getKlineEntity().getSymbol();
-
-        Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
-        TradingEntity tradingEntity = tradingEntityOpt.orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
-
-        BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
-        BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
-
-        // klineEvent를 역직렬화하여 데이터베이스에 저장
-        KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
-        BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
-
-        if (quoteAssetVolume.compareTo(averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)) > 0) {
-            // 현재 캔들에 오픈된 포지션이 없다면
-            // 현재 캔들의 거래량이 기준치가 되는 거래량(기준치 비율 * 평균 거래량 = 평균거래량의 N배) 보다 높다면
-            //System.out.println(symbol + "(현재거래량 : " + quoteAssetVolume+" / 기준거래량 : "+averageQuoteAssetVolume.multiply(QuoteAssetVolumeStandard)+")");
-            if(positionRepository.getPositionByKlineEndTime(
-                    klineEventEntity.getKlineEntity().getSymbol()
-                    , klineEventEntity.getKlineEntity().getEndTime()
-                    , "OPEN").isEmpty()) {
-                System.out.println("["+symbol + "] 거래량("+quoteAssetVolume+")이 " +
-                        "평균 거래량("+averageQuoteAssetVolume+") 의 "+
-                        quoteAssetVolume.divide(averageQuoteAssetVolume, RoundingMode.FLOOR)+
-                        "(기준치 : "+QuoteAssetVolumeStandard+") 배 보다 큽니다.");
-                PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
-                entryPosition.setPositionStatus("OPEN");
-                klineEventEntity = klineEventRepository.save(klineEventEntity);
-
-                System.out.println("["+symbol + "] 포지션을 진입합니다. <<<<< ");
-                System.out.println(
-                        "진입가("+klineEventEntity.getKlineEntity().getClosePrice()+"), "+
-                                "목표가(LONG:"+entryPosition.getPlusGoalPrice()+
-                                "/SHORT:"+entryPosition.getMinusGoalPrice()+")"
-                );
-                System.out.println("포지션 : "+klineEventEntity.getKlineEntity().getPositionEntity().toString());
-            };
-        }
-        // 목표가에 도달한 KlineEvent들을 업데이트
-        updateGoalAchievedKlineEvent(klineEventEntity);
-    }
-
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public KlineEventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
-        KlineEventEntity klineEventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
-        int goalPricePercent = tradingEntity.getGoalPricePercent();
-        int leverage = tradingEntity.getLeverage();
+        KlineEventEntity klineEventEntity = null;
+        // 최대 재시도 횟수와 초기 재시도 간격 설정
+        int maxRetries = 3;
+        int initialDelayMillis = 1000;
+        for (int retry = 0; retry < maxRetries; retry++) {
+            try {
+                klineEventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
+                int goalPricePercent = tradingEntity.getGoalPricePercent();
+                int leverage = tradingEntity.getLeverage();
 
-        PositionEntity positionEntity = PositionEntity.builder()
-            .positionStatus("NONE")
-            .goalPricePercent(goalPricePercent)
-            .klineEntity(klineEventEntity.getKlineEntity())
-            .plusGoalPrice(
-                CommonUtils.calculateGoalPrice(
-                    klineEventEntity.getKlineEntity().getClosePrice(), "LONG", leverage, goalPricePercent))
-            .minusGoalPrice(
-                CommonUtils.calculateGoalPrice(
-                    klineEventEntity.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
-            .build();
+                PositionEntity positionEntity = PositionEntity.builder()
+                        .positionStatus("NONE")
+                        .goalPricePercent(goalPricePercent)
+                        .klineEntity(klineEventEntity.getKlineEntity())
+                        .plusGoalPrice(
+                                CommonUtils.calculateGoalPrice(
+                                        klineEventEntity.getKlineEntity().getClosePrice(), "LONG", leverage, goalPricePercent))
+                        .minusGoalPrice(
+                                CommonUtils.calculateGoalPrice(
+                                        klineEventEntity.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
+                        .build();
 
-        if(tradingEntity.getFluctuationRate().compareTo(BigDecimal.ZERO)>0){
-            positionEntity.setPositionSide("LONG");
-            //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : LONG");
-        }else{
-            positionEntity.setPositionSide("SHORT");
-            //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : SHORT");
+                if (tradingEntity.getFluctuationRate().compareTo(BigDecimal.ZERO) > 0) {
+                    positionEntity.setPositionSide("LONG");
+                    //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : LONG");
+                } else {
+                    positionEntity.setPositionSide("SHORT");
+                    //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : SHORT");
+                }
+
+                klineEventEntity.setTradingEntity(tradingEntity);
+                klineEventEntity.getKlineEntity().setPositionEntity(positionEntity);
+                klineEventEntity = klineEventRepository.save(klineEventEntity);
+            } catch (Exception e) {
+                e.printStackTrace();
+                if (retry >= maxRetries - 1) {
+                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
+                    throw e;
+                }
+                // 재시도 간격을 설정한 시간만큼 대기
+                try {
+                    Thread.sleep(initialDelayMillis);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+
+                // 재시도 간격을 증가시킴 (예: 백오프 전략)
+                initialDelayMillis *= 2;
+            }
         }
-
-        klineEventEntity.setTradingEntity(tradingEntity);
-        klineEventEntity.getKlineEntity().setPositionEntity(positionEntity);
-        return klineEventRepository.save(klineEventEntity);
+        return klineEventEntity;
     }
 
+    @Transactional
     public void updateGoalAchievedKlineEvent(KlineEventEntity klineEventEntity) {
         List<KlineEventEntity> goalAchievedPlusList = klineEventRepository
                 .findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(
@@ -438,13 +542,23 @@ public class FutureService {
         log.info("accountInfo >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         //System.out.println(umFuturesClientImpl.account().accountInformation());
-
-        System.out.println(BINANCE_TEST_SECRET_KEY + " " + BINANCE_TEST_API_KEY + " " + BASE_URL);
-        HmacSignatureGenerator signatureGenerator = new HmacSignatureGenerator(BINANCE_TEST_SECRET_KEY);
-        WebSocketApiClient client = new WebSocketApiClientImpl(BINANCE_TEST_API_KEY, signatureGenerator, BASE_URL);
-
+        System.out.println(BINANCE_API_KEY + " " + BINANCE_SECRET_KEY);
+        HmacSignatureGenerator signatureGenerator = new HmacSignatureGenerator(BINANCE_SECRET_KEY);
+        WebSocketApiClient client = new WebSocketApiClientImpl(BINANCE_API_KEY, signatureGenerator, BASE_URL);
         client.connect(((event) -> {
             System.out.println(event + "\n");
+        }));
+        return resultMap;
+    }
+
+    public Map<String, Object> orderBookStream(String symbol) throws Exception {
+        log.info("accountInfo >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        ArrayList<String> streams = new ArrayList<>();
+        streams.add("btcusdt@trade");
+        streams.add("btcusdt@bookTicker");
+        umWebSocketStreamClient.combineStreams(streams, ((event) -> {
+            System.out.println(event);
         }));
         return resultMap;
     }

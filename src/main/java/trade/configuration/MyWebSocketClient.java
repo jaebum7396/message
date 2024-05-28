@@ -17,4 +17,6 @@ public interface MyWebSocketClient extends WebsocketClient {
             Request request
     );
     TradingEntity klineStream(TradingEntity tradingEntity, WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback);
+
+    TradingEntity combineStreams(TradingEntity tradingEntity, ArrayList<String> streams, WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback);
 }

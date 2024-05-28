@@ -146,7 +146,8 @@ public class CommonUtils {
     }
 
     public static KlineEventDTO convertKlineEventDTO(String event) {
-        JSONObject klineEventObj = new JSONObject(event);
+        JSONObject eventObj = new JSONObject(event);
+        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
         JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
         KlineEventDTO klineEventDTO = KlineEventDTO.builder()
             .e(klineEventObj.get("e").toString())

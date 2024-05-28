@@ -67,4 +67,10 @@ public class FutureController {
     public ResponseEntity accountInfo() throws Exception {
         return commonUtils.okResponsePackaging(futureService.accountInfo());
     }
+
+    @GetMapping(value = "/future/orderbook")
+    @Operation(summary="계좌 정보를 가져옵니다.", description="계좌 정보를 가져옵니다.")
+    public ResponseEntity orderBook(@RequestParam String symbol) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.orderBookStream(symbol));
+    }
 }
