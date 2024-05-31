@@ -125,32 +125,37 @@ public class FutureService {
 
         for (int retry = 0; retry < maxRetries; retry++) {
             try {
-                // 트랜잭션 시작
-                // ...
+                //System.out.println("event : " + event);
+                JSONObject eventObj = new JSONObject(event);
+                JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+                if(String.valueOf(klineEventObj.get("e")).equals("kline")){
+                    // 트랜잭션 시작
+                    // 트랜잭션 내에서 수행할 작업들
+                    KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
+                    String symbol = klineEvent.getKlineEntity().getSymbol();
 
-                // 트랜잭션 내에서 수행할 작업들
-                KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
-                String symbol = klineEvent.getKlineEntity().getSymbol();
+                    // 트레이딩 엔티티 조회
+                    TradingEntity tradingEntity = getTradingEntity(symbol);
+                    BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
+                    BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
 
-                // 트레이딩 엔티티 조회
-                TradingEntity tradingEntity = getTradingEntity(symbol);
-                BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
-                BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
+                    // klineEvent를 역직렬화하여 데이터베이스에 저장
+                    KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
+                    BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
 
-                // klineEvent를 역직렬화하여 데이터베이스에 저장
-                KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
-                BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
+                    // 포지션 확인 및 저장
+                    checkAndSavePosition(klineEventEntity, tradingEntity, QuoteAssetVolumeStandard, averageQuoteAssetVolume, quoteAssetVolume);
 
-                // 포지션 확인 및 저장
-                checkAndSavePosition(klineEventEntity, tradingEntity, QuoteAssetVolumeStandard, averageQuoteAssetVolume, quoteAssetVolume);
+                    // 목표가에 도달한 KlineEvent들을 업데이트
+                    updateGoalAchievedKlineEvent(klineEventEntity);
 
-                // 목표가에 도달한 KlineEvent들을 업데이트
-                updateGoalAchievedKlineEvent(klineEventEntity);
-
-                // 트랜잭션 커밋
-                // ...
-
-                // 트랜잭션 성공 시 반복문 종료
+                    // 트랜잭션 성공 시 반복문 종료
+                } else if(String.valueOf(klineEventObj.get("e")).equals("forceOrder")){
+                    System.out.println("강제 청산 이벤트 발생");
+                    System.out.println("event : " + event);
+                } else {
+                    System.out.println("event : " + event);
+                }
                 break;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -272,8 +277,11 @@ public class FutureService {
         String klineStreamName = tradingEntity.getSymbol().toLowerCase() + "@kline_" + tradingEntity.getCandleInterval();
         System.out.println("klineStreamName : " + klineStreamName);
         streams.add(klineStreamName);
-        //String orderStreamName = "btcusdt@trade";
-        //streams.add(orderStreamName);
+        String forceOrderStreamName = tradingEntity.getSymbol().toLowerCase() + "@forceOrder";
+        streams.add(forceOrderStreamName);
+
+        String allMarketForceOrderStreamName = "!forceOrder@arr";
+        streams.add(allMarketForceOrderStreamName);
 
         tradingEntity = umWebSocketStreamClient.combineStreams(tradingEntity, streams, openCallback, onMessageCallback, closeCallback, failureCallback);
         //tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
