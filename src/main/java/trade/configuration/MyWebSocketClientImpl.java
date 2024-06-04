@@ -10,6 +10,7 @@ import trade.future.model.entity.TradingEntity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 @Component
@@ -18,6 +19,9 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
     private final Map<Integer, TradingEntity> TradingEntitys = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(MyWebSocketClientImpl.class);
 
+    public Map<Integer, WebSocketConnection> getConnections() {
+        return connections;
+    }
     @Override
     public TradingEntity createConnection(
             TradingEntity tradingEntity,
@@ -48,6 +52,29 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
             connections.remove(connectionId);
         } else {
             logger.info("Connection ID {} does not exist!", connectionId);
+        }
+    }
+
+    @Override
+    public void closeAllConnections() {
+        if (!this.connections.isEmpty()) {
+            logger.info("Closing {} connections(s)", this.connections.size());
+            Iterator<Map.Entry<Integer, WebSocketConnection>> iter = this.connections.entrySet().iterator();
+
+            while(iter.hasNext()) {
+                WebSocketConnection connection = (WebSocketConnection)((Map.Entry)iter.next()).getValue();
+                connection.close();
+                iter.remove();
+            }
+        }
+
+        if (this.connections.isEmpty()) {
+            HttpClientSingleton.getHttpClient().dispatcher().executorService().shutdown();
+            logger.info("All connections are closed!");
+
+            // Create a new HttpClient
+            HttpClientSingleton.getHttpClient();
+            logger.info("New HttpClient created!");
         }
     }
 

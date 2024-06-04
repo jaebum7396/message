@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
 import trade.future.model.dto.KlineDTO;
-import trade.future.model.dto.KlineEventDTO;
+import trade.future.model.dto.EventDTO;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
@@ -145,11 +145,11 @@ public class CommonUtils {
         return "$" + df.format(Double.parseDouble(amount));
     }
 
-    public static KlineEventDTO convertKlineEventDTO(String event) {
+    public static EventDTO convertKlineEventDTO(String event) {
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
         JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
-        KlineEventDTO klineEventDTO = KlineEventDTO.builder()
+        EventDTO eventDTO = EventDTO.builder()
             .e(klineEventObj.get("e").toString())
             .E(Long.parseLong(klineEventObj.get("E").toString()))
             .s(klineEventObj.get("s").toString())
@@ -173,7 +173,7 @@ public class CommonUtils {
                 .B(Integer.parseInt(klineObj.get("B").toString()))
                 .build()
             ).build();
-        return klineEventDTO;
+        return eventDTO;
     }
 
     // x배율 롱포지션에서 n% 이득을 보는 가격 계산

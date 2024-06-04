@@ -8,7 +8,7 @@ import org.json.JSONArray;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import trade.future.repository.KlineEventRepository;
+import trade.future.mongo.EventRepository;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,7 +18,8 @@ import java.util.Map;
 @Transactional
 @RequiredArgsConstructor
 public class TradeService {
-    @Autowired KlineEventRepository klineEventRepository;
+    @Autowired
+    EventRepository eventRepository;
     UMWebsocketClientImpl umWebSocketStreamClient = new UMWebsocketClientImpl();
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
 

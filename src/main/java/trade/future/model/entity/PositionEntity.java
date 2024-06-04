@@ -15,7 +15,6 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper=false)
-@Entity(name = "POSITION")
 public class PositionEntity extends BaseEntity implements Serializable {
     @Id
     @GeneratedValue(generator = "uuid")

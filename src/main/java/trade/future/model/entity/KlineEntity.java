@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.GenericGenerator;
+import org.springframework.data.mongodb.core.mapping.Document;
 import trade.common.model.BaseEntity;
 
 import javax.persistence.*;
@@ -16,7 +17,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper=false)
-@Entity(name = "KLINE")
 public class KlineEntity extends BaseEntity implements Serializable {
     @Id
     @GeneratedValue(generator = "uuid")
@@ -32,7 +32,7 @@ public class KlineEntity extends BaseEntity implements Serializable {
     //연관관계의 주인
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "KLINE_EVENT_CD")
-    private KlineEventEntity klineEvent;
+    private EventEntity klineEvent;
 
     @Column( name = "START_TIME")
     private LocalDateTime startTime; // Kline 시작 시간

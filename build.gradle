@@ -98,6 +98,9 @@ dependencies {
 	//binance
 	implementation group: 'io.github.binance', name: 'binance-connector-java', version: '3.2.0'
 	implementation 'io.github.binance:binance-futures-connector-java:3.0.2'
+
+	implementation 'org.mongodb:mongodb-driver-sync'
+	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 }
 
 dependencyManagement {

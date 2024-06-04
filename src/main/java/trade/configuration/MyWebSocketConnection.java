@@ -1,6 +1,7 @@
 package trade.configuration;
 
 
+import com.binance.connector.futures.client.utils.HttpClientSingleton;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
 import com.binance.connector.futures.client.utils.WebSocketConnection;
 import okhttp3.Request;
