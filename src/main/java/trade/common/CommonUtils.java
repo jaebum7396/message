@@ -1,5 +1,6 @@
 package trade.common;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import trade.common.model.Response;
 import trade.configuration.JacksonConfig;
@@ -15,6 +16,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
 import trade.future.model.dto.KlineDTO;
 import trade.future.model.dto.EventDTO;
+import trade.future.model.entity.KlineEntity;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
@@ -27,6 +29,7 @@ import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -143,6 +146,32 @@ public class CommonUtils {
         // 숫자 포맷 지정
         DecimalFormat df = new DecimalFormat("#,###.##");
         return "$" + df.format(Double.parseDouble(amount));
+    }
+
+    public static KlineEntity parseKlineEntity(JSONArray klineArray) {
+        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(0)), ZoneOffset.UTC);
+        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(6)), ZoneOffset.UTC);
+
+        return KlineEntity.builder()
+                .kLineCd(null) // ID는 자동 생성
+                .startTime(startTime)
+                .endTime(endTime)
+                .symbol("BTCUSDT") // 심볼은 주어진 데이터에 없으므로 임의로 지정
+                .candleInterval("1m") // 인터벌도 임의로 지정
+                .firstTradeId(null) // 데이터에 포함되지 않으므로 null로 설정
+                .lastTradeId(null) // 데이터에 포함되지 않으므로 null로 설정
+                .openPrice(new BigDecimal(klineArray.getString(1)))
+                .closePrice(new BigDecimal(klineArray.getString(4)))
+                .highPrice(new BigDecimal(klineArray.getString(2)))
+                .lowPrice(new BigDecimal(klineArray.getString(3)))
+                .volume(new BigDecimal(klineArray.getString(5)))
+                .tradeCount(klineArray.getInt(8))
+                .isClosed(true) // 데이터에 포함되지 않으므로 임의로 true로 설정
+                .quoteAssetVolume(new BigDecimal(klineArray.getString(7)))
+                .takerBuyBaseAssetVolume(new BigDecimal(klineArray.getString(9)))
+                .takerBuyQuoteAssetVolume(new BigDecimal(klineArray.getString(10)))
+                .ignoreField(klineArray.getInt(11))
+                .build();
     }
 
     public static EventDTO convertKlineEventDTO(String event) {

@@ -6,6 +6,7 @@ import com.binance.connector.client.utils.signaturegenerator.HmacSignatureGenera
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.future.model.entity.EventEntity;
+import trade.future.model.entity.KlineEntity;
 import trade.future.model.entity.PositionEntity;
 import trade.future.model.entity.TradingEntity;
 import trade.future.mongo.EventRepository;
@@ -23,11 +25,15 @@ import trade.future.mongo.PositionRepository;
 import trade.future.repository.TradingRepository;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static trade.common.CommonUtils.parseKlineEntity;
 
 @Slf4j
 @Service
@@ -68,6 +74,8 @@ public class FutureService {
     private final WebSocketCallback failureCallback = this::onFailureCallback;
 
     int failureCount = 0;
+    private HashMap<String, List<KlineEntity>> klines = new HashMap<String, List<KlineEntity>>();
+    private static final int WINDOW_SIZE = 500; // For demonstration purposes
 
     @Transactional
     public void onOpenCallback(String streamId) {
@@ -128,17 +136,27 @@ public class FutureService {
                 JSONObject eventData = new JSONObject(event);
                 //System.out.println("eventData : " + eventData);
                 JSONObject eventObj = new JSONObject(eventData.get("data").toString());
-                if(String.valueOf(eventObj.get("e")).equals("kline")){
-                    System.out.println("kline 이벤트 발생");
-                    System.out.println("event : " + event);
-                } else if(String.valueOf(eventObj.get("e")).equals("forceOrder")){
-                    System.out.println("강제 청산 이벤트 발생");
-                    System.out.println("event : " + event);
-                } else {
-                    System.out.println("기타 이벤트 발생");
-                    System.out.println("event : " + event);
+                switch (String.valueOf(eventObj.get("e"))) {
+                    case "kline":
+                        klineProcess(event);
+                        break;
+                    case "forceOrder":
+                        System.out.println("forceOrder 이벤트 발생");
+                        System.out.println("event : " + event);
+                        break;
+                    case "depthUpdate":
+                        System.out.println("depthUpdate 이벤트 발생");
+                        System.out.println("event : " + event);
+                        break;
+                    case "aggTrade":
+                        System.out.println("aggTrade 이벤트 발생");
+                        System.out.println("event : " + event);
+                        break;
+                    default:
+                        System.out.println("기타 이벤트 발생");
+                        System.out.println("event : " + event);
+                        break;
                 }
-                break;
             } catch (Exception e) {
                 e.printStackTrace();
                 if (retry >= maxRetries - 1) {
@@ -157,6 +175,25 @@ public class FutureService {
                 initialDelayMillis *= 2;
             }
         }
+    }
+
+    private void klineProcess(String klineEvent){
+        System.out.println("kline 이벤트 발생");
+        System.out.println("event : " + klineEvent);
+        /*if (jsonObject.has("k")) {
+            JSONObject kline = jsonObject.getJSONObject("k");
+            boolean isFinal = kline.getBoolean("x");
+            if (isFinal) {
+                double closePrice = kline.getDouble("c");
+                closePrices.add(closePrice);
+                if (closePrices.size() > WINDOW_SIZE) {
+                    closePrices.remove(0);
+                }
+                if (closePrices.size() >= WINDOW_SIZE) {
+                    performLinearRegression();
+                }
+            }
+        }*/
     }
 
     private TradingEntity getTradingEntity(String symbol) {
@@ -216,22 +253,23 @@ public class FutureService {
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
         log.info("klineStreamOpen >>>>> ");
         ArrayList<String> streams = new ArrayList<>();
-        //streams.add("btcusdt@trade");
-        //streams.add("btcusdt@bookTicker");
 
         String klineStreamName = tradingEntity.getSymbol().toLowerCase() + "@kline_" + tradingEntity.getCandleInterval();
-        System.out.println("klineStreamName : " + klineStreamName);
         streams.add(klineStreamName);
+
         String forceOrderStreamName = tradingEntity.getSymbol().toLowerCase() + "@forceOrder";
         streams.add(forceOrderStreamName);
+
+        String depthStreamName = tradingEntity.getSymbol().toLowerCase() + "@depth";
+        streams.add(depthStreamName);
+
+        String aggTradeStreamName = tradingEntity.getSymbol().toLowerCase() + "@aggTrade";
+        streams.add(aggTradeStreamName);
 
         String allMarketForceOrderStreamName = "!forceOrder@arr";
         //streams.add(allMarketForceOrderStreamName);
 
-        //umWebSocketStreamClient = new MyWebSocketClientImpl();
-
         tradingEntity = umWebSocketStreamClient.combineStreams(tradingEntity, streams, openCallback, onMessageCallback, closeCallback, failureCallback);
-        //tradingEntity = umWebSocketStreamClient.klineStream(tradingEntity, openCallback, onMessageCallback, closeCallback, failureCallback);
         return tradingEntity;
     }
 
@@ -391,22 +429,6 @@ public class FutureService {
         return averageQuoteAssetVolume;
     }
 
-    public Map<String, Object> getKlines(String symbol, String interval, int limit) {
-        log.info("getKline >>>>>");
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-
-        UMFuturesClientImpl client = new UMFuturesClientImpl();
-
-        paramMap.put("symbol", symbol);
-        paramMap.put("interval", interval);
-
-        String resultStr = client.market().klines(paramMap);
-        JSONArray resultArray = new JSONArray(resultStr);
-        resultMap.put("result", resultArray);
-        return resultMap;
-    }
-
     public Map<String, Object> getStockSelection(int limit) throws Exception {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
@@ -506,25 +528,136 @@ public class FutureService {
         return resultMap;
     }
 
-    public Map<String, Object> orderBookStream(String symbol) throws Exception {
-        log.info("accountInfo >>>>>");
+    public Map<String, Object> getKlines(String symbol, String interval, int limit) {
+        log.info("getKline >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        ArrayList<String> streams = new ArrayList<>();
-        streams.add("btcusdt@trade");
-        streams.add("btcusdt@bookTicker");
-        umWebSocketStreamClient.combineStreams(streams, ((event) -> {
-            System.out.println(event);
-        }));
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+
+        UMFuturesClientImpl client = new UMFuturesClientImpl();
+
+        paramMap.put("symbol", symbol);
+        paramMap.put("interval", interval);
+        paramMap.put("limit", limit);
+
+        String resultStr = client.market().klines(paramMap);
+        System.out.println(resultStr);
+
+        JSONArray jsonArray = new JSONArray(resultStr);
+        List<KlineEntity> klineEntities = new ArrayList<>();
+
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONArray klineArray = jsonArray.getJSONArray(i);
+            KlineEntity klineEntity = parseKlineEntity(klineArray);
+            klineEntities.add(klineEntity);
+            if(i!=0){
+                performLinearRegression(klineEntities);
+                System.out.println(klineEntity);
+            }
+        }
+        klines.put(symbol, klineEntities);
+        resultMap.put("result", klineEntities);
+        performLinearRegression(klineEntities);
+
         return resultMap;
     }
 
+    private void performLinearRegression(List<KlineEntity> klineEntities) {
+        // 선형 회귀 수행
+        BigDecimal[] x = new BigDecimal[klineEntities.size()];
+        BigDecimal[] y = new BigDecimal[klineEntities.size()];
 
+        BigDecimal[] high = new BigDecimal[klineEntities.size()];
+        BigDecimal[] low = new BigDecimal[klineEntities.size()];
 
+        for (int i = 0; i < klineEntities.size(); i++) {
+            x[i] = BigDecimal.valueOf(i);
+            y[i] = klineEntities.get(i).getClosePrice();
+            high[i] = klineEntities.get(i).getHighPrice();
+            low[i] = klineEntities.get(i).getLowPrice();
+        }
 
+        // 수동으로 회귀 계산 수행
+        BigDecimal trend = calculateTrendLine(x, y, y);
+        BigDecimal highTrend = calculateTrendLine(x, y, high);
+        BigDecimal lowTrend = calculateTrendLine(x, y, low);
+        BigDecimal actual = y[y.length - 1];
+        BigDecimal currentSpread = actual.subtract(trend);
 
+        // 이동 평균 계산
+        BigDecimal sma = calculateSMA(y, y.length);
+        BigDecimal ema = calculateEMA(y, y.length);
 
+        // 현재 추세 파악
+        String trendDirection = determineTrend(sma, ema, actual);
 
+        // 소수점 이하 4자리로 설정
+        actual = actual.setScale(4, RoundingMode.HALF_UP);
+        trend = trend.setScale(4, RoundingMode.HALF_UP);
+        currentSpread = currentSpread.setScale(4, RoundingMode.HALF_UP);
+        System.out.println("****************");
+        System.out.println("종가 : " + actual);
+        System.out.println("고가추세: " + highTrend);
+        System.out.println("추세가: " + trend);
+        System.out.println("저가추세: " + lowTrend);
+        System.out.println("이격: " + currentSpread);
+        System.out.println("SMA: " + sma);
+        System.out.println("EMA: " + ema);
+        System.out.println("Current Trend: " + trendDirection);
+        System.out.println();
+    }
 
+    private static BigDecimal calculateSMA(BigDecimal[] prices, int period) {
+        if (prices.length < period) return BigDecimal.ZERO;
+        BigDecimal sum = BigDecimal.ZERO;
+        for (int i = prices.length - period; i < prices.length; i++) {
+            sum = sum.add(prices[i]);
+        }
+        return sum.divide(BigDecimal.valueOf(period), RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal calculateEMA(BigDecimal[] prices, int period) {
+        if (prices.length < period) return BigDecimal.ZERO;
+        BigDecimal alpha = BigDecimal.valueOf(2.0 / (period + 1));
+        BigDecimal ema = prices[prices.length - period];
+        for (int i = prices.length - period + 1; i < prices.length; i++) {
+            ema = prices[i].multiply(alpha).add(ema.multiply(BigDecimal.ONE.subtract(alpha)));
+        }
+        return ema.setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private static String determineTrend(BigDecimal sma, BigDecimal ema, BigDecimal currentPrice) {
+        if (currentPrice.compareTo(sma) > 0 && currentPrice.compareTo(ema) > 0) {
+            return "Uptrend";
+        } else if (currentPrice.compareTo(sma) < 0 && currentPrice.compareTo(ema) < 0) {
+            return "Downtrend";
+        } else {
+            return "Sideways";
+        }
+    }
+
+    private BigDecimal calculateTrendLine(BigDecimal[] x, BigDecimal[] y, BigDecimal[] prices) {
+        BigDecimal n = BigDecimal.valueOf(x.length);
+        BigDecimal sumX = BigDecimal.ZERO;
+        BigDecimal sumY = BigDecimal.ZERO;
+        BigDecimal sumXY = BigDecimal.ZERO;
+        BigDecimal sumX2 = BigDecimal.ZERO;
+
+        for (int i = 0; i < x.length; i++) {
+            sumX = sumX.add(x[i]);
+            sumY = sumY.add(y[i]);
+            sumXY = sumXY.add(x[i].multiply(prices[i]));
+            sumX2 = sumX2.add(x[i].multiply(x[i]));
+        }
+
+        BigDecimal slope = (n.multiply(sumXY).subtract(sumX.multiply(sumY)))
+                .divide(n.multiply(sumX2).subtract(sumX.multiply(sumX)), MathContext.DECIMAL128);
+
+        BigDecimal intercept = (sumY.subtract(slope.multiply(sumX))).divide(n, MathContext.DECIMAL128);
+
+        BigDecimal lastX = x[x.length - 1];
+        BigDecimal trendValue = slope.multiply(lastX).add(intercept);
+        return trendValue.setScale(4, RoundingMode.HALF_UP);
+    }
 
     /*@Transactional
     public void onMessageCallback(String event){
