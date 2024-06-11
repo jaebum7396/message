@@ -6,7 +6,6 @@ import com.binance.connector.client.utils.signaturegenerator.HmacSignatureGenera
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +13,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.ta4j.core.BaseBarSeries;
+import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.RSIIndicator;
+import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.helpers.HighPriceIndicator;
+import org.ta4j.core.indicators.helpers.LowPriceIndicator;
+import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
+import org.ta4j.core.num.Num;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.future.model.entity.EventEntity;
@@ -25,8 +37,9 @@ import trade.future.mongo.PositionRepository;
 import trade.future.repository.TradingRepository;
 
 import java.math.BigDecimal;
-import java.math.MathContext;
-import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -54,13 +67,20 @@ public class FutureService {
             this.BASE_URL = BASE_URL_REAL;
         }
         System.out.println(BINANCE_API_KEY + " " + BINANCE_SECRET_KEY);
+        this.exchangeInfo = new JSONObject(umFuturesClientImpl.market().exchangeInfo());
+        this.symbols = new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
+        System.out.println("exchangeInfo.get(\"symbols\") : " + symbols);
     }
     public String BINANCE_API_KEY;
     public String BINANCE_SECRET_KEY;
 
+    public JSONObject exchangeInfo;
+    public JSONArray symbols;
     public String BASE_URL;
     public static final String BASE_URL_TEST = "https://testnet.binance.vision";
     public static final String BASE_URL_REAL = "wss://ws-api.binance.com:443/ws-api/v3";
+
+    @Autowired TechnicalIndicatorCalculator technicalIndicatorCalculator;
 
     @Autowired EventRepository eventRepository;
     @Autowired PositionRepository positionRepository;
@@ -73,8 +93,12 @@ public class FutureService {
     private final WebSocketCallback closeCallback = this::onCloseCallback;
     private final WebSocketCallback failureCallback = this::onFailureCallback;
 
+    // 원하는 형식의 날짜 포맷 지정
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     int failureCount = 0;
     private HashMap<String, List<KlineEntity>> klines = new HashMap<String, List<KlineEntity>>();
+    private HashMap<String, BaseBarSeries> seriesMap = new HashMap<String, BaseBarSeries>();
     private static final int WINDOW_SIZE = 500; // For demonstration purposes
 
     @Transactional
@@ -529,6 +553,7 @@ public class FutureService {
     }
 
     public Map<String, Object> getKlines(String symbol, String interval, int limit) {
+        long startTime = System.currentTimeMillis(); // 시작 시간 기록
         log.info("getKline >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
@@ -540,123 +565,134 @@ public class FutureService {
         paramMap.put("limit", limit);
 
         String resultStr = client.market().klines(paramMap);
-        System.out.println(resultStr);
 
         JSONArray jsonArray = new JSONArray(resultStr);
         List<KlineEntity> klineEntities = new ArrayList<>();
-
+        BigDecimal[] closePrices = new BigDecimal[jsonArray.length()];
+        BaseBarSeries series = new BaseBarSeries();
+        seriesMap.put(symbol+"_"+interval, series);
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
             KlineEntity klineEntity = parseKlineEntity(klineArray);
             klineEntities.add(klineEntity);
+
+            Num open = series.numOf(klineEntity.getOpenPrice());
+            Num high = series.numOf(klineEntity.getHighPrice());
+            Num low = series.numOf(klineEntity.getLowPrice());
+            Num close = series.numOf(klineEntity.getClosePrice());
+            Num volume = series.numOf(klineEntity.getVolume());
+
+            series.addBar(klineEntity.getEndTime().atZone(ZoneId.systemDefault()), open, high, low, close, volume);
+
             if(i!=0){
-                performLinearRegression(klineEntities);
-                System.out.println(klineEntity);
+                //TechnicalIndicatorCalculate(series);
+                TechnicalIndicatorCalculate(symbol, interval);
             }
         }
         klines.put(symbol, klineEntities);
         resultMap.put("result", klineEntities);
-        performLinearRegression(klineEntities);
 
+        long endTime = System.currentTimeMillis(); // 종료 시간 기록
+        long elapsedTime = endTime - startTime; // 실행 시간 계산
+        System.out.println("소요시간 : " + elapsedTime + " milliseconds");
         return resultMap;
     }
 
-    private void performLinearRegression(List<KlineEntity> klineEntities) {
-        // 선형 회귀 수행
-        BigDecimal[] x = new BigDecimal[klineEntities.size()];
-        BigDecimal[] y = new BigDecimal[klineEntities.size()];
+    private BigDecimal getTickSize(String symbol) {
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        JSONObject priceFilter = getFilterInfo(symbolInfo, "PRICE_FILTER");
+        return new BigDecimal(priceFilter.getString("tickSize"));
+    }
 
-        BigDecimal[] high = new BigDecimal[klineEntities.size()];
-        BigDecimal[] low = new BigDecimal[klineEntities.size()];
+    private JSONObject getExchangeInfo() {
+        return new JSONObject(umFuturesClientImpl.market().exchangeInfo());
+    }
+    private JSONArray getSymbols(JSONObject exchangeInfo) {
+        return new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
+    }
 
-        for (int i = 0; i < klineEntities.size(); i++) {
-            x[i] = BigDecimal.valueOf(i);
-            y[i] = klineEntities.get(i).getClosePrice();
-            high[i] = klineEntities.get(i).getHighPrice();
-            low[i] = klineEntities.get(i).getLowPrice();
+    private JSONObject getSymbolInfo(JSONArray symbols, String symbol) {
+        for (int i = 0; i < symbols.length(); i++) {
+            JSONObject symbolObject = symbols.getJSONObject(i);
+            String findSymbol = symbolObject.getString("symbol");
+            if(findSymbol.equals(symbol)){
+                return symbolObject;
+            }
         }
+        return null;
+    }
 
-        // 수동으로 회귀 계산 수행
-        BigDecimal trend = calculateTrendLine(x, y, y);
-        BigDecimal highTrend = calculateTrendLine(x, y, high);
-        BigDecimal lowTrend = calculateTrendLine(x, y, low);
-        BigDecimal actual = y[y.length - 1];
-        BigDecimal currentSpread = actual.subtract(trend);
+    private JSONObject getFilterInfo(JSONObject symbolInfo, String filterType) {
+        JSONArray filters = symbolInfo.getJSONArray("filters");
+        for (int i = 0; i < filters.length(); i++) {
+            JSONObject filter = filters.getJSONObject(i);
+            String filterTypeValue = filter.getString("filterType");
+            if(filterTypeValue.equals(filterType)){
+                return filter;
+            }
+        }
+        return null;
+    }
 
-        // 이동 평균 계산
-        BigDecimal sma = calculateSMA(y, y.length);
-        BigDecimal ema = calculateEMA(y, y.length);
+    private void TechnicalIndicatorCalculate(String symbol, String interval) {
+        BaseBarSeries series = seriesMap.get(symbol+"_"+interval);
+        // Define indicators
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        HighPriceIndicator highPrice = new HighPriceIndicator(series);
+        LowPriceIndicator lowPrice = new LowPriceIndicator(series);
 
-        // 현재 추세 파악
-        String trendDirection = determineTrend(sma, ema, actual);
+        // Calculate SMA
+        SMAIndicator sma = new SMAIndicator(closePrice, 7);
 
-        // 소수점 이하 4자리로 설정
-        actual = actual.setScale(4, RoundingMode.HALF_UP);
-        trend = trend.setScale(4, RoundingMode.HALF_UP);
-        currentSpread = currentSpread.setScale(4, RoundingMode.HALF_UP);
-        System.out.println("****************");
-        System.out.println("종가 : " + actual);
-        System.out.println("고가추세: " + highTrend);
-        System.out.println("추세가: " + trend);
-        System.out.println("저가추세: " + lowTrend);
-        System.out.println("이격: " + currentSpread);
-        System.out.println("SMA: " + sma);
-        System.out.println("EMA: " + ema);
-        System.out.println("Current Trend: " + trendDirection);
+        // Calculate EMA
+        EMAIndicator ema = new EMAIndicator(closePrice, 7);
+
+        // Calculate Bollinger Bands
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, 21);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(sma);
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+
+        // Calculate RSI
+        RSIIndicator rsi = new RSIIndicator(closePrice, 6);
+
+        // Calculate MACD
+        MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
+
+        // Determine current trend
+        String currentTrend = determineTrend(series, sma);
+
+        // 포맷 적용하여 문자열로 변환
+        String formattedEndTime = formatter.format(series.getBar(series.getEndIndex()).getEndTime());
+
+        BigDecimal tickSize = getTickSize(symbol);
+        // Print results
+        System.out.println("[캔들시간] : " + formattedEndTime);
+        System.out.println("Close price: "           + CommonUtils.truncate(closePrice.getValue(series.getEndIndex()), tickSize));
+        System.out.println("SMA: "                   + CommonUtils.truncate(sma.getValue(series.getEndIndex()), tickSize));
+        System.out.println("EMA: "                   + CommonUtils.truncate(ema.getValue(series.getEndIndex()), tickSize));
+        System.out.println("Upper Bollinger Band: "  + CommonUtils.truncate(upperBBand.getValue(series.getEndIndex()), tickSize));
+        System.out.println("Middle Bollinger Band: " + CommonUtils.truncate(middleBBand.getValue(series.getEndIndex()), tickSize));
+        System.out.println("Lower Bollinger Band: "  + CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize));
+        System.out.println("RSI: "                   + CommonUtils.truncate(rsi.getValue(series.getEndIndex()), new BigDecimal(2)));
+        System.out.println("MACD: "                  + CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(2)));
+        System.out.println("Current Trend: " + currentTrend);
         System.out.println();
     }
 
-    private static BigDecimal calculateSMA(BigDecimal[] prices, int period) {
-        if (prices.length < period) return BigDecimal.ZERO;
-        BigDecimal sum = BigDecimal.ZERO;
-        for (int i = prices.length - period; i < prices.length; i++) {
-            sum = sum.add(prices[i]);
-        }
-        return sum.divide(BigDecimal.valueOf(period), RoundingMode.HALF_UP);
-    }
+    private String determineTrend(BaseBarSeries series, SMAIndicator sma) {
+        int endIndex = series.getEndIndex() - 1;
+        Num lastValue = sma.getValue(endIndex);
+        Num secondLastValue = sma.getValue(endIndex - 1);
 
-    private static BigDecimal calculateEMA(BigDecimal[] prices, int period) {
-        if (prices.length < period) return BigDecimal.ZERO;
-        BigDecimal alpha = BigDecimal.valueOf(2.0 / (period + 1));
-        BigDecimal ema = prices[prices.length - period];
-        for (int i = prices.length - period + 1; i < prices.length; i++) {
-            ema = prices[i].multiply(alpha).add(ema.multiply(BigDecimal.ONE.subtract(alpha)));
-        }
-        return ema.setScale(4, RoundingMode.HALF_UP);
-    }
-
-    private static String determineTrend(BigDecimal sma, BigDecimal ema, BigDecimal currentPrice) {
-        if (currentPrice.compareTo(sma) > 0 && currentPrice.compareTo(ema) > 0) {
+        if (lastValue.isGreaterThan(secondLastValue)) {
             return "Uptrend";
-        } else if (currentPrice.compareTo(sma) < 0 && currentPrice.compareTo(ema) < 0) {
+        } else if (lastValue.isLessThan(secondLastValue)) {
             return "Downtrend";
         } else {
             return "Sideways";
         }
-    }
-
-    private BigDecimal calculateTrendLine(BigDecimal[] x, BigDecimal[] y, BigDecimal[] prices) {
-        BigDecimal n = BigDecimal.valueOf(x.length);
-        BigDecimal sumX = BigDecimal.ZERO;
-        BigDecimal sumY = BigDecimal.ZERO;
-        BigDecimal sumXY = BigDecimal.ZERO;
-        BigDecimal sumX2 = BigDecimal.ZERO;
-
-        for (int i = 0; i < x.length; i++) {
-            sumX = sumX.add(x[i]);
-            sumY = sumY.add(y[i]);
-            sumXY = sumXY.add(x[i].multiply(prices[i]));
-            sumX2 = sumX2.add(x[i].multiply(x[i]));
-        }
-
-        BigDecimal slope = (n.multiply(sumXY).subtract(sumX.multiply(sumY)))
-                .divide(n.multiply(sumX2).subtract(sumX.multiply(sumX)), MathContext.DECIMAL128);
-
-        BigDecimal intercept = (sumY.subtract(slope.multiply(sumX))).divide(n, MathContext.DECIMAL128);
-
-        BigDecimal lastX = x[x.length - 1];
-        BigDecimal trendValue = slope.multiply(lastX).add(intercept);
-        return trendValue.setScale(4, RoundingMode.HALF_UP);
     }
 
     /*@Transactional

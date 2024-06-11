@@ -2,6 +2,7 @@ package trade.common;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.ta4j.core.num.Num;
 import trade.common.model.Response;
 import trade.configuration.JacksonConfig;
 import io.jsonwebtoken.Claims;
@@ -149,8 +150,8 @@ public class CommonUtils {
     }
 
     public static KlineEntity parseKlineEntity(JSONArray klineArray) {
-        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(0)), ZoneOffset.UTC);
-        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(6)), ZoneOffset.UTC);
+        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(0)), ZoneOffset.systemDefault());
+        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(6)), ZoneOffset.systemDefault());
 
         return KlineEntity.builder()
                 .kLineCd(null) // ID는 자동 생성
@@ -255,4 +256,10 @@ public class CommonUtils {
 
         return targetPrice;
     }
+
+    public static BigDecimal truncate(Num value, BigDecimal tickSize) {
+        BigDecimal decimalValue = new BigDecimal(value.doubleValue());
+        return decimalValue.setScale(tickSize.scale(), RoundingMode.DOWN);
+    }
+
 }
