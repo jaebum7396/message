@@ -24,6 +24,7 @@ import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
+import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.Num;
 import trade.common.CommonUtils;
@@ -32,13 +33,17 @@ import trade.future.model.entity.EventEntity;
 import trade.future.model.entity.KlineEntity;
 import trade.future.model.entity.PositionEntity;
 import trade.future.model.entity.TradingEntity;
+import trade.future.model.enums.ADX_GRADE;
 import trade.future.mongo.EventRepository;
 import trade.future.mongo.PositionRepository;
 import trade.future.repository.TradingRepository;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -66,10 +71,10 @@ public class FutureService {
             this.BINANCE_SECRET_KEY = BINANCE_REAL_SECRET_KEY;
             this.BASE_URL = BASE_URL_REAL;
         }
-        System.out.println(BINANCE_API_KEY + " " + BINANCE_SECRET_KEY);
+        //System.out.println(BINANCE_API_KEY + " " + BINANCE_SECRET_KEY);
         this.exchangeInfo = new JSONObject(umFuturesClientImpl.market().exchangeInfo());
         this.symbols = new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
-        System.out.println("exchangeInfo.get(\"symbols\") : " + symbols);
+        //System.out.println("exchangeInfo.get(\"symbols\") : " + symbols);
     }
     public String BINANCE_API_KEY;
     public String BINANCE_SECRET_KEY;
@@ -568,9 +573,9 @@ public class FutureService {
 
         JSONArray jsonArray = new JSONArray(resultStr);
         List<KlineEntity> klineEntities = new ArrayList<>();
-        BigDecimal[] closePrices = new BigDecimal[jsonArray.length()];
         BaseBarSeries series = new BaseBarSeries();
         seriesMap.put(symbol+"_"+interval, series);
+
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
             KlineEntity klineEntity = parseKlineEntity(klineArray);
@@ -582,11 +587,11 @@ public class FutureService {
             Num close = series.numOf(klineEntity.getClosePrice());
             Num volume = series.numOf(klineEntity.getVolume());
 
-            series.addBar(klineEntity.getEndTime().atZone(ZoneId.systemDefault()), open, high, low, close, volume);
+            series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
 
             if(i!=0){
                 //TechnicalIndicatorCalculate(series);
-                TechnicalIndicatorCalculate(symbol, interval);
+                technicalIndicatorCalculate(symbol, interval);
             }
         }
         klines.put(symbol, klineEntities);
@@ -635,9 +640,10 @@ public class FutureService {
         return null;
     }
 
-    private void TechnicalIndicatorCalculate(String symbol, String interval) {
+    private void technicalIndicatorCalculate(String symbol, String interval) {
         BaseBarSeries series = seriesMap.get(symbol+"_"+interval);
         // Define indicators
+        OpenPriceIndicator openPrice = new OpenPriceIndicator(series);
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         HighPriceIndicator highPrice = new HighPriceIndicator(series);
         LowPriceIndicator lowPrice = new LowPriceIndicator(series);
@@ -661,14 +667,55 @@ public class FutureService {
         MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
 
         // Determine current trend
-        String currentTrend = determineTrend(series, sma);
+        String currentTrend = technicalIndicatorCalculator.determineTrend(series, sma);
 
         // 포맷 적용하여 문자열로 변환
-        String formattedEndTime = formatter.format(series.getBar(series.getEndIndex()).getEndTime());
+        ZonedDateTime utcEndTime = series.getBar(series.getEndIndex()).getEndTime();
+        ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
+        String formattedEndTime = formatter.format(kstEndTime);
+        System.out.println("[캔들종료시간] : "         + formattedEndTime);
 
         BigDecimal tickSize = getTickSize(symbol);
+        double currentAdx = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex());
+        double previousAdx = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex()-1);
+
+        double adxGap = currentAdx - previousAdx;
+        /*if (adxGap > 0) {
+            System.out.println("추세증가 : " + adxGap);
+        } else if (adxGap < 0) {
+            System.out.println("추세감소 : " + adxGap);
+        }*/
+        ADX_GRADE currentAdxGrade = technicalIndicatorCalculator.calculateADXGrade(currentAdx);
+        ADX_GRADE previousAdxGrade = technicalIndicatorCalculator.calculateADXGrade(previousAdx);
+        if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() > 0){
+            System.out.println("추세등급 증가 : " + (previousAdxGrade +" > "+ currentAdxGrade));
+            if (previousAdxGrade.getGrade() == 1 && currentAdxGrade.getGrade() == 2) {
+                System.out.println("!!! 포지션 진입 시그널");
+            }
+        } else if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() < 0){
+            System.out.println("추세등급 감소 : " + previousAdxGrade +" > "+ currentAdxGrade);
+        } else {
+            System.out.println("추세등급 유지 : " + currentAdxGrade);
+        }
+
+        /*if(currentAdx <= 20){
+            System.out.println("횡보 : adx(" + currentAdx+ ")");
+        }
+        if(currentAdx > 20 && currentAdx <= 30){
+            System.out.println("약한추세 : adx(" + currentAdx+ ")");
+        }
+        if(currentAdx > 30 && currentAdx <= 40){
+            System.out.println("추세확정 : adx(" + currentAdx+ ")");
+        }
+        if(currentAdx > 40 && currentAdx <= 50){
+            System.out.println("강한추세 : adx(" + currentAdx+ ")");
+        }
+        if(currentAdx > 50){
+            System.out.println("추세말미 : adx(" + currentAdx+ ")");
+        }*/
+
         // Print results
-        System.out.println("[캔들시간] : " + formattedEndTime);
+        System.out.println("Open price: "            + CommonUtils.truncate(openPrice.getValue(series.getEndIndex()), tickSize));
         System.out.println("Close price: "           + CommonUtils.truncate(closePrice.getValue(series.getEndIndex()), tickSize));
         System.out.println("SMA: "                   + CommonUtils.truncate(sma.getValue(series.getEndIndex()), tickSize));
         System.out.println("EMA: "                   + CommonUtils.truncate(ema.getValue(series.getEndIndex()), tickSize));
@@ -678,21 +725,17 @@ public class FutureService {
         System.out.println("RSI: "                   + CommonUtils.truncate(rsi.getValue(series.getEndIndex()), new BigDecimal(2)));
         System.out.println("MACD: "                  + CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(2)));
         System.out.println("Current Trend: " + currentTrend);
-        System.out.println();
-    }
 
-    private String determineTrend(BaseBarSeries series, SMAIndicator sma) {
-        int endIndex = series.getEndIndex() - 1;
-        Num lastValue = sma.getValue(endIndex);
-        Num secondLastValue = sma.getValue(endIndex - 1);
-
-        if (lastValue.isGreaterThan(secondLastValue)) {
-            return "Uptrend";
-        } else if (lastValue.isLessThan(secondLastValue)) {
-            return "Downtrend";
-        } else {
-            return "Sideways";
+        boolean isGolden = technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9);
+        boolean isDead = technicalIndicatorCalculator.isDeadCross(series, 12, 26, 9);
+        if (isGolden) {
+            System.out.println("MACD Golden Cross: " + isGolden);
         }
+        if (isDead) {
+            System.out.println("MACD Dead Cross: " + isDead);
+        }
+        //technicalIndicatorCalculator.detectDivergence(series, closePrice, rsi, 100);
+        System.out.println();
     }
 
     /*@Transactional

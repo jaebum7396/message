@@ -2,6 +2,9 @@ package trade.common;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.RSIIndicator;
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.num.Num;
 import trade.common.model.Response;
 import trade.configuration.JacksonConfig;
@@ -150,8 +153,8 @@ public class CommonUtils {
     }
 
     public static KlineEntity parseKlineEntity(JSONArray klineArray) {
-        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(0)), ZoneOffset.systemDefault());
-        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(6)), ZoneOffset.systemDefault());
+        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(0)), ZoneOffset.UTC);
+        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(6)), ZoneOffset.UTC);
 
         return KlineEntity.builder()
                 .kLineCd(null) // ID는 자동 생성
