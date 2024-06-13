@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper=false)
+@Entity(name = "KLINE")
 public class KlineEntity extends BaseEntity implements Serializable {
     @Id
     @GeneratedValue(generator = "uuid")
@@ -29,10 +30,15 @@ public class KlineEntity extends BaseEntity implements Serializable {
     @JoinColumn(name = "POSITION_CD")
     private PositionEntity positionEntity;
 
+    @JsonIgnore
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "TECHNICAL_INDICATOR_REPORT_CD")
+    private TechnicalIndicatorReportEntity technicalIndicatorReportEntity;
+
     //연관관계의 주인
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "KLINE_EVENT_CD")
-    private EventEntity klineEvent;
+    @JoinColumn(name = "EVENT_CD")
+    private EventEntity Event;
 
     @Column( name = "START_TIME")
     private LocalDateTime startTime; // Kline 시작 시간

@@ -2,6 +2,7 @@ package trade.common;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.ta4j.core.Bar;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
@@ -140,7 +141,7 @@ public class CommonUtils {
      */
     public static LocalDateTime convertTimestampToDateTime(long timestamp) {
         Instant instant = Instant.ofEpochMilli(timestamp);
-        return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        return LocalDateTime.ofInstant(instant, ZoneId.of(ZoneOffset.UTC.getId()));
     }
 
     /**
@@ -179,13 +180,13 @@ public class CommonUtils {
     }
 
     public static EventDTO convertKlineEventDTO(String event) {
-        JSONObject eventObj = new JSONObject(event);
-        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
-        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
+        JSONObject eventDataObj = new JSONObject(event);
+        JSONObject eventObj = new JSONObject(eventDataObj.get("data").toString());
+        JSONObject klineObj = new JSONObject(eventObj.get("k").toString());
         EventDTO eventDTO = EventDTO.builder()
-            .e(klineEventObj.get("e").toString())
-            .E(Long.parseLong(klineEventObj.get("E").toString()))
-            .s(klineEventObj.get("s").toString())
+            .e(eventObj.get("e").toString())
+            .E(Long.parseLong(eventObj.get("E").toString()))
+            .s(eventObj.get("s").toString())
             .k(KlineDTO.builder()
                 .t(Long.parseLong(klineObj.get("t").toString()))
                 .T(Long.parseLong(klineObj.get("T").toString()))

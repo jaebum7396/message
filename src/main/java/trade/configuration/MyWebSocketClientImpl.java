@@ -37,6 +37,8 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
         connections.put(connectionId, connection);
         tradingEntity.setStreamId(connectionId);
         TradingEntitys.put(connectionId, tradingEntity);
+        System.out.println("connections : " + connections);
+        System.out.println("TradingEntitys : " + TradingEntitys);
         return tradingEntity;
     }
 

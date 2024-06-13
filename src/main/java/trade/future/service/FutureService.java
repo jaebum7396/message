@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.ta4j.core.Bar;
+import org.ta4j.core.BaseBar;
 import org.ta4j.core.BaseBarSeries;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.MACDIndicator;
@@ -29,18 +31,14 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.Num;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
-import trade.future.model.entity.EventEntity;
-import trade.future.model.entity.KlineEntity;
-import trade.future.model.entity.PositionEntity;
-import trade.future.model.entity.TradingEntity;
+import trade.future.model.entity.*;
 import trade.future.model.enums.ADX_GRADE;
-import trade.future.mongo.EventRepository;
-import trade.future.mongo.PositionRepository;
+import trade.future.repository.EventRepository;
+import trade.future.repository.PositionRepository;
 import trade.future.repository.TradingRepository;
 
 import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
-import java.time.Instant;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -170,22 +168,23 @@ public class FutureService {
                         klineProcess(event);
                         break;
                     case "forceOrder":
-                        System.out.println("forceOrder 이벤트 발생");
+                        //System.out.println("forceOrder 이벤트 발생");
                         System.out.println("event : " + event);
                         break;
                     case "depthUpdate":
-                        System.out.println("depthUpdate 이벤트 발생");
+                        //System.out.println("depthUpdate 이벤트 발생");
                         System.out.println("event : " + event);
                         break;
                     case "aggTrade":
-                        System.out.println("aggTrade 이벤트 발생");
+                        //System.out.println("aggTrade 이벤트 발생");
                         System.out.println("event : " + event);
                         break;
                     default:
-                        System.out.println("기타 이벤트 발생");
+                        //System.out.println("기타 이벤트 발생");
                         System.out.println("event : " + event);
                         break;
                 }
+                break;
             } catch (Exception e) {
                 e.printStackTrace();
                 if (retry >= maxRetries - 1) {
@@ -206,101 +205,110 @@ public class FutureService {
         }
     }
 
-    private void klineProcess(String klineEvent){
-        System.out.println("kline 이벤트 발생");
-        System.out.println("event : " + klineEvent);
-        /*if (jsonObject.has("k")) {
-            JSONObject kline = jsonObject.getJSONObject("k");
-            boolean isFinal = kline.getBoolean("x");
-            if (isFinal) {
-                double closePrice = kline.getDouble("c");
-                closePrices.add(closePrice);
-                if (closePrices.size() > WINDOW_SIZE) {
-                    closePrices.remove(0);
-                }
-                if (closePrices.size() >= WINDOW_SIZE) {
-                    performLinearRegression();
-                }
+    private void klineProcess(String event){
+        JSONObject eventObj = new JSONObject(event);
+        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
+        boolean isFinal = klineObj.getBoolean("x");
+
+        String seriesNm = String.valueOf(eventObj.get("stream"));
+        String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
+        String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
+
+        BaseBarSeries series = seriesMap.get(seriesNm);
+        if (isFinal) {
+            System.out.println("event : " + event);
+            //캔들데이터 to EventEntity
+            //EventEntity eventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
+            // 트레이딩 엔티티 조회
+            TradingEntity tradingEntity = getTradingEntity(symbol);
+            // klineEvent를 데이터베이스에 저장
+            EventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
+
+            ZonedDateTime closeTime = CommonUtils.convertTimestampToDateTime(klineObj.getLong("T")).atZone(ZoneOffset.UTC);
+            ZonedDateTime kstEndTime = closeTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
+            String formattedEndTime = formatter.format(kstEndTime);
+
+            Num open = series.numOf(klineObj.getDouble("o"));
+            Num high = series.numOf(klineObj.getDouble("h"));
+            Num low = series.numOf(klineObj.getDouble("l"));
+            Num close = series.numOf(klineObj.getDouble("c"));
+            Num volume = series.numOf(klineObj.getDouble("v"));
+            //series.addBar(closeTime, open, high, low, close, volume);
+            Bar newBar = new BaseBar(Duration.ofMinutes(15), closeTime, open, high, low, close, volume ,null);
+            series.addBar(newBar, true);
+
+            TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(symbol, interval);
+            if (technicalIndicatorReportEntity.getAdxSignal() == 1){
+                System.out.println("진입시그널");
+                klineEventEntity.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
+                /*PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
+                entryPosition.setPositionStatus("OPEN");*/
             }
-        }*/
+            eventRepository.save(klineEventEntity);
+
+        }
     }
 
-    private TradingEntity getTradingEntity(String symbol) {
-        return tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN")
-                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
-    }
+     /*@Transactional
+    public void onMessageCallback(String event){
+        // 최대 재시도 횟수와 초기 재시도 간격 설정
+        int maxRetries = 3;
+        int initialDelayMillis = 1000;
 
-    public void streamClose(int streamId) {
-        umWebSocketStreamClient.closeConnection(streamId);
-    }
+        for (int retry = 0; retry < maxRetries; retry++) {
+            try {
+                //System.out.println("event : " + event);
+                JSONObject eventObj = new JSONObject(event);
+                JSONObject eventObj = new JSONObject(eventObj.get("data").toString());
+                if(String.valueOf(eventObj.get("e")).equals("kline")){
+                    // 트랜잭션 시작
+                    // 트랜잭션 내에서 수행할 작업들
+                    KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
+                    String symbol = klineEvent.getKlineEntity().getSymbol();
 
-    @Transactional
-    public void autoTradingClose() {
-        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
-        tradingEntityList.stream().forEach(tradingEntity -> {
-            if(tradingEntity.getTradingStatus().equals("OPEN")){
-                tradingEntity.setTradingStatus("CLOSE");
-                tradingRepository.save(tradingEntity);
-                streamClose(tradingEntity.getStreamId());
-            }
-        });
-        //umWebSocketStreamClient.closeAllConnections();
-    }
+                    // 트레이딩 엔티티 조회
+                    TradingEntity tradingEntity = getTradingEntity(symbol);
+                    BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
+                    BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
 
-    @Transactional
-    public Map<String, Object> autoTradingOpen(String symbolParam, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
-        log.info("autoTrading >>>>>");
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
-        for(Map<String, Object> selectedStock : selectedStockList){
-            String symbol = String.valueOf(selectedStock.get("symbol"));
-            //String symbol = symbolParam;
-            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+                    // klineEvent를 역직렬화하여 데이터베이스에 저장
+                    KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
+                    BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
 
-            // 해당 심볼의 트레이딩이 없으면 트레이딩을 시작합니다.
-            if(tradingEntityOpt.isEmpty()) {
-                // 해당 페어의 평균 거래량을 구합니다.
-                BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
-                TradingEntity tradingEntity = TradingEntity.builder()
-                        .symbol(symbol)
-                        .tradingStatus("OPEN")
-                        .candleInterval(interval)
-                        .leverage(leverage)
-                        .goalPricePercent(goalPricePercent)
-                        .stockSelectionCount(stockSelectionCount)
-                        .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
-                        .averageQuoteAssetVolume(averageQuoteAssetVolume)
-                        .fluctuationRate(new BigDecimal(String.valueOf(selectedStock.get("priceChangePercent"))))
-                        //.fluctuationRate(new BigDecimal(2))
-                        .build();
-                autoTradeStreamOpen(tradingEntity);
+                    // 포지션 확인 및 저장
+                    checkAndSavePosition(klineEventEntity, tradingEntity, QuoteAssetVolumeStandard, averageQuoteAssetVolume, quoteAssetVolume);
+
+                    // 목표가에 도달한 KlineEvent들을 업데이트
+                    updateGoalAchievedKlineEvent(klineEventEntity);
+
+                    // 트랜잭션 성공 시 반복문 종료
+                } else if(String.valueOf(eventObj.get("e")).equals("forceOrder")){
+                    System.out.println("강제 청산 이벤트 발생");
+                    System.out.println("event : " + event);
+                } else {
+                    System.out.println("event : " + event);
+                }
+                break;
+            } catch (Exception e) {
+                e.printStackTrace();
+                if (retry >= maxRetries - 1) {
+                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
+                    throw e;
+                }
+
+                // 재시도 간격을 설정한 시간만큼 대기
+                try {
+                    Thread.sleep(initialDelayMillis);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+
+                // 재시도 간격을 증가시킴 (예: 백오프 전략)
+                initialDelayMillis *= 2;
             }
         }
-        return resultMap;
-    }
-
-    public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
-        log.info("klineStreamOpen >>>>> ");
-        ArrayList<String> streams = new ArrayList<>();
-
-        String klineStreamName = tradingEntity.getSymbol().toLowerCase() + "@kline_" + tradingEntity.getCandleInterval();
-        streams.add(klineStreamName);
-
-        String forceOrderStreamName = tradingEntity.getSymbol().toLowerCase() + "@forceOrder";
-        streams.add(forceOrderStreamName);
-
-        String depthStreamName = tradingEntity.getSymbol().toLowerCase() + "@depth";
-        streams.add(depthStreamName);
-
-        String aggTradeStreamName = tradingEntity.getSymbol().toLowerCase() + "@aggTrade";
-        streams.add(aggTradeStreamName);
-
-        String allMarketForceOrderStreamName = "!forceOrder@arr";
-        //streams.add(allMarketForceOrderStreamName);
-
-        tradingEntity = umWebSocketStreamClient.combineStreams(tradingEntity, streams, openCallback, onMessageCallback, closeCallback, failureCallback);
-        return tradingEntity;
-    }
+    }*/
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
@@ -337,6 +345,7 @@ public class FutureService {
                 eventEntity.setTradingEntity(tradingEntity);
                 eventEntity.getKlineEntity().setPositionEntity(positionEntity);
                 eventEntity = eventRepository.save(eventEntity);
+                break;
             } catch (Exception e) {
                 e.printStackTrace();
                 if (retry >= maxRetries - 1) {
@@ -355,6 +364,84 @@ public class FutureService {
             }
         }
         return eventEntity;
+    }
+
+    private TradingEntity getTradingEntity(String symbol) {
+        return tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN")
+                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+    }
+
+    public void streamClose(int streamId) {
+        umWebSocketStreamClient.closeConnection(streamId);
+    }
+
+    @Transactional
+    public void autoTradingClose() {
+        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
+        tradingEntityList.stream().forEach(tradingEntity -> {
+            if(tradingEntity.getTradingStatus().equals("OPEN")){
+                tradingEntity.setTradingStatus("CLOSE");
+                tradingRepository.save(tradingEntity);
+                streamClose(tradingEntity.getStreamId());
+            }
+        });
+        //umWebSocketStreamClient.closeAllConnections();
+    }
+
+    @Transactional
+    public Map<String, Object> autoTradingOpen(String symbolParam, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
+        log.info("autoTrading >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
+
+        selectedStockList.parallelStream().forEach(selectedStock -> {
+            String symbol = String.valueOf(selectedStock.get("symbol"));
+            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+
+            // 해당 심볼의 트레이딩이 없으면 트레이딩을 시작합니다.
+            if(tradingEntityOpt.isEmpty()) {
+                // 해당 페어의 평균 거래량을 구합니다.
+                //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
+                TradingEntity tradingEntity = TradingEntity.builder()
+                        .symbol(symbol)
+                        .tradingStatus("OPEN")
+                        .candleInterval(interval)
+                        .leverage(leverage)
+                        .goalPricePercent(goalPricePercent)
+                        .stockSelectionCount(stockSelectionCount)
+                        .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
+                        //.averageQuoteAssetVolume(averageQuoteAssetVolume)
+                        .fluctuationRate(new BigDecimal(String.valueOf(selectedStock.get("priceChangePercent"))))
+                        //.fluctuationRate(new BigDecimal(2))
+                        .build();
+                autoTradeStreamOpen(tradingEntity);
+            }
+        });
+        return resultMap;
+    }
+
+    public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
+        getKlines(tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 500);
+        log.info("klineStreamOpen >>>>> ");
+        ArrayList<String> streams = new ArrayList<>();
+
+        String klineStreamName = tradingEntity.getSymbol().toLowerCase() + "@kline_" + tradingEntity.getCandleInterval();
+        streams.add(klineStreamName);
+
+        String forceOrderStreamName = tradingEntity.getSymbol().toLowerCase() + "@forceOrder";
+        streams.add(forceOrderStreamName);
+
+        /*String depthStreamName = tradingEntity.getSymbol().toLowerCase() + "@depth";
+        streams.add(depthStreamName);*/
+
+        /*String aggTradeStreamName = tradingEntity.getSymbol().toLowerCase() + "@aggTrade";
+        streams.add(aggTradeStreamName);*/
+
+        String allMarketForceOrderStreamName = "!forceOrder@arr";
+        //streams.add(allMarketForceOrderStreamName);
+
+        tradingEntity = umWebSocketStreamClient.combineStreams(tradingEntity, streams, openCallback, onMessageCallback, closeCallback, failureCallback);
+        return tradingEntity;
     }
 
     /*@Transactional
@@ -574,11 +661,13 @@ public class FutureService {
         JSONArray jsonArray = new JSONArray(resultStr);
         List<KlineEntity> klineEntities = new ArrayList<>();
         BaseBarSeries series = new BaseBarSeries();
-        seriesMap.put(symbol+"_"+interval, series);
+        series.setMaximumBarCount(WINDOW_SIZE);
+        seriesMap.put(symbol.toLowerCase() + "@kline_" + interval, series);
 
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
             KlineEntity klineEntity = parseKlineEntity(klineArray);
+            System.out.println(klineArray);
             klineEntities.add(klineEntity);
 
             Num open = series.numOf(klineEntity.getOpenPrice());
@@ -590,7 +679,6 @@ public class FutureService {
             series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
 
             if(i!=0){
-                //TechnicalIndicatorCalculate(series);
                 technicalIndicatorCalculate(symbol, interval);
             }
         }
@@ -640,8 +728,8 @@ public class FutureService {
         return null;
     }
 
-    private void technicalIndicatorCalculate(String symbol, String interval) {
-        BaseBarSeries series = seriesMap.get(symbol+"_"+interval);
+    private TechnicalIndicatorReportEntity technicalIndicatorCalculate(String symbol, String interval) {
+        BaseBarSeries series = seriesMap.get(symbol.toLowerCase() + "@kline_" + interval);
         // Define indicators
         OpenPriceIndicator openPrice = new OpenPriceIndicator(series);
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -650,19 +738,15 @@ public class FutureService {
 
         // Calculate SMA
         SMAIndicator sma = new SMAIndicator(closePrice, 7);
-
         // Calculate EMA
         EMAIndicator ema = new EMAIndicator(closePrice, 7);
-
         // Calculate Bollinger Bands
         StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, 21);
         BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(sma);
         BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
         BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
-
         // Calculate RSI
         RSIIndicator rsi = new RSIIndicator(closePrice, 6);
-
         // Calculate MACD
         MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
 
@@ -673,11 +757,17 @@ public class FutureService {
         ZonedDateTime utcEndTime = series.getBar(series.getEndIndex()).getEndTime();
         ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
         String formattedEndTime = formatter.format(kstEndTime);
-        System.out.println("[캔들종료시간] : "         + formattedEndTime);
+        System.out.println("[캔들종료시간] : "+symbol+"/"+ formattedEndTime);
 
-        BigDecimal tickSize = getTickSize(symbol);
-        double currentAdx = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex());
+        BigDecimal tickSize = getTickSize(symbol.toUpperCase());
+        //adx
+        double currentAdx  = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex());
         double previousAdx = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex()-1);
+        //di
+        double plusDi = technicalIndicatorCalculator.calculatePlusDI(series, 14, series.getEndIndex());
+        double minusDi = technicalIndicatorCalculator.calculateMinusDI(series, 14, series.getEndIndex());
+        //direction
+        String direction = technicalIndicatorCalculator.getDirection(series, 14, series.getEndIndex());
 
         double adxGap = currentAdx - previousAdx;
         /*if (adxGap > 0) {
@@ -685,18 +775,25 @@ public class FutureService {
         } else if (adxGap < 0) {
             System.out.println("추세감소 : " + adxGap);
         }*/
-        ADX_GRADE currentAdxGrade = technicalIndicatorCalculator.calculateADXGrade(currentAdx);
+        ADX_GRADE currentAdxGrade  = technicalIndicatorCalculator.calculateADXGrade(currentAdx);
         ADX_GRADE previousAdxGrade = technicalIndicatorCalculator.calculateADXGrade(previousAdx);
+
+        int adxSignal = 0;
         if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() > 0){
-            System.out.println("추세등급 증가 : " + (previousAdxGrade +" > "+ currentAdxGrade));
             if (previousAdxGrade.getGrade() == 1 && currentAdxGrade.getGrade() == 2) {
                 System.out.println("!!! 포지션 진입 시그널");
+                adxSignal = 1;
             }
+            System.out.println("추세등급 증가: " + (previousAdxGrade +" > "+ currentAdxGrade));
+            System.out.println("방향(DI기준): " + direction);
         } else if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() < 0){
-            System.out.println("추세등급 감소 : " + previousAdxGrade +" > "+ currentAdxGrade);
+            System.out.println("추세등급 감소: " + previousAdxGrade +" > "+ currentAdxGrade);
+            System.out.println("방향(DI기준): " + direction);
         } else {
-            System.out.println("추세등급 유지 : " + currentAdxGrade);
+            System.out.println("추세등급 유지: " + currentAdxGrade);
+            System.out.println("방향(DI기준): " + direction);
         }
+        System.out.println("방향(MA기준): " + currentTrend);
 
         /*if(currentAdx <= 20){
             System.out.println("횡보 : adx(" + currentAdx+ ")");
@@ -714,87 +811,28 @@ public class FutureService {
             System.out.println("추세말미 : adx(" + currentAdx+ ")");
         }*/
 
-        // Print results
-        System.out.println("Open price: "            + CommonUtils.truncate(openPrice.getValue(series.getEndIndex()), tickSize));
-        System.out.println("Close price: "           + CommonUtils.truncate(closePrice.getValue(series.getEndIndex()), tickSize));
-        System.out.println("SMA: "                   + CommonUtils.truncate(sma.getValue(series.getEndIndex()), tickSize));
-        System.out.println("EMA: "                   + CommonUtils.truncate(ema.getValue(series.getEndIndex()), tickSize));
-        System.out.println("Upper Bollinger Band: "  + CommonUtils.truncate(upperBBand.getValue(series.getEndIndex()), tickSize));
-        System.out.println("Middle Bollinger Band: " + CommonUtils.truncate(middleBBand.getValue(series.getEndIndex()), tickSize));
-        System.out.println("Lower Bollinger Band: "  + CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize));
-        System.out.println("RSI: "                   + CommonUtils.truncate(rsi.getValue(series.getEndIndex()), new BigDecimal(2)));
-        System.out.println("MACD: "                  + CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(2)));
-        System.out.println("Current Trend: " + currentTrend);
-
-        boolean isGolden = technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9);
-        boolean isDead = technicalIndicatorCalculator.isDeadCross(series, 12, 26, 9);
-        if (isGolden) {
-            System.out.println("MACD Golden Cross: " + isGolden);
-        }
-        if (isDead) {
-            System.out.println("MACD Dead Cross: " + isDead);
-        }
-        //technicalIndicatorCalculator.detectDivergence(series, closePrice, rsi, 100);
-        System.out.println();
+        TechnicalIndicatorReportEntity technicalIndicatorReport = TechnicalIndicatorReportEntity.builder()
+                .symbol(symbol)
+                .endTime(kstEndTime.toLocalDateTime())
+                .currentAdx(currentAdx)
+                .currentAdxGrade(currentAdxGrade)
+                .previousAdx(previousAdx)
+                .previousAdxGrade(previousAdxGrade)
+                .adxSignal(adxSignal)
+                .plusDi(plusDi)
+                .minusDi(minusDi)
+                .directionDi(direction)
+                .sma(CommonUtils.truncate(sma.getValue(series.getEndIndex()), tickSize))
+                .ema(CommonUtils.truncate(ema.getValue(series.getEndIndex()), tickSize))
+                .maDi(currentTrend)
+                .ubb(CommonUtils.truncate(upperBBand.getValue(series.getEndIndex()), tickSize))
+                .mbb(CommonUtils.truncate(middleBBand.getValue(series.getEndIndex()), tickSize))
+                .lbb(CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize))
+                .rsi(CommonUtils.truncate(rsi.getValue(series.getEndIndex()), new BigDecimal(2)))
+                .macd(CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(0)))
+                .macdGoldenCross(technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9))
+                .macdDeadCross(technicalIndicatorCalculator.isDeadCross(series, 12, 26, 9))
+                .build();
+        return technicalIndicatorReport;
     }
-
-    /*@Transactional
-    public void onMessageCallback(String event){
-        // 최대 재시도 횟수와 초기 재시도 간격 설정
-        int maxRetries = 3;
-        int initialDelayMillis = 1000;
-
-        for (int retry = 0; retry < maxRetries; retry++) {
-            try {
-                //System.out.println("event : " + event);
-                JSONObject eventObj = new JSONObject(event);
-                JSONObject eventObj = new JSONObject(eventObj.get("data").toString());
-                if(String.valueOf(eventObj.get("e")).equals("kline")){
-                    // 트랜잭션 시작
-                    // 트랜잭션 내에서 수행할 작업들
-                    KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
-                    String symbol = klineEvent.getKlineEntity().getSymbol();
-
-                    // 트레이딩 엔티티 조회
-                    TradingEntity tradingEntity = getTradingEntity(symbol);
-                    BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
-                    BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
-
-                    // klineEvent를 역직렬화하여 데이터베이스에 저장
-                    KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
-                    BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
-
-                    // 포지션 확인 및 저장
-                    checkAndSavePosition(klineEventEntity, tradingEntity, QuoteAssetVolumeStandard, averageQuoteAssetVolume, quoteAssetVolume);
-
-                    // 목표가에 도달한 KlineEvent들을 업데이트
-                    updateGoalAchievedKlineEvent(klineEventEntity);
-
-                    // 트랜잭션 성공 시 반복문 종료
-                } else if(String.valueOf(eventObj.get("e")).equals("forceOrder")){
-                    System.out.println("강제 청산 이벤트 발생");
-                    System.out.println("event : " + event);
-                } else {
-                    System.out.println("event : " + event);
-                }
-                break;
-            } catch (Exception e) {
-                e.printStackTrace();
-                if (retry >= maxRetries - 1) {
-                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
-                    throw e;
-                }
-
-                // 재시도 간격을 설정한 시간만큼 대기
-                try {
-                    Thread.sleep(initialDelayMillis);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-
-                // 재시도 간격을 증가시킴 (예: 백오프 전략)
-                initialDelayMillis *= 2;
-            }
-        }
-    }*/
 }

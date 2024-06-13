@@ -10,6 +10,8 @@ import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.adx.ADXIndicator;
+import org.ta4j.core.indicators.adx.MinusDIIndicator;
+import org.ta4j.core.indicators.adx.PlusDIIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
@@ -127,11 +129,11 @@ public class TechnicalIndicatorCalculator {
 
         if (lastValue.isGreaterThan(secondLastValue)) {
             // Calculate upward trend angle
-            double angle = calculateUpwardAngle(series, 5); // Choose a suitable period
+            double angle = calculateUpwardAngle(series, 14); // Choose a suitable period
             return "Uptrend (Angle: " + angle + " degrees)";
         } else if (lastValue.isLessThan(secondLastValue)) {
             // Calculate downward trend angle
-            double angle = calculateDownwardAngle(series, 5); // Choose a suitable period
+            double angle = calculateDownwardAngle(series, 14); // Choose a suitable period
             return "Downtrend (Angle: " + angle + " degrees)";
         } else {
             return "Sideways";
@@ -172,6 +174,34 @@ public class TechnicalIndicatorCalculator {
         ADXIndicator adxIndicator = new ADXIndicator(series, adxPeriod);
         return adxIndicator.getValue(idx).doubleValue();
     }
+
+    public double calculatePlusDI(BaseBarSeries series, int period, int idx) {
+        PlusDIIndicator plusDI = new PlusDIIndicator(series, period);
+        return plusDI.getValue(idx).doubleValue();
+    }
+
+    public double calculateMinusDI(BaseBarSeries series, int period, int idx) {
+        MinusDIIndicator minusDI = new MinusDIIndicator(series, period);
+        return minusDI.getValue(idx).doubleValue();
+    }
+
+    public String getDirection(BaseBarSeries series, int period, int idx){
+        double plusDI = calculatePlusDI(series, period, idx);
+        double minusDI = calculateMinusDI(series, period, idx);
+
+        String direction = "";
+        if(plusDI > minusDI){
+            direction = "상승";
+        }
+        else if(plusDI < minusDI){
+            direction = "하락";
+        }
+        else{
+            direction = "횡보";
+        }
+        return direction;
+    }
+
     public ADX_GRADE calculateADXGrade(double adx){
         ADX_GRADE adx_grade = ADX_GRADE.횡보;
         if(adx <= 20){

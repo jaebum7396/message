@@ -15,12 +15,13 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper=false)
+@Entity(name = "EVENT")
 public class EventEntity extends BaseEntity implements Serializable {
     @Id
     @GeneratedValue(generator = "uuid")
     @GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
-    @Column( name = "KLINE_EVENT_CD")
-    private String kLineEventCd; // ID 필드 추가 (데이터베이스 식별자)
+    @Column( name = "EVENT_CD")
+    private String EventCd; // ID 필드 추가 (데이터베이스 식별자)
 
     @JsonIgnore
     @OneToOne(cascade = CascadeType.ALL)
