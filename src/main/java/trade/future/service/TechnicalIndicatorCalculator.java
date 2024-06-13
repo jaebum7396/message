@@ -130,13 +130,13 @@ public class TechnicalIndicatorCalculator {
         if (lastValue.isGreaterThan(secondLastValue)) {
             // Calculate upward trend angle
             double angle = calculateUpwardAngle(series, 14); // Choose a suitable period
-            return "Uptrend (Angle: " + angle + " degrees)";
+            return "LONG";
         } else if (lastValue.isLessThan(secondLastValue)) {
             // Calculate downward trend angle
             double angle = calculateDownwardAngle(series, 14); // Choose a suitable period
-            return "Downtrend (Angle: " + angle + " degrees)";
+            return "SHORT";
         } else {
-            return "Sideways";
+            return "SIDE";
         }
     }
 
@@ -191,13 +191,13 @@ public class TechnicalIndicatorCalculator {
 
         String direction = "";
         if(plusDI > minusDI){
-            direction = "상승";
+            direction = "LONG";
         }
         else if(plusDI < minusDI){
-            direction = "하락";
+            direction = "SHORT";
         }
         else{
-            direction = "횡보";
+            direction = "SIDE";
         }
         return direction;
     }

@@ -60,8 +60,8 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "EMA")
     private BigDecimal ema;
 
-    @Column( name = "MA_DI")
-    private String maDi;
+    @Column( name = "DIRECTION_MA")
+    private String directionMa;
 
     @Column( name = "UBB")
     private BigDecimal ubb; // Upper Bollinger Band

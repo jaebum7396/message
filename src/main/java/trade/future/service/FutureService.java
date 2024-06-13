@@ -218,97 +218,25 @@ public class FutureService {
         BaseBarSeries series = seriesMap.get(seriesNm);
         if (isFinal) {
             System.out.println("event : " + event);
-            //캔들데이터 to EventEntity
-            //EventEntity eventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
-            // 트레이딩 엔티티 조회
             TradingEntity tradingEntity = getTradingEntity(symbol);
             // klineEvent를 데이터베이스에 저장
             EventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
+            klineEventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
 
-            ZonedDateTime closeTime = CommonUtils.convertTimestampToDateTime(klineObj.getLong("T")).atZone(ZoneOffset.UTC);
-            ZonedDateTime kstEndTime = closeTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
-            String formattedEndTime = formatter.format(kstEndTime);
-
-            Num open = series.numOf(klineObj.getDouble("o"));
-            Num high = series.numOf(klineObj.getDouble("h"));
-            Num low = series.numOf(klineObj.getDouble("l"));
-            Num close = series.numOf(klineObj.getDouble("c"));
-            Num volume = series.numOf(klineObj.getDouble("v"));
-            //series.addBar(closeTime, open, high, low, close, volume);
-            Bar newBar = new BaseBar(Duration.ofMinutes(15), closeTime, open, high, low, close, volume ,null);
-            series.addBar(newBar, true);
-
-            TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(symbol, interval);
-            if (technicalIndicatorReportEntity.getAdxSignal() == 1){
-                System.out.println("진입시그널");
-                klineEventEntity.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
-                /*PositionEntity entryPosition = klineEventEntity.getKlineEntity().getPositionEntity();
-                entryPosition.setPositionStatus("OPEN");*/
+            if(klineEventEntity.getKlineEntity().getTechnicalIndicatorReportEntity().getAdxSignal() == -1){
+                System.out.println("청산시그널");
+                eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> {
+                    PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
+                    if(closePosition.getPositionStatus().equals("OPEN")){
+                        closePosition.setPositionStatus("CLOSE");
+                        closePosition.setClosePrice(klineEvent.getKlineEntity().getClosePrice());
+                        positionRepository.save(closePosition);
+                    }
+                });
             }
             eventRepository.save(klineEventEntity);
-
         }
     }
-
-     /*@Transactional
-    public void onMessageCallback(String event){
-        // 최대 재시도 횟수와 초기 재시도 간격 설정
-        int maxRetries = 3;
-        int initialDelayMillis = 1000;
-
-        for (int retry = 0; retry < maxRetries; retry++) {
-            try {
-                //System.out.println("event : " + event);
-                JSONObject eventObj = new JSONObject(event);
-                JSONObject eventObj = new JSONObject(eventObj.get("data").toString());
-                if(String.valueOf(eventObj.get("e")).equals("kline")){
-                    // 트랜잭션 시작
-                    // 트랜잭션 내에서 수행할 작업들
-                    KlineEventEntity klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
-                    String symbol = klineEvent.getKlineEntity().getSymbol();
-
-                    // 트레이딩 엔티티 조회
-                    TradingEntity tradingEntity = getTradingEntity(symbol);
-                    BigDecimal QuoteAssetVolumeStandard = tradingEntity.getQuoteAssetVolumeStandard();
-                    BigDecimal averageQuoteAssetVolume = tradingEntity.getAverageQuoteAssetVolume();
-
-                    // klineEvent를 역직렬화하여 데이터베이스에 저장
-                    KlineEventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
-                    BigDecimal quoteAssetVolume = klineEventEntity.getKlineEntity().getQuoteAssetVolume();
-
-                    // 포지션 확인 및 저장
-                    checkAndSavePosition(klineEventEntity, tradingEntity, QuoteAssetVolumeStandard, averageQuoteAssetVolume, quoteAssetVolume);
-
-                    // 목표가에 도달한 KlineEvent들을 업데이트
-                    updateGoalAchievedKlineEvent(klineEventEntity);
-
-                    // 트랜잭션 성공 시 반복문 종료
-                } else if(String.valueOf(eventObj.get("e")).equals("forceOrder")){
-                    System.out.println("강제 청산 이벤트 발생");
-                    System.out.println("event : " + event);
-                } else {
-                    System.out.println("event : " + event);
-                }
-                break;
-            } catch (Exception e) {
-                e.printStackTrace();
-                if (retry >= maxRetries - 1) {
-                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
-                    throw e;
-                }
-
-                // 재시도 간격을 설정한 시간만큼 대기
-                try {
-                    Thread.sleep(initialDelayMillis);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-
-                // 재시도 간격을 증가시킴 (예: 백오프 전략)
-                initialDelayMillis *= 2;
-            }
-        }
-    }*/
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
@@ -322,6 +250,10 @@ public class FutureService {
                 int goalPricePercent = tradingEntity.getGoalPricePercent();
                 int leverage = tradingEntity.getLeverage();
 
+                // 캔들데이터 분석을 위한 bar 세팅
+                settingBar(event);
+                TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
+                // 포지션 엔티티 생성
                 PositionEntity positionEntity = PositionEntity.builder()
                         .positionStatus("NONE")
                         .goalPricePercent(goalPricePercent)
@@ -334,16 +266,16 @@ public class FutureService {
                                         eventEntity.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
                         .build();
 
-                if (tradingEntity.getFluctuationRate().compareTo(BigDecimal.ZERO) > 0) {
-                    positionEntity.setPositionSide("LONG");
-                    //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : LONG");
-                } else {
-                    positionEntity.setPositionSide("SHORT");
-                    //System.out.println("변동률 :" + tradingEntity.getFluctuationRate()+ " / 포지션 : SHORT");
+                if (technicalIndicatorReportEntity.getAdxSignal() == 1){
+                    System.out.println("진입시그널");
+                    positionEntity.setPositionStatus("OPEN");
+                    positionEntity.setEntryPrice(eventEntity.getKlineEntity().getClosePrice());
+                    positionEntity.setPositionSide(technicalIndicatorReportEntity.getDirectionDi());
                 }
 
                 eventEntity.setTradingEntity(tradingEntity);
                 eventEntity.getKlineEntity().setPositionEntity(positionEntity);
+                eventEntity.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
                 eventEntity = eventRepository.save(eventEntity);
                 break;
             } catch (Exception e) {
@@ -364,6 +296,27 @@ public class FutureService {
             }
         }
         return eventEntity;
+    }
+
+    private void settingBar(String event) {
+        JSONObject eventObj = new JSONObject(event);
+        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
+
+        String seriesNm = String.valueOf(eventObj.get("stream"));
+        BaseBarSeries series = seriesMap.get(seriesNm);
+        //캔들데이터 분석
+        ZonedDateTime closeTime = CommonUtils.convertTimestampToDateTime(klineObj.getLong("T")).atZone(ZoneOffset.UTC);
+        ZonedDateTime kstEndTime = closeTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
+        String formattedEndTime = formatter.format(kstEndTime);
+        Num open = series.numOf(klineObj.getDouble("o"));
+        Num high = series.numOf(klineObj.getDouble("h"));
+        Num low = series.numOf(klineObj.getDouble("l"));
+        Num close = series.numOf(klineObj.getDouble("c"));
+        Num volume = series.numOf(klineObj.getDouble("v"));
+        //series.addBar(closeTime, open, high, low, close, volume);
+        Bar newBar = new BaseBar(Duration.ofMinutes(15), closeTime, open, high, low, close, volume ,null);
+        series.addBar(newBar, true);
     }
 
     private TradingEntity getTradingEntity(String symbol) {
@@ -757,7 +710,7 @@ public class FutureService {
         ZonedDateTime utcEndTime = series.getBar(series.getEndIndex()).getEndTime();
         ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
         String formattedEndTime = formatter.format(kstEndTime);
-        System.out.println("[캔들종료시간] : "+symbol+"/"+ formattedEndTime);
+        //System.out.println("[캔들종료시간] : "+symbol+"/"+ formattedEndTime);
 
         BigDecimal tickSize = getTickSize(symbol.toUpperCase());
         //adx
@@ -784,32 +737,17 @@ public class FutureService {
                 System.out.println("!!! 포지션 진입 시그널");
                 adxSignal = 1;
             }
-            System.out.println("추세등급 증가: " + (previousAdxGrade +" > "+ currentAdxGrade));
-            System.out.println("방향(DI기준): " + direction);
+            //System.out.println("추세등급 증가: " + (previousAdxGrade +" > "+ currentAdxGrade));
+            //System.out.println("방향(DI기준): " + direction);
         } else if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() < 0){
-            System.out.println("추세등급 감소: " + previousAdxGrade +" > "+ currentAdxGrade);
-            System.out.println("방향(DI기준): " + direction);
+            //System.out.println("추세등급 감소: " + previousAdxGrade +" > "+ currentAdxGrade);
+            //System.out.println("방향(DI기준): " + direction);
+            adxSignal = -1;
         } else {
-            System.out.println("추세등급 유지: " + currentAdxGrade);
-            System.out.println("방향(DI기준): " + direction);
+            //System.out.println("추세등급 유지: " + currentAdxGrade);
+            //System.out.println("방향(DI기준): " + direction);
         }
-        System.out.println("방향(MA기준): " + currentTrend);
-
-        /*if(currentAdx <= 20){
-            System.out.println("횡보 : adx(" + currentAdx+ ")");
-        }
-        if(currentAdx > 20 && currentAdx <= 30){
-            System.out.println("약한추세 : adx(" + currentAdx+ ")");
-        }
-        if(currentAdx > 30 && currentAdx <= 40){
-            System.out.println("추세확정 : adx(" + currentAdx+ ")");
-        }
-        if(currentAdx > 40 && currentAdx <= 50){
-            System.out.println("강한추세 : adx(" + currentAdx+ ")");
-        }
-        if(currentAdx > 50){
-            System.out.println("추세말미 : adx(" + currentAdx+ ")");
-        }*/
+        //System.out.println("방향(MA기준): " + currentTrend);
 
         TechnicalIndicatorReportEntity technicalIndicatorReport = TechnicalIndicatorReportEntity.builder()
                 .symbol(symbol)
@@ -824,7 +762,7 @@ public class FutureService {
                 .directionDi(direction)
                 .sma(CommonUtils.truncate(sma.getValue(series.getEndIndex()), tickSize))
                 .ema(CommonUtils.truncate(ema.getValue(series.getEndIndex()), tickSize))
-                .maDi(currentTrend)
+                .directionMa(currentTrend)
                 .ubb(CommonUtils.truncate(upperBBand.getValue(series.getEndIndex()), tickSize))
                 .mbb(CommonUtils.truncate(middleBBand.getValue(series.getEndIndex()), tickSize))
                 .lbb(CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize))

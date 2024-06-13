@@ -37,13 +37,11 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Builder.Default
     private boolean goalPriceCheck = false; // 목표가 도달 여부
 
-    @Column( name = "GOAL_PRICE_PLUS")
-    @Builder.Default
-    private boolean goalPricePlus = false; //상방으로 목표가 달성
+    @Column( name = "ENTRY_PRICE")
+    private BigDecimal entryPrice;
 
-    @Column( name = "GOAL_PRICE_MINUS")
-    @Builder.Default
-    private boolean goalPriceMinus = false; //하방으로 목표가 달성
+    @Column( name = "CLOSE_PRICE")
+    private BigDecimal closePrice;
 
     @Column( name = "PLUS_GOAL_PRICE", precision = 19, scale = 8)
     private BigDecimal plusGoalPrice;
