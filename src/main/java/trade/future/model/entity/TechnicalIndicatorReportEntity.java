@@ -24,10 +24,6 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "TECHNICAL_INDICATOR_REPORT_CD")
     private String technicalIndicatorReportCd; // ID 필드 추가 (데이터베이스 식별자)
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "KLINE_CD")
-    private KlineEntity klineEntity;
-
     @Column( name = "SYMBOL")
     private String symbol; // 심볼
 
