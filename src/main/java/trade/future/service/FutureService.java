@@ -1,6 +1,7 @@
 package trade.future.service;
 
 import com.binance.connector.client.WebSocketApiClient;
+import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.client.impl.WebSocketApiClientImpl;
 import com.binance.connector.client.utils.signaturegenerator.HmacSignatureGenerator;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
@@ -215,7 +216,6 @@ public class FutureService {
         String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
         String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
 
-        BaseBarSeries series = seriesMap.get(seriesNm);
         if (isFinal) {
             System.out.println("event : " + event);
             TradingEntity tradingEntity = getTradingEntity(symbol);
@@ -309,6 +309,7 @@ public class FutureService {
         ZonedDateTime closeTime = CommonUtils.convertTimestampToDateTime(klineObj.getLong("T")).atZone(ZoneOffset.UTC);
         ZonedDateTime kstEndTime = closeTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
         String formattedEndTime = formatter.format(kstEndTime);
+        System.out.println("한국시간 : " + formattedEndTime);
         Num open = series.numOf(klineObj.getDouble("o"));
         Num high = series.numOf(klineObj.getDouble("h"));
         Num low = series.numOf(klineObj.getDouble("l"));
@@ -316,7 +317,13 @@ public class FutureService {
         Num volume = series.numOf(klineObj.getDouble("v"));
         //series.addBar(closeTime, open, high, low, close, volume);
         Bar newBar = new BaseBar(Duration.ofMinutes(15), closeTime, open, high, low, close, volume ,null);
-        series.addBar(newBar, true);
+        Bar lastBar = series.getLastBar();
+        if (!newBar.getEndTime().isAfter(lastBar.getEndTime())) {
+            series.addBar(newBar, true);
+        }else{
+            series.addBar(newBar, false);
+        }
+
     }
 
     private TradingEntity getTradingEntity(String symbol) {
@@ -345,7 +352,21 @@ public class FutureService {
     public Map<String, Object> autoTradingOpen(String symbolParam, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
         log.info("autoTrading >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
+        List<Map<String, Object>> selectedStockList;
+
+        System.out.println("symbolParam : " + symbolParam);
+
+        if(symbolParam == null || symbolParam.isEmpty()) {
+            selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
+        } else {
+            LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+            paramMap.put("symbol", symbolParam);
+            String resultStr = umFuturesClientImpl.market().ticker24H(paramMap);
+            JSONObject result = new JSONObject(resultStr);
+            List<Map<String, Object>> list = new ArrayList<>();
+            list.add(result.toMap());
+            selectedStockList = list;
+        }
 
         selectedStockList.parallelStream().forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
@@ -587,14 +608,71 @@ public class FutureService {
     public Map<String, Object> accountInfo() throws Exception {
         log.info("accountInfo >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        //System.out.println(umFuturesClientImpl.account().accountInformation());
-        System.out.println(BINANCE_API_KEY + " " + BINANCE_SECRET_KEY);
-        HmacSignatureGenerator signatureGenerator = new HmacSignatureGenerator(BINANCE_SECRET_KEY);
-        WebSocketApiClient client = new WebSocketApiClientImpl(BINANCE_API_KEY, signatureGenerator, BASE_URL);
-        client.connect(((event) -> {
-            System.out.println(event + "\n");
-        }));
+        //WebSocketApiClient client = new WebSocketApiClientImpl(BINANCE_API_KEY, signatureGenerator, BASE_URL);
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+
+        JSONArray balanceInfo = new JSONArray(client.account().futuresAccountBalance(new LinkedHashMap<>()));
+        printPrettyJson(balanceInfo);
+
+        /*JSONArray positionInfo = new JSONArray(client.account().getPositionMarginChangeHistory(new LinkedHashMap<>(Map.of("symbol", "BTCUSDT"))));
+        printPrettyJson(positionInfo);*/
+
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        printPrettyJson(accountInfo);
+        JSONArray positionArr = findObjectByValue(accountInfo.getJSONArray("positions"), "symbol", "BTCUSDT");
+        System.out.println("[BTCUSDT 포지션 정보]");
+        printPrettyJson(positionArr);
+        //findObjectByValue(accountInfo.getJSONArray("positions"), "symbol", "BTCUSDT").ifPresent(System.out::println);
+
+        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
         return resultMap;
+    }
+
+    public static JSONArray findObjectByValue(JSONArray jsonArray, String key, String value) {
+        JSONArray result = new JSONArray();
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONObject jsonObject = jsonArray.getJSONObject(i);
+            if (jsonObject.getString(key).equals(value)) {
+                result.put(jsonObject);
+            }
+        }
+        return result;
+    }
+
+    public void printPrettyJson(Object jsonObj) {
+        if (jsonObj instanceof JSONObject) {
+            // JSONObject인 경우
+            JSONObject jsonObject = (JSONObject) jsonObj;
+            System.out.println(jsonObject.toString(2));  // 들여쓰기 2칸
+        } else if (jsonObj instanceof JSONArray) {
+            // JSONArray인 경우
+            JSONArray jsonArray = (JSONArray) jsonObj;
+            System.out.println(jsonArray.toString(2));  // 들여쓰기 2칸
+        } else {
+            System.out.println("Invalid JSON object.");
+        }
+    }
+
+
+    public void printPrettyJsonString(String jsonStr) {
+        // Trim the string to handle any leading or trailing spaces
+        String trimmedJsonStr = jsonStr.trim();
+
+        // Determine if the JSON string is an object or array
+        if (trimmedJsonStr.startsWith("{")) {
+            // It's a JSONObject
+            JSONObject jsonObject = new JSONObject(trimmedJsonStr);
+            System.out.println(jsonObject.toString(2));
+        } else if (trimmedJsonStr.startsWith("[")) {
+            // It's a JSONArray
+            JSONArray jsonArray = new JSONArray(trimmedJsonStr);
+            System.out.println(jsonArray.toString(2));
+        } else {
+            System.out.println("Invalid JSON string.");
+        }
     }
 
     public Map<String, Object> getKlines(String symbol, String interval, int limit) {
@@ -620,7 +698,7 @@ public class FutureService {
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
             KlineEntity klineEntity = parseKlineEntity(klineArray);
-            System.out.println(klineArray);
+            //System.out.println(klineArray);
             klineEntities.add(klineEntity);
 
             Num open = series.numOf(klineEntity.getOpenPrice());
