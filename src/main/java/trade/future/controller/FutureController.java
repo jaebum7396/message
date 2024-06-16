@@ -12,6 +12,8 @@ import trade.common.CommonUtils;
 import trade.future.service.FutureService;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 @Slf4j
 @Api(tags = "FutureController")
@@ -66,5 +68,11 @@ public class FutureController {
     @Operation(summary="계좌 정보를 가져옵니다.", description="계좌 정보를 가져옵니다.")
     public ResponseEntity accountInfo() throws Exception {
         return commonUtils.okResponsePackaging(futureService.accountInfo());
+    }
+
+    @PostMapping(value = "/future/order")
+    @Operation(summary="주문제출.", description="주문제출.")
+    public ResponseEntity orderSubmit(@RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.orderSubmit(requestParam));
     }
 }

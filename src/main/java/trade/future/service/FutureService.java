@@ -39,6 +39,7 @@ import trade.future.repository.PositionRepository;
 import trade.future.repository.TradingRepository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -220,10 +221,11 @@ public class FutureService {
             System.out.println("event : " + event);
             TradingEntity tradingEntity = getTradingEntity(symbol);
             // klineEvent를 데이터베이스에 저장
-            EventEntity klineEventEntity = saveKlineEvent(event, tradingEntity);
-            klineEventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
+            EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
 
-            if(klineEventEntity.getKlineEntity().getTechnicalIndicatorReportEntity().getAdxSignal() == -1){
+            eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
+
+            if(eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity().getAdxSignal() == -1){
                 System.out.println("청산시그널");
                 eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> {
                     PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -231,52 +233,97 @@ public class FutureService {
                         closePosition.setPositionStatus("CLOSE");
                         closePosition.setClosePrice(klineEvent.getKlineEntity().getClosePrice());
                         positionRepository.save(closePosition);
+                        try {
+                            orderSubmit(makeOrder(klineEvent, "CLOSE", "MARKET"));
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
                     }
                 });
             }
-            eventRepository.save(klineEventEntity);
+            eventRepository.save(eventEntity);
         }
+    }
+
+    public LinkedHashMap<String,Object> makeOrder(EventEntity eventEntity, String intent, String type){
+        LinkedHashMap<String,Object> paramMap = new LinkedHashMap<>();
+        TradingEntity tradingEntity = eventEntity.getTradingEntity();
+        KlineEntity klineEntity = eventEntity.getKlineEntity();
+        PositionEntity positionEntity = klineEntity.getPositionEntity();
+        String symbol = tradingEntity.getSymbol();
+        String side = positionEntity.getPositionSide();
+
+        paramMap.put("symbol", symbol);
+        paramMap.put("side", side);
+        if (intent.equals("OPEN")) {
+            paramMap.put("positionSide", side.equals("LONG") ? "BUY" : "SELL");
+            BigDecimal notional = tradingEntity.getCollateral().multiply(new BigDecimal("3"));
+            if (notional.compareTo(getNotional(symbol)) > 0) {
+                BigDecimal quantity = notional.divide(klineEntity.getClosePrice(), 10, RoundingMode.UP);
+                quantity = roundQuantity(quantity, getTickSize(symbol));
+                paramMap.put("quantity", quantity);
+            }else{
+                System.out.println("명목가치(" + notional+ ")가 최소주문가능금액보다 작습니다.");
+                // 포지션 종료하고 새로 오픈하는 소스 작성
+            }
+
+        } else if (intent.equals("CLOSE")) {
+            paramMap.put("positionSide", side.equals("LONG") ? "SELL" : "BUY");
+            paramMap.put("closePosition", "true");
+        }
+        //paramMap.put("positionSide", positionEntity.getPositionStatus());
+        paramMap.put("type", type);
+
+        return paramMap;
+    }
+
+    public static BigDecimal roundQuantity(BigDecimal quantity, BigDecimal tickSize) {
+        return quantity.divide(tickSize, 0, RoundingMode.UP).multiply(tickSize);
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
-        EventEntity eventEntity = null;
+        EventEntity klineEvent = null;
         // 최대 재시도 횟수와 초기 재시도 간격 설정
         int maxRetries = 3;
         int initialDelayMillis = 1000;
         for (int retry = 0; retry < maxRetries; retry++) {
             try {
-                eventEntity = CommonUtils.convertKlineEventDTO(event).toEntity();
+                klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
+                klineEvent.setTradingEntity(tradingEntity);
                 int goalPricePercent = tradingEntity.getGoalPricePercent();
                 int leverage = tradingEntity.getLeverage();
 
                 // 캔들데이터 분석을 위한 bar 세팅
                 settingBar(event);
                 TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
+                klineEvent.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
+
                 // 포지션 엔티티 생성
                 PositionEntity positionEntity = PositionEntity.builder()
                         .positionStatus("NONE")
                         .goalPricePercent(goalPricePercent)
-                        .klineEntity(eventEntity.getKlineEntity())
+                        .klineEntity(klineEvent.getKlineEntity())
                         .plusGoalPrice(
                                 CommonUtils.calculateGoalPrice(
-                                        eventEntity.getKlineEntity().getClosePrice(), "LONG", leverage, goalPricePercent))
+                                        klineEvent.getKlineEntity().getClosePrice(), "LONG", leverage, goalPricePercent))
                         .minusGoalPrice(
                                 CommonUtils.calculateGoalPrice(
-                                        eventEntity.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
+                                        klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
                         .build();
-
+                klineEvent.getKlineEntity().setPositionEntity(positionEntity);
                 if (technicalIndicatorReportEntity.getAdxSignal() == 1){
                     System.out.println("진입시그널");
                     positionEntity.setPositionStatus("OPEN");
-                    positionEntity.setEntryPrice(eventEntity.getKlineEntity().getClosePrice());
+                    positionEntity.setEntryPrice(klineEvent.getKlineEntity().getClosePrice());
                     positionEntity.setPositionSide(technicalIndicatorReportEntity.getDirectionDi());
+                    try {
+                        orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
                 }
-
-                eventEntity.setTradingEntity(tradingEntity);
-                eventEntity.getKlineEntity().setPositionEntity(positionEntity);
-                eventEntity.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
-                eventEntity = eventRepository.save(eventEntity);
+                klineEvent = eventRepository.save(klineEvent);
                 break;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -295,7 +342,7 @@ public class FutureService {
                 initialDelayMillis *= 2;
             }
         }
-        return eventEntity;
+        return klineEvent;
     }
 
     private void settingBar(String event) {
@@ -386,6 +433,7 @@ public class FutureService {
                         .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
                         //.averageQuoteAssetVolume(averageQuoteAssetVolume)
                         .fluctuationRate(new BigDecimal(String.valueOf(selectedStock.get("priceChangePercent"))))
+                        .collateral(new BigDecimal("100"))
                         //.fluctuationRate(new BigDecimal(2))
                         .build();
                 autoTradeStreamOpen(tradingEntity);
@@ -597,11 +645,27 @@ public class FutureService {
     }
 
     public Map<String, Object> autoTradingInfo() throws Exception {
-        log.info("autoTradingInfo >>>>>");
+        log.info("orderSubmit >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<TradingEntity> tradingEntityList = tradingRepository.findAll();
         tradingEntityList = tradingEntityList.stream().filter(tradingEntity -> tradingEntity.getTradingStatus().equals("OPEN")).collect(Collectors.toList());
         resultMap.put("tradingEntityList", tradingEntityList);
+        return resultMap;
+    }
+
+    public Map<String, Object> orderSubmit(LinkedHashMap<String, Object> requestParam) throws Exception {
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        try{
+            UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+            LinkedHashMap<String, Object> leverageParam = new LinkedHashMap<>();
+            leverageParam.put("symbol", requestParam.get("symbol"));
+            leverageParam.put("leverage", 3);
+            String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
+            String result = client.account().newOrder(requestParam);
+            resultMap.put("result", result);
+        } catch (Exception e) {
+            System.out.print(e.getMessage());
+        }
         return resultMap;
     }
 
@@ -722,7 +786,14 @@ public class FutureService {
         return resultMap;
     }
 
-    private BigDecimal getTickSize(String symbol) {
+    private BigDecimal getNotional(String symbol) {
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        JSONObject priceFilter = getFilterInfo(symbolInfo, "MIN_NOTIONAL");
+        return new BigDecimal(priceFilter.getString("notional"));
+    }
+
+    private BigDecimal getTickSize(String symbol) { //최소 주문가능 금액
         JSONArray symbols = getSymbols(exchangeInfo);
         JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
         JSONObject priceFilter = getFilterInfo(symbolInfo, "PRICE_FILTER");
