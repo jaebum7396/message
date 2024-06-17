@@ -91,7 +91,6 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Builder.Default
     private boolean goalPriceCheck = false; // 목표가 도달 여부
 
-
     @Column( name = "PLUS_GOAL_PRICE", precision = 19, scale = 8)
     private BigDecimal plusGoalPrice;
 
@@ -103,6 +102,9 @@ public class PositionEntity extends BaseEntity implements Serializable {
 
     @Column( name = "REALIZATION_PNL")
     private BigDecimal realizatioPnl; // 실현손익
+
+    @Column( name = "REMARK")
+    private String remark; //
 
     @Override
     public String toString() {

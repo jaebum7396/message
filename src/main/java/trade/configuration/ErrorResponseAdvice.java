@@ -6,6 +6,7 @@ import java.util.Map;
 import io.jsonwebtoken.ExpiredJwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -13,10 +14,22 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import trade.common.model.Response;
+import trade.exception.TradingException;
+import trade.future.model.entity.TradingEntity;
+import trade.future.repository.TradingRepository;
+import trade.future.service.FutureService;
 
 @RestControllerAdvice
 public class ErrorResponseAdvice {
 	private Logger logger = LoggerFactory.getLogger(ErrorResponseAdvice.class);
+	@Autowired FutureService futureService;
+	@Autowired TradingRepository tradingRepository;
+
+	@ExceptionHandler(TradingException.class)
+	public void handleTradingException(TradingEntity tradingEntity) {
+		// 포지션 종료하고 새로 오픈하는 소스 작성
+		futureService.reconnectStream(tradingEntity);
+	}
 	
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity handleException(Exception e) {

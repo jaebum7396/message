@@ -14,6 +14,7 @@ import trade.future.service.FutureService;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.UUID;
 
 @Slf4j
 @Api(tags = "FutureController")
@@ -55,7 +56,7 @@ public class FutureController {
     @GetMapping(value = "/future/klines/")
     @Operation(summary="해당 심볼의 캔들 데이터를 가져옵니다(기본값 500개)", description="해당 심볼의 캔들 데이터를 가져옵니다.")
     public ResponseEntity getKlines(@RequestParam String symbol, @RequestParam String interval, @RequestParam int limit) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.getKlines(symbol, interval, limit));
+        return commonUtils.okResponsePackaging(futureService.getKlines(String.valueOf(UUID.randomUUID()), symbol, interval, limit));
     }
 
     @GetMapping(value = "/future/auto/info")

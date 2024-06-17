@@ -78,11 +78,8 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MACD")
     private BigDecimal macd; // Moving Average Convergence Divergence
 
-    @Column( name = "MACD_GOLDEN_CROSS")
-    private boolean macdGoldenCross;
-
-    @Column( name = "MACD_DEAD_CROSS")
-    private boolean macdDeadCross;
+    @Column( name = "MACD_CROSS_SIGNAL")
+    private int macdCrossSignal;
 
     @Override
     public String toString() {
