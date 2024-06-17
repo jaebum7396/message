@@ -44,7 +44,6 @@ public class MyWebSocketConnection extends WebSocketConnection {
 
     @Override
     public void onClosing(WebSocket ws, int code, String reason) {
-        System.out.println("reason : " + reason);
         onClosingCallback.onReceive(String.valueOf(super.getConnectionId()));
     }
 

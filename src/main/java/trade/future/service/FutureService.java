@@ -1,9 +1,5 @@
 package trade.future.service;
 
-import com.binance.connector.client.WebSocketApiClient;
-import com.binance.connector.client.impl.SpotClientImpl;
-import com.binance.connector.client.impl.WebSocketApiClientImpl;
-import com.binance.connector.client.utils.signaturegenerator.HmacSignatureGenerator;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +33,6 @@ import trade.future.model.enums.ADX_GRADE;
 import trade.future.repository.EventRepository;
 import trade.future.repository.PositionRepository;
 import trade.future.repository.TradingRepository;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -71,10 +66,8 @@ public class FutureService {
             this.BINANCE_SECRET_KEY = BINANCE_REAL_SECRET_KEY;
             this.BASE_URL = BASE_URL_REAL;
         }
-        //System.out.println(BINANCE_API_KEY + " " + BINANCE_SECRET_KEY);
         this.exchangeInfo = new JSONObject(umFuturesClientImpl.market().exchangeInfo());
-        this.symbols = new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
-        //System.out.println("exchangeInfo.get(\"symbols\") : " + symbols);
+        this.symbols      = new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
     }
     public String BINANCE_API_KEY;
     public String BINANCE_SECRET_KEY;
@@ -86,7 +79,6 @@ public class FutureService {
     public static final String BASE_URL_REAL = "wss://ws-api.binance.com:443/ws-api/v3";
 
     @Autowired TechnicalIndicatorCalculator technicalIndicatorCalculator;
-
     @Autowired EventRepository eventRepository;
     @Autowired PositionRepository positionRepository;
     @Autowired TradingRepository tradingRepository;
@@ -111,8 +103,12 @@ public class FutureService {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
         System.out.println("[OPEN] >>>>> " + streamId + " 번 스트림을 오픈합니다.");
+        tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
-        log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
+        if (streamId.equals("1")){
+            throw new RuntimeException("강제예외 발생");
+        }
+        //log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
     }
 
     @Transactional
@@ -370,7 +366,6 @@ public class FutureService {
         }else{
             series.addBar(newBar, false);
         }
-
     }
 
     private TradingEntity getTradingEntity(String symbol) {
