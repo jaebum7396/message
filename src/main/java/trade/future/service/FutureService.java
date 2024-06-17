@@ -105,10 +105,10 @@ public class FutureService {
         System.out.println("[OPEN] >>>>> " + streamId + " 번 스트림을 오픈합니다.");
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
-        if (streamId.equals("1")){
+        /*if (streamId.equals("1")){
             throw new RuntimeException("강제예외 발생");
-        }
-        //log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
+        }*/
+        log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
     }
 
     @Transactional
