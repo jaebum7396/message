@@ -69,6 +69,7 @@ public class FutureService {
         }
         this.exchangeInfo = new JSONObject(umFuturesClientImpl.market().exchangeInfo());
         this.symbols      = new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
+        System.out.println("symbols : "+symbols);
     }
     public String BINANCE_API_KEY;
     public String BINANCE_SECRET_KEY;
@@ -223,6 +224,7 @@ public class FutureService {
             TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
             if(technicalIndicatorReportEntity.getAdxSignal() == -1){
                 eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> {
+                    System.out.println("klineEvent : "+ klineEvent);
                     String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                     PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                     if(closePosition.getPositionStatus().equals("OPEN")){
@@ -233,6 +235,7 @@ public class FutureService {
                 int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
                 if(technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("200")) > 0 && macdCrossSignal<0){ //MACD가 200을 넘어서 데드크로스가 일어났을때.
                     eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
+                        System.out.println("klineEvent : "+ klineEvent);
                         String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                         if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
@@ -241,6 +244,7 @@ public class FutureService {
                     });
                 } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){ //MACD가 -200을 넘어서 골든크로스가 일어났을때.
                     eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
+                        System.out.println("klineEvent : "+ klineEvent);
                         String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                         if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
@@ -262,8 +266,9 @@ public class FutureService {
         closePosition.setClosePrice(klineEvent.getKlineEntity().getClosePrice());
         positionRepository.save(closePosition); //포지션을 클로즈한다.
         try { //마켓가로 클로즈 주문을 제출한다.
-            orderSubmit(makeOrder(klineEvent, "CLOSE", "MARKET"));
+            orderSubmit(makeOrder(klineEvent, "CLOSE", "STOP_MARKET"));
         } catch (Exception e) {
+            e.printStackTrace();
             throw new TradingException(tradingEntity);
         }
     }
@@ -279,6 +284,7 @@ public class FutureService {
         try {
             orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
         } catch (Exception e) {
+            e.printStackTrace();
             throw new TradingException(tradingEntity);
         }
     }
@@ -299,7 +305,9 @@ public class FutureService {
             BigDecimal notional = tradingEntity.getCollateral().multiply(new BigDecimal("3"));
             if (notional.compareTo(getNotional(symbol)) > 0) {
                 BigDecimal quantity = notional.divide(klineEntity.getClosePrice(), 10, RoundingMode.UP);
-                quantity = roundQuantity(quantity, getTickSize(symbol));
+                BigDecimal stepSize = getStepSize(symbol);
+                quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
+
                 paramMap.put("quantity", quantity);
             }else{
                 System.out.println("명목가치(" + notional+ ")가 최소주문가능금액보다 작습니다.");
@@ -359,6 +367,7 @@ public class FutureService {
                 klineEvent.getKlineEntity().setPositionEntity(positionEntity);
                 if (technicalIndicatorReportEntity.getAdxSignal() == 1){
                     String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                    System.out.println("klineEvent : "+ klineEvent);
                     makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
                     try {
                         orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
@@ -369,6 +378,7 @@ public class FutureService {
                     int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
                     if(technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("200")) > 0 && macdCrossSignal<0){
                         String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                        System.out.println("klineEvent : "+ klineEvent);
                         makeOpenOrder(klineEvent, "SHORT", remark);
                         try {
                             orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
@@ -377,6 +387,7 @@ public class FutureService {
                         }
                     } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){
                         String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                        System.out.println("klineEvent : "+ klineEvent);
                         makeOpenOrder(klineEvent, "LONG", remark);
                         try {
                             orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
@@ -864,6 +875,20 @@ public class FutureService {
         JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
         JSONObject priceFilter = getFilterInfo(symbolInfo, "PRICE_FILTER");
         return new BigDecimal(priceFilter.getString("tickSize"));
+    }
+
+    private BigDecimal getMinQty(String symbol) { //최소 주문가능 금액
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
+        return new BigDecimal(lotSizeFilter.getString("minQty"));
+    }
+
+    private BigDecimal getStepSize(String symbol) { //최소 주문가능 금액
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
+        return new BigDecimal(lotSizeFilter.getString("stepSize"));
     }
 
     private JSONObject getExchangeInfo() {
