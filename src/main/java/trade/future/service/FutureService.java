@@ -331,7 +331,9 @@ public class FutureService {
             BigDecimal notional = tradingEntity.getCollateral().multiply(new BigDecimal("3"));
             if (notional.compareTo(getNotional(symbol)) > 0) {
                 BigDecimal quantity = notional.divide(klineEntity.getClosePrice(), 10, RoundingMode.UP);
-                quantity = roundQuantity(quantity, getTickSize(symbol));
+                BigDecimal stepSize = getStepSize(symbol);
+                quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
+
                 paramMap.put("quantity", quantity);
             }else{
                 System.out.println("명목가치(" + notional+ ")가 최소주문가능금액보다 작습니다.");
@@ -581,6 +583,87 @@ public class FutureService {
         return tradingEntity;
     }
 
+    /*@Transactional
+    public void updateGoalAchievedKlineEvent(EventEntity eventEntity) {
+        List<EventEntity> goalAchievedPlusList = eventRepository
+                .findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(
+                        eventEntity.getKlineEntity().getSymbol()
+                        , eventEntity.getKlineEntity().getClosePrice());
+
+        goalAchievedPlusList.stream().forEach(goalAchievedPlus -> {
+            goalAchievedPlus.getKlineEntity().getPositionEntity().setGoalPriceCheck(true);
+            goalAchievedPlus.getKlineEntity().getPositionEntity().setGoalPricePlus(true);
+
+            Optional<PositionEntity> currentPositionOpt = Optional.ofNullable(goalAchievedPlus.getKlineEntity().getPositionEntity());
+
+            if(currentPositionOpt.isPresent()){
+                PositionEntity currentPosition = currentPositionOpt.get();
+                if(currentPosition.getPositionStatus().equals("OPEN")) {
+                    System.out.println("목표가 도달(long) : " + goalAchievedPlus.getKlineEntity().getSymbol()
+                            + " 현재가 : " + eventEntity.getKlineEntity().getClosePrice()
+                            + "/ 목표가 : " + goalAchievedPlus.getKlineEntity().getPositionEntity().getPlusGoalPrice());
+                    currentPosition.setPositionStatus("CLOSE");
+                    //System.out.println(currentPosition.toString());
+                    System.out.println(">>>>> 포지션을 종료합니다. " + goalAchievedPlus.getKlineEntity().getSymbol());
+
+                    // 트레이딩을 닫습니다.
+                    TradingEntity tradingEntity = goalAchievedPlus.getTradingEntity();
+                    streamClose(tradingEntity.getStreamId());
+                    //tradingEntity.setTradingStatus("CLOSE");
+                    //tradingRepository.save(tradingEntity);
+
+                    //트레이딩을 다시 시작합니다.
+                    try {
+                        autoTradingOpen(tradingEntity.getSymbol(),tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+            eventRepository.save(goalAchievedPlus);
+        });
+
+        List<EventEntity> goalAchievedMinusList = eventRepository
+                .findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(
+                        eventEntity.getKlineEntity().getSymbol()
+                        , eventEntity.getKlineEntity().getClosePrice());
+
+        goalAchievedMinusList.stream().forEach(goalAchievedMinus -> {
+            goalAchievedMinus.getKlineEntity().getPositionEntity().setGoalPriceCheck(true);
+            goalAchievedMinus.getKlineEntity().getPositionEntity().setGoalPriceMinus(true);
+
+            Optional<PositionEntity> currentPositionOpt = Optional.ofNullable(goalAchievedMinus.getKlineEntity().getPositionEntity());
+
+            if(currentPositionOpt.isPresent()){
+                PositionEntity currentPosition = currentPositionOpt.get();
+                if(currentPosition.getPositionStatus().equals("OPEN")){
+                    System.out.println("목표가 도달(short) : " + goalAchievedMinus.getKlineEntity().getSymbol()
+                            + " 현재가 : " + eventEntity.getKlineEntity().getClosePrice()
+                            + "/ 목표가 : " + goalAchievedMinus.getKlineEntity().getPositionEntity().getMinusGoalPrice());
+                    currentPosition.setPositionStatus("CLOSE");
+                    System.out.println(">>>>> 포지션을 종료합니다. " + goalAchievedMinus.getKlineEntity().getSymbol());
+                    System.out.println(currentPosition.toString());
+
+                    // 트레이딩을 닫습니다.
+                    TradingEntity tradingEntity = goalAchievedMinus.getTradingEntity();
+                    tradingEntity.setTradingStatus("CLOSE");
+                    tradingRepository.save(tradingEntity);
+
+                    // 소켓 스트림을 닫습니다.
+                    streamClose(tradingEntity.getStreamId());
+
+                    //트레이딩을 다시 시작합니다.
+                    try {
+                        autoTradingOpen(tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+            eventRepository.save(goalAchievedMinus);
+        });
+    }*/
+
     public BigDecimal getKlinesAverageQuoteAssetVolume(JSONArray klineArray, String interval) {
         log.info("getKlinesAverageQuoteAssetVolume >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
@@ -816,6 +899,20 @@ public class FutureService {
         JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
         JSONObject priceFilter = getFilterInfo(symbolInfo, "PRICE_FILTER");
         return new BigDecimal(priceFilter.getString("tickSize"));
+    }
+
+    private BigDecimal getMinQty(String symbol) { //최소 주문가능 금액
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
+        return new BigDecimal(lotSizeFilter.getString("minQty"));
+    }
+
+    private BigDecimal getStepSize(String symbol) { //최소 주문가능 금액
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
+        return new BigDecimal(lotSizeFilter.getString("stepSize"));
     }
 
     private JSONObject getExchangeInfo() {
