@@ -546,7 +546,7 @@ public class FutureService {
         log.info("autoTrading >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> selectedStockList;
-        //allPositionsClose();
+        allPositionsClose();
 
         System.out.println("symbolParam : " + symbolParam);
 
