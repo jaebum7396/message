@@ -46,6 +46,9 @@ public class KlineEntity extends BaseEntity implements Serializable {
     @Column( name = "END_TIME")
     private LocalDateTime endTime; // Kline 종료 시간
 
+    @Column( name = "END_TIME_KR")
+    private LocalDateTime endTimeKr; // Kline 종료 시간
+
     @Column( name = "SYMBOL")
     private String symbol; // 심볼
 

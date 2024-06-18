@@ -11,4 +11,6 @@ public interface EventRepositoryQ {
     List<EventEntity> findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(String symbol, BigDecimal currentPrice);
     List<EventEntity> findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(String symbol, BigDecimal currentPrice);
     Optional<EventEntity> findEventBySymbolAndPositionStatus(String symbol, String positionStatus);
+
+    List<EventEntity> findEventByPositionStatus(String positionStatus);
 }

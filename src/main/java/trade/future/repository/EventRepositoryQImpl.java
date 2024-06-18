@@ -37,6 +37,27 @@ public class EventRepositoryQImpl implements EventRepositoryQ {
         return result;
     }
 
+    public List<EventEntity> findEventByPositionStatus(String positionStatus) {
+        JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
+
+        QEventEntity qKlineEvent = QEventEntity.eventEntity;
+        QTradingEntity qTradingEntity = QTradingEntity.tradingEntity;
+        QKlineEntity qKline = QKlineEntity.klineEntity;
+        QPositionEntity qPosition = QPositionEntity.positionEntity;
+
+        List<EventEntity> result =
+            queryFactory
+                .selectFrom(qKlineEvent)
+                .join(qKlineEvent.klineEntity, qKline).fetchJoin()
+                .join(qKlineEvent.tradingEntity, qTradingEntity).fetchJoin()
+                .join(qKline.positionEntity, qPosition).fetchJoin()
+                .where(
+                    qPosition.positionStatus.eq(positionStatus)
+                )
+                .fetch();
+        return result;
+    }
+
     public List<EventEntity> findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(String symbol, BigDecimal currentPrice) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 

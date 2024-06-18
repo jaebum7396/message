@@ -31,10 +31,7 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.text.DecimalFormat;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -142,6 +139,11 @@ public class CommonUtils {
     public static LocalDateTime convertTimestampToDateTime(long timestamp) {
         Instant instant = Instant.ofEpochMilli(timestamp);
         return LocalDateTime.ofInstant(instant, ZoneId.of(ZoneOffset.UTC.getId()));
+    }
+
+    public static LocalDateTime convertTimestampToDateTimeKr(long timestamp) {
+        Instant instant = Instant.ofEpochMilli(timestamp);
+        return LocalDateTime.ofInstant(instant, ZoneId.of(ZoneOffset.UTC.getId())).atZone(ZoneOffset.UTC).withZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime();
     }
 
     /**

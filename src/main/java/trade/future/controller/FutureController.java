@@ -25,11 +25,6 @@ public class FutureController {
     @Autowired FutureService futureService;
     @Autowired CommonUtils commonUtils;
 
-    @GetMapping(value = "/future/auto/close")
-    @Operation(summary="자동매매를 종료합니다.", description="자동매매를 종료합니다.")
-    public void autoTradingClose() {
-        futureService.autoTradingClose();
-    }
     @GetMapping(value = "/future/auto/open")
     @Operation(summary="자동매매를 시작합니다.", description="자동매매를 시작합니다.")
     public ResponseEntity autoTradingOpen(
@@ -40,6 +35,21 @@ public class FutureController {
             , @RequestParam int stockSelectionCount
             , @RequestParam BigDecimal quoteAssetVolumeStandard) throws Exception {
         return commonUtils.okResponsePackaging(futureService.autoTradingOpen(symbol, interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
+    }
+    @GetMapping(value = "/future/auto/close")
+    @Operation(summary="자동매매를 종료합니다.", description="자동매매를 종료합니다.")
+    public void autoTradingClose() {
+        futureService.autoTradingClose();
+    }
+    @PostMapping(value = "/future/order/submit")
+    @Operation(summary="주문제출.", description="주문제출.")
+    public ResponseEntity orderSubmit(@RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.orderSubmit(requestParam));
+    }
+    @GetMapping(value = "/future/positions/close")
+    @Operation(summary="모든 포지션을 종료합니다.", description="모든 포지션을 종료합니다.")
+    public void allPositionsClose() {
+        futureService.allPositionsClose();
     }
     @GetMapping(value = "/future/stream/close")
     @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
@@ -69,11 +79,5 @@ public class FutureController {
     @Operation(summary="계좌 정보를 가져옵니다.", description="계좌 정보를 가져옵니다.")
     public ResponseEntity accountInfo() throws Exception {
         return commonUtils.okResponsePackaging(futureService.accountInfo());
-    }
-
-    @PostMapping(value = "/future/order")
-    @Operation(summary="주문제출.", description="주문제출.")
-    public ResponseEntity orderSubmit(@RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.orderSubmit(requestParam));
     }
 }
