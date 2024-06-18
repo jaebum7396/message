@@ -46,6 +46,11 @@ public class FutureController {
     public ResponseEntity orderSubmit(@RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
         return commonUtils.okResponsePackaging(futureService.orderSubmit(requestParam));
     }
+    @PostMapping(value = "/future/order/submit/collateral")
+    @Operation(summary="주문제출.", description="주문제출.")
+    public ResponseEntity orderSubmitCollateral(@RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.orderSubmitCollateral(requestParam));
+    }
     @GetMapping(value = "/future/positions/close")
     @Operation(summary="모든 포지션을 종료합니다.", description="모든 포지션을 종료합니다.")
     public void allPositionsClose() {

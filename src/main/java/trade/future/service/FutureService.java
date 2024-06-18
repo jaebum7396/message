@@ -226,7 +226,7 @@ public class FutureService {
                     String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                     PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                     if(closePosition.getPositionStatus().equals("OPEN")){
-                        makeCloseOrder(eventEntity, closePosition, remark);
+                        makeCloseOrder(eventEntity, klineEvent, remark);
                     }
                 });
             }else if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
@@ -236,7 +236,7 @@ public class FutureService {
                         String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                         if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
-                            makeCloseOrder(eventEntity, closePosition, remark);
+                            makeCloseOrder(eventEntity, klineEvent, remark);
                         }
                     });
                 } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){ //MACD가 -200을 넘어서 골든크로스가 일어났을때.
@@ -244,7 +244,7 @@ public class FutureService {
                         String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                         if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
-                            makeCloseOrder(eventEntity, closePosition, remark);
+                            makeCloseOrder(eventEntity, klineEvent, remark);
                         }
                     });
                 }
@@ -283,45 +283,43 @@ public class FutureService {
         autoTradingClose();
     }
 
-    public void makeCloseOrder(EventEntity currentEvent, PositionEntity closePosition, String remark){
+    public void makeCloseOrder(EventEntity currentEvent, EventEntity positionEvent, String remark){
         System.out.println(remark);
         TradingEntity tradingEntity = currentEvent.getTradingEntity();
+        PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
         try { //마켓가로 클로즈 주문을 제출한다.
             closePosition.setRemark(remark);
             closePosition.setPositionStatus("CLOSE");
             closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
-            Map<String, Object> returnMap = orderSubmit(makeOrder(currentEvent, "OPEN", "MARKET"));
-            positionRepository.save(closePosition); //포지션을 클로즈한다.
+            Map<String, Object> returnMap = orderSubmit(makeOrder(tradingEntity, closePosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
+            eventRepository.save(positionEvent); //포지션을 클로즈한다.
         } catch (Exception e) {
             e.printStackTrace();
             throw new TradingException(tradingEntity);
         }
     }
 
-    public void makeOpenOrder(EventEntity klineEvent,String positionSide, String remark){
+    public void makeOpenOrder(EventEntity currentEvent, String positionSide, String remark){
         System.out.println(remark);
-        PositionEntity openPosition = klineEvent.getKlineEntity().getPositionEntity();
-        TradingEntity tradingEntity = klineEvent.getTradingEntity();
+        PositionEntity openPosition = currentEvent.getKlineEntity().getPositionEntity();
+        TradingEntity tradingEntity = currentEvent.getTradingEntity();
         try {
             openPosition.setPositionStatus("OPEN");
-            openPosition.setEntryPrice(klineEvent.getKlineEntity().getClosePrice());
+            openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
             openPosition.setPositionSide(positionSide);
             openPosition.setRemark(remark);
-            Map<String, Object> returnMap = orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
-            positionRepository.save(openPosition);
+            Map<String, Object> returnMap = orderSubmit(makeOrder(tradingEntity, openPosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
+            //Map<String, Object> returnMap = orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
+            eventRepository.save(currentEvent);
         } catch (Exception e) {
             e.printStackTrace();
             throw new TradingException(tradingEntity);
         }
     }
 
-    public LinkedHashMap<String,Object> makeOrder(EventEntity eventEntity, String intent, String type){
+    public LinkedHashMap<String,Object> makeOrder(TradingEntity tradingEntity, String positionSide, BigDecimal currentPrice, String intent, String type){
         LinkedHashMap<String,Object> paramMap = new LinkedHashMap<>();
-        TradingEntity tradingEntity = eventEntity.getTradingEntity();
-        KlineEntity klineEntity = eventEntity.getKlineEntity();
-        PositionEntity positionEntity = klineEntity.getPositionEntity();
         String symbol = tradingEntity.getSymbol();
-        String positionSide = positionEntity.getPositionSide(); //LONG/SHORT
         String side = ""; //BUY/SELL
         paramMap.put("symbol", symbol);
         if (intent.equals("OPEN")) {
@@ -330,7 +328,7 @@ public class FutureService {
             paramMap.put("side", side);
             BigDecimal notional = tradingEntity.getCollateral().multiply(new BigDecimal("3"));
             if (notional.compareTo(getNotional(symbol)) > 0) {
-                BigDecimal quantity = notional.divide(klineEntity.getClosePrice(), 10, RoundingMode.UP);
+                BigDecimal quantity = notional.divide(currentPrice, 10, RoundingMode.UP);
                 BigDecimal stepSize = getStepSize(symbol);
                 quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
 
@@ -348,6 +346,42 @@ public class FutureService {
         paramMap.put("type", type);
 
         return paramMap;
+    }
+
+    public Map<String, Object> orderSubmitCollateral(LinkedHashMap<String, Object> requestParam) throws Exception {
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        try{
+            UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+            LinkedHashMap<String, Object> leverageParam = new LinkedHashMap<>();
+            String symbol = String.valueOf(requestParam.get("symbol")).toUpperCase();
+            leverageParam.put("symbol", requestParam.get("symbol"));
+            leverageParam.put("leverage", 3);
+            String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
+
+            exchangeInfo = getExchangeInfo();
+
+            LinkedHashMap<String, Object> klineMap = new LinkedHashMap<>();
+            klineMap.put("symbol", symbol);
+            klineMap.put("interval", "1m");
+            String resultStr = client.market().klines(klineMap);
+            JSONArray jsonArray = new JSONArray(resultStr);
+            JSONArray klineArray = jsonArray.getJSONArray(jsonArray.length()-1);
+            KlineEntity klineEntity = parseKlineEntity(klineArray);
+            BigDecimal notional = new BigDecimal(String.valueOf(requestParam.get("collateral"))).multiply(new BigDecimal("3"));
+            if (notional.compareTo(getNotional(symbol)) > 0) {
+                BigDecimal quantity = notional.divide(klineEntity.getClosePrice(), 10, RoundingMode.UP);
+                BigDecimal stepSize = getStepSize(symbol);
+                quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
+                requestParam.put("quantity", quantity);
+            }
+            System.out.println("new Order : " + requestParam);
+            String result = client.account().newOrder(requestParam);
+            System.out.println("result : " + result);
+            resultMap.put("result", result);
+        } catch (Exception e) {
+            throw e;
+        }
+        return resultMap;
     }
 
     public Map<String, Object> orderSubmit(LinkedHashMap<String, Object> requestParam) throws Exception {
@@ -411,9 +445,8 @@ public class FutureService {
                 klineEvent.getKlineEntity().setPositionEntity(positionEntity);
                 if (technicalIndicatorReportEntity.getAdxSignal() == 1){
                     String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
-                    makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
                     try {
-                        orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
+                        makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
                     } catch (Exception e) {
                         throw new TradingException(tradingEntity);
                     }
@@ -421,17 +454,15 @@ public class FutureService {
                     int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
                     if(technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("200")) > 0 && macdCrossSignal<0){
                         String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                        makeOpenOrder(klineEvent, "SHORT", remark);
                         try {
-                            orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
+                            makeOpenOrder(klineEvent, "SHORT", remark);
                         } catch (Exception e) {
                             throw new TradingException(tradingEntity);
                         }
                     } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){
                         String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                        makeOpenOrder(klineEvent, "LONG", remark);
                         try {
-                            orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
+                            makeOpenOrder(klineEvent, "LONG", remark);
                         } catch (Exception e) {
                             throw new TradingException(tradingEntity);
                         }
