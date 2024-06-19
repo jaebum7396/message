@@ -27,20 +27,38 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "TRADING_CD")
     private String tradingCd; // ID 필드 추가 (데이터베이스 식별자)
 
-    @Column( name = "SYMBOL")
-    private String symbol; // 포지션 사이드
-
     @Column( name = "TRADING_STATUS")
     private String tradingStatus; // 포지션 상태
 
+    @Column( name = "POSITION_STATUS")
+    private String positionStatus; // 포지션 상태
+
+    @Column( name = "SYMBOL")
+    private String symbol; // 거래 페어
+
+    @Column( name = "TARGET_SYMBOL")
+    private String targetSymbol; // 타게팅된 심볼
+
+    @Column( name = "LEVERAGE")
+    int leverage; // 레버리지
+
+    @Column( name = "POSITION_SIDE")
+    private String positionSide; // 포지션 사이드
+
+    @Column( name = "OPEN_PRICE")
+    private BigDecimal openPrice; // 진입가격
+
+    @Column( name = "CLOSE_PRICE")
+    private BigDecimal closePrice;  // 청산가격
+
+    @Column ( name = "PROFIT")
+    private BigDecimal profit; // 수익률
+
     @Column( name = "STREAM_ID")
-    private int streamId; // 포지션 상태
+    private int streamId; // 스트림 ID
 
     @Column( name = "CANDLE_INTERVAL")
     String candleInterval; // 캔들 기준
-
-    @Column( name = "LEVERAGE")
-    int leverage;
 
     @Column( name = "GOAL_PRICE_PERCENT")
     int goalPricePercent;

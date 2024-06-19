@@ -36,10 +36,10 @@ public class FutureController {
             , @RequestParam BigDecimal quoteAssetVolumeStandard) throws Exception {
         return commonUtils.okResponsePackaging(futureService.autoTradingOpen(symbol, interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
     }
-    @GetMapping(value = "/future/auto/close")
-    @Operation(summary="자동매매를 종료합니다.", description="자동매매를 종료합니다.")
-    public void autoTradingClose() {
-        futureService.autoTradingClose();
+    @GetMapping(value = "/future/stream/close/all")
+    @Operation(summary="모든 스트림을 종료합니다.", description="모든 스트림을 종료합니다.")
+    public void allStreamClose() {
+        futureService.allStreamClose();
     }
     @PostMapping(value = "/future/order/submit")
     @Operation(summary="주문제출.", description="주문제출.")
