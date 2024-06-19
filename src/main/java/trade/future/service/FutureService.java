@@ -254,6 +254,7 @@ public class FutureService {
     }
 
     public void allPositionsClose(){
+        log.info("모든 포지션 종료");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         /*JSONArray balanceInfo = new JSONArray(client.account().futuresAccountBalance(new LinkedHashMap<>()));
         printPrettyJson(balanceInfo);*/
@@ -269,7 +270,7 @@ public class FutureService {
                 paramMap.put("quantity", "100");
                 paramMap.put("type", "MARKET");
                 try {
-                    orderSubmit(paramMap);
+                    Map<String,Object> resultMap = orderSubmit(paramMap);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -280,37 +281,95 @@ public class FutureService {
             eventEntity.getKlineEntity().getPositionEntity().setPositionStatus("CLOSE");
             eventRepository.save(eventEntity);
         }
-        autoTradingClose();
-    }
-
-    public void makeCloseOrder(EventEntity currentEvent, EventEntity positionEvent, String remark){
-        System.out.println(remark);
-        TradingEntity tradingEntity = currentEvent.getTradingEntity();
-        PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-        try { //마켓가로 클로즈 주문을 제출한다.
-            closePosition.setRemark(remark);
-            closePosition.setPositionStatus("CLOSE");
-            closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
-            Map<String, Object> returnMap = orderSubmit(makeOrder(tradingEntity, closePosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
-            eventRepository.save(positionEvent); //포지션을 클로즈한다.
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new TradingException(tradingEntity);
-        }
+        allStreamClose();
     }
 
     public void makeOpenOrder(EventEntity currentEvent, String positionSide, String remark){
         System.out.println(remark);
         PositionEntity openPosition = currentEvent.getKlineEntity().getPositionEntity();
         TradingEntity tradingEntity = currentEvent.getTradingEntity();
+
+        tradingEntity.setPositionStatus("OPEN");
+        tradingEntity.setPositionSide(positionSide);
+        tradingEntity.setOpenPrice(currentEvent.getKlineEntity().getClosePrice());
         try {
             openPosition.setPositionStatus("OPEN");
             openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
             openPosition.setPositionSide(positionSide);
             openPosition.setRemark(remark);
-            Map<String, Object> returnMap = orderSubmit(makeOrder(tradingEntity, openPosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
-            //Map<String, Object> returnMap = orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
+            Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "OPEN"));
             eventRepository.save(currentEvent);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new TradingException(tradingEntity);
+        }
+    }
+
+    public void makeCloseOrder(EventEntity currentEvent, EventEntity positionEvent, String remark){
+        System.out.println(remark);
+        TradingEntity tradingEntity = currentEvent.getTradingEntity();
+        PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+
+        tradingEntity.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
+        try { //마켓가로 클로즈 주문을 제출한다.
+            closePosition.setRemark(remark);
+            closePosition.setPositionStatus("CLOSE");
+            closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
+            Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
+            eventRepository.save(positionEvent);
+            autoTradingRestart(tradingEntity);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new TradingException(tradingEntity);
+        }
+    }
+
+    public LinkedHashMap<String,Object> makeOrder(TradingEntity tradingEntity, String intent){
+        LinkedHashMap<String,Object> paramMap = new LinkedHashMap<>();
+        String symbol = tradingEntity.getSymbol();
+        String positionSide = tradingEntity.getPositionSide();
+        String side = ""; //BUY/SELL
+        paramMap.put("symbol", symbol);
+        if (intent.equals("OPEN")) {
+            BigDecimal openPrice = tradingEntity.getOpenPrice();
+            side = positionSide.equals("LONG") ? "BUY" : "SELL";
+            paramMap.put("leverage", tradingEntity.getLeverage());
+            paramMap.put("positionSide", positionSide);
+            paramMap.put("side", side);
+            BigDecimal notional = tradingEntity.getCollateral().multiply(new BigDecimal("3"));
+            if (notional.compareTo(getNotional(symbol)) > 0) {
+                BigDecimal quantity = notional.divide(openPrice, 10, RoundingMode.UP);
+                BigDecimal stepSize = getStepSize(symbol);
+                quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
+
+                paramMap.put("quantity", quantity);
+            }else{
+                System.out.println("명목가치(" + notional+ ")가 최소주문가능금액보다 작습니다.");
+                throw new TradingException(tradingEntity);
+            }
+        } else if (intent.equals("CLOSE")) {
+            BigDecimal closePrice = tradingEntity.getClosePrice();
+            paramMap.put("positionSide", positionSide);
+            paramMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
+            paramMap.put("quantity", getMaxQty(symbol));
+        }
+        paramMap.put("type", "MARKET");
+        return paramMap;
+    }
+
+    public Map<String, Object> orderSubmit(LinkedHashMap<String, Object> requestParam) throws Exception {
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        try{
+            UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+            LinkedHashMap<String, Object> leverageParam = new LinkedHashMap<>();
+            leverageParam.put("symbol", requestParam.get("symbol"));
+            leverageParam.put("leverage", requestParam.get("leverage"));
+            String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
+            requestParam.remove("leverage");
+            System.out.println("new Order : " + requestParam);
+            String orderResult = client.account().newOrder(requestParam);
+            System.out.println("result : " + orderResult);
+            resultMap.put("result", orderResult);
         } catch (Exception e) {
             e.printStackTrace();
             throw new TradingException(tradingEntity);
@@ -374,24 +433,6 @@ public class FutureService {
                 quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
                 requestParam.put("quantity", quantity);
             }
-            System.out.println("new Order : " + requestParam);
-            String result = client.account().newOrder(requestParam);
-            System.out.println("result : " + result);
-            resultMap.put("result", result);
-        } catch (Exception e) {
-            throw e;
-        }
-        return resultMap;
-    }
-
-    public Map<String, Object> orderSubmit(LinkedHashMap<String, Object> requestParam) throws Exception {
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        try{
-            UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-            LinkedHashMap<String, Object> leverageParam = new LinkedHashMap<>();
-            leverageParam.put("symbol", requestParam.get("symbol"));
-            leverageParam.put("leverage", 3);
-            String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
             System.out.println("new Order : " + requestParam);
             String result = client.account().newOrder(requestParam);
             System.out.println("result : " + result);
@@ -525,11 +566,13 @@ public class FutureService {
     }
 
     public void streamClose(int streamId) {
+        log.info("streamClose >>>>> " + streamId);
         umWebSocketStreamClient.closeConnection(streamId);
     }
 
     @Transactional
-    public void autoTradingClose() {
+    public void allStreamClose() {
+        log.info("모든 스트림 종료");
         List<TradingEntity> tradingEntityList = tradingRepository.findAll();
         tradingEntityList.stream().forEach(tradingEntity -> {
             if(tradingEntity.getTradingStatus().equals("OPEN")){
@@ -542,49 +585,83 @@ public class FutureService {
     }
 
     @Transactional
-    public Map<String, Object> autoTradingOpen(String symbolParam, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
+    public void autoTradingClose(TradingEntity tradingEntity) { //특정 심볼의 트레이딩 종료
+        log.info("모든 스트림 종료");
+        if(tradingEntity.getTradingStatus().equals("OPEN")){
+            tradingEntity.setTradingStatus("CLOSE");
+            tradingRepository.save(tradingEntity);
+            streamClose(tradingEntity.getStreamId());
+        }
+    }
+
+    public void autoTradingRestart(TradingEntity tradingEntity) throws Exception {
+        autoTradingClose(tradingEntity);
+        autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+    }
+
+    @Transactional
+    public Map<String, Object> autoTradingOpen(String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) throws Exception {
         log.info("autoTrading >>>>>");
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+       // printPrettyJson(accountInfo);
+
+        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> selectedStockList;
-        allPositionsClose();
-
-        System.out.println("symbolParam : " + symbolParam);
-
-        if(symbolParam == null || symbolParam.isEmpty()) {
+        //allPositionsClose();
+        System.out.println("symbolParam : " + targetSymbol);
+        if(targetSymbol == null || targetSymbol.isEmpty()) {
             selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
         } else {
             LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-            paramMap.put("symbol", symbolParam);
-            String resultStr = umFuturesClientImpl.market().ticker24H(paramMap);
+            paramMap.put("symbol", targetSymbol);
+            String resultStr = client.market().ticker24H(paramMap);
             JSONObject result = new JSONObject(resultStr);
             List<Map<String, Object>> list = new ArrayList<>();
             list.add(result.toMap());
             selectedStockList = list;
         }
 
+        ArrayList<Map<String, Object>> tradingTargetSymbols = new ArrayList<>();
         selectedStockList.parallelStream().forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
             Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
-
-            // 해당 심볼의 트레이딩이 없으면 트레이딩을 시작합니다.
+            // 해당 심볼의 오픈된 트레이딩이 없으면 트레이딩 타겟 심볼 리스트에 넣습니다.
             if(tradingEntityOpt.isEmpty()) {
-                // 해당 페어의 평균 거래량을 구합니다.
-                //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
-                TradingEntity tradingEntity = TradingEntity.builder()
-                        .symbol(symbol)
-                        .tradingStatus("OPEN")
-                        .candleInterval(interval)
-                        .leverage(leverage)
-                        .goalPricePercent(goalPricePercent)
-                        .stockSelectionCount(stockSelectionCount)
-                        .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
-                        //.averageQuoteAssetVolume(averageQuoteAssetVolume)
-                        .fluctuationRate(new BigDecimal(String.valueOf(selectedStock.get("priceChangePercent"))))
-                        .collateral(new BigDecimal("100"))
-                        //.fluctuationRate(new BigDecimal(2))
-                        .build();
-                autoTradeStreamOpen(tradingEntity);
+                tradingTargetSymbols.add(selectedStock);
             }
+        });
+
+        availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
+
+        BigDecimal finalAvailableBalance = availableBalance;
+        System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
+        tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
+            String symbol = String.valueOf(selectedStock.get("symbol"));
+            System.out.println("symbol : " + symbol);
+            // 해당 페어의 평균 거래량을 구합니다.
+            //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
+            TradingEntity tradingEntity = TradingEntity.builder()
+                    .symbol(symbol)
+                    .tradingStatus("OPEN")
+                    .candleInterval(interval)
+                    .leverage(leverage)
+                    .goalPricePercent(goalPricePercent)
+                    .stockSelectionCount(stockSelectionCount)
+                    .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
+                    .collateral(finalAvailableBalance)
+                    .build();
+            if (targetSymbol != null && !targetSymbol.isEmpty()) {
+                tradingEntity.setTargetSymbol(targetSymbol);
+            }
+            autoTradeStreamOpen(tradingEntity);
         });
         return resultMap;
     }
@@ -613,87 +690,6 @@ public class FutureService {
         tradingEntity = umWebSocketStreamClient.combineStreams(tradingEntity, streams, openCallback, onMessageCallback, closeCallback, failureCallback);
         return tradingEntity;
     }
-
-    /*@Transactional
-    public void updateGoalAchievedKlineEvent(EventEntity eventEntity) {
-        List<EventEntity> goalAchievedPlusList = eventRepository
-                .findKlineEventsWithPlusGoalPriceLessThanCurrentPrice(
-                        eventEntity.getKlineEntity().getSymbol()
-                        , eventEntity.getKlineEntity().getClosePrice());
-
-        goalAchievedPlusList.stream().forEach(goalAchievedPlus -> {
-            goalAchievedPlus.getKlineEntity().getPositionEntity().setGoalPriceCheck(true);
-            goalAchievedPlus.getKlineEntity().getPositionEntity().setGoalPricePlus(true);
-
-            Optional<PositionEntity> currentPositionOpt = Optional.ofNullable(goalAchievedPlus.getKlineEntity().getPositionEntity());
-
-            if(currentPositionOpt.isPresent()){
-                PositionEntity currentPosition = currentPositionOpt.get();
-                if(currentPosition.getPositionStatus().equals("OPEN")) {
-                    System.out.println("목표가 도달(long) : " + goalAchievedPlus.getKlineEntity().getSymbol()
-                            + " 현재가 : " + eventEntity.getKlineEntity().getClosePrice()
-                            + "/ 목표가 : " + goalAchievedPlus.getKlineEntity().getPositionEntity().getPlusGoalPrice());
-                    currentPosition.setPositionStatus("CLOSE");
-                    //System.out.println(currentPosition.toString());
-                    System.out.println(">>>>> 포지션을 종료합니다. " + goalAchievedPlus.getKlineEntity().getSymbol());
-
-                    // 트레이딩을 닫습니다.
-                    TradingEntity tradingEntity = goalAchievedPlus.getTradingEntity();
-                    streamClose(tradingEntity.getStreamId());
-                    //tradingEntity.setTradingStatus("CLOSE");
-                    //tradingRepository.save(tradingEntity);
-
-                    //트레이딩을 다시 시작합니다.
-                    try {
-                        autoTradingOpen(tradingEntity.getSymbol(),tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-            eventRepository.save(goalAchievedPlus);
-        });
-
-        List<EventEntity> goalAchievedMinusList = eventRepository
-                .findKlineEventsWithMinusGoalPriceGreaterThanCurrentPrice(
-                        eventEntity.getKlineEntity().getSymbol()
-                        , eventEntity.getKlineEntity().getClosePrice());
-
-        goalAchievedMinusList.stream().forEach(goalAchievedMinus -> {
-            goalAchievedMinus.getKlineEntity().getPositionEntity().setGoalPriceCheck(true);
-            goalAchievedMinus.getKlineEntity().getPositionEntity().setGoalPriceMinus(true);
-
-            Optional<PositionEntity> currentPositionOpt = Optional.ofNullable(goalAchievedMinus.getKlineEntity().getPositionEntity());
-
-            if(currentPositionOpt.isPresent()){
-                PositionEntity currentPosition = currentPositionOpt.get();
-                if(currentPosition.getPositionStatus().equals("OPEN")){
-                    System.out.println("목표가 도달(short) : " + goalAchievedMinus.getKlineEntity().getSymbol()
-                            + " 현재가 : " + eventEntity.getKlineEntity().getClosePrice()
-                            + "/ 목표가 : " + goalAchievedMinus.getKlineEntity().getPositionEntity().getMinusGoalPrice());
-                    currentPosition.setPositionStatus("CLOSE");
-                    System.out.println(">>>>> 포지션을 종료합니다. " + goalAchievedMinus.getKlineEntity().getSymbol());
-                    System.out.println(currentPosition.toString());
-
-                    // 트레이딩을 닫습니다.
-                    TradingEntity tradingEntity = goalAchievedMinus.getTradingEntity();
-                    tradingEntity.setTradingStatus("CLOSE");
-                    tradingRepository.save(tradingEntity);
-
-                    // 소켓 스트림을 닫습니다.
-                    streamClose(tradingEntity.getStreamId());
-
-                    //트레이딩을 다시 시작합니다.
-                    try {
-                        autoTradingOpen(tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-            eventRepository.save(goalAchievedMinus);
-        });
-    }*/
 
     public BigDecimal getKlinesAverageQuoteAssetVolume(JSONArray klineArray, String interval) {
         log.info("getKlinesAverageQuoteAssetVolume >>>>>");
@@ -937,6 +933,13 @@ public class FutureService {
         JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
         JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
         return new BigDecimal(lotSizeFilter.getString("minQty"));
+    }
+
+    private BigDecimal getMaxQty(String symbol) { //최소 주문가능 금액
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
+        return new BigDecimal(lotSizeFilter.getString("maxQty"));
     }
 
     private BigDecimal getStepSize(String symbol) { //최소 주문가능 금액
