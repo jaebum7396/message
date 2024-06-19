@@ -371,9 +371,9 @@ public class FutureService {
             System.out.println("result : " + orderResult);
             resultMap.put("result", orderResult);
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new TradingException(tradingEntity);
+            throw e;
         }
+        return resultMap;
     }
 
     public LinkedHashMap<String,Object> makeOrder(TradingEntity tradingEntity, String positionSide, BigDecimal currentPrice, String intent, String type){
