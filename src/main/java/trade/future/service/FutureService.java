@@ -254,6 +254,7 @@ public class FutureService {
     }
 
     public void allPositionsClose(){
+        log.info("모든 포지션 종료");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         /*JSONArray balanceInfo = new JSONArray(client.account().futuresAccountBalance(new LinkedHashMap<>()));
         printPrettyJson(balanceInfo);*/
@@ -269,7 +270,7 @@ public class FutureService {
                 paramMap.put("quantity", "100");
                 paramMap.put("type", "MARKET");
                 try {
-                    orderSubmit(paramMap);
+                    Map<String,Object> resultMap = orderSubmit(paramMap);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -291,7 +292,8 @@ public class FutureService {
             closePosition.setRemark(remark);
             closePosition.setPositionStatus("CLOSE");
             closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
-            Map<String, Object> returnMap = orderSubmit(makeOrder(tradingEntity, closePosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
+            Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, closePosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
+
             eventRepository.save(positionEvent); //포지션을 클로즈한다.
         } catch (Exception e) {
             e.printStackTrace();
@@ -308,7 +310,7 @@ public class FutureService {
             openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
             openPosition.setPositionSide(positionSide);
             openPosition.setRemark(remark);
-            Map<String, Object> returnMap = orderSubmit(makeOrder(tradingEntity, openPosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
+            Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, openPosition.getPositionSide(), currentEvent.getKlineEntity().getClosePrice(), "OPEN", "MARKET"));
             //Map<String, Object> returnMap = orderSubmit(makeOrder(klineEvent, "OPEN", "MARKET"));
             eventRepository.save(currentEvent);
         } catch (Exception e) {
@@ -393,9 +395,9 @@ public class FutureService {
             leverageParam.put("leverage", 3);
             String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
             System.out.println("new Order : " + requestParam);
-            String result = client.account().newOrder(requestParam);
-            System.out.println("result : " + result);
-            resultMap.put("result", result);
+            String orderResult = client.account().newOrder(requestParam);
+            System.out.println("result : " + orderResult);
+            resultMap.put("result", orderResult);
         } catch (Exception e) {
             throw e;
         }
@@ -525,11 +527,13 @@ public class FutureService {
     }
 
     public void streamClose(int streamId) {
+        log.info("streamClose >>>>> " + streamId);
         umWebSocketStreamClient.closeConnection(streamId);
     }
 
     @Transactional
     public void autoTradingClose() {
+        log.info("자동매매 종료");
         List<TradingEntity> tradingEntityList = tradingRepository.findAll();
         tradingEntityList.stream().forEach(tradingEntity -> {
             if(tradingEntity.getTradingStatus().equals("OPEN")){
