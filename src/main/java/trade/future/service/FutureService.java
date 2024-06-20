@@ -277,7 +277,8 @@ public class FutureService {
                 paramMap.put("symbol", symbol);
                 paramMap.put("positionSide", symbolObj.get("positionSide"));
                 paramMap.put("side", symbolObj.get("positionSide").equals("LONG") ? "SELL" : "BUY");
-                paramMap.put("quantity", symbolObj.get("positionAmt"));
+                BigDecimal positionAmt = new BigDecimal(symbolObj.getString("positionAmt"));
+                paramMap.put("quantity", positionAmt.abs()); // 절대값으로 설정
                 paramMap.put("type", "MARKET");
                 try {
                     Map<String,Object> resultMap = orderSubmit(paramMap);
@@ -373,7 +374,8 @@ public class FutureService {
             paramMap.put("positionSide", positionSide);
             paramMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
             JSONObject currentPosition = getPosition(symbol, positionSide).orElseThrow(() -> new RuntimeException("포지션을 찾을 수 없습니다."));
-            paramMap.put("quantity", currentPosition.get("positionAmt"));
+            BigDecimal positionAmt = new BigDecimal(currentPosition.getString("positionAmt"));
+            paramMap.put("quantity", positionAmt.abs()); // 절대값으로 설정
         }
         paramMap.put("type", "MARKET");
         return paramMap;
