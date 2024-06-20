@@ -708,7 +708,7 @@ public class FutureService {
     }
 
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
-        tradingRepository.save(tradingEntity);
+        //tradingRepository.save(tradingEntity);
         getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 50);
         log.info("klineStreamOpen >>>>> ");
         ArrayList<String> streams = new ArrayList<>();
