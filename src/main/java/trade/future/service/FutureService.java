@@ -155,7 +155,7 @@ public class FutureService {
     @Transactional
     public void onMessageCallback(String event){
         // 최대 재시도 횟수와 초기 재시도 간격 설정
-        int maxRetries = 3;
+        int maxRetries = 1;
         int initialDelayMillis = 1000;
 
         for (int retry = 0; retry < maxRetries; retry++) {
@@ -497,7 +497,7 @@ public class FutureService {
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
         EventEntity klineEvent = null;
         // 최대 재시도 횟수와 초기 재시도 간격 설정
-        int maxRetries = 3;
+        int maxRetries = 1;
         int initialDelayMillis = 1000;
         for (int retry = 0; retry < maxRetries; retry++) {
             try {
