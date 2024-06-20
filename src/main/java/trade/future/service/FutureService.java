@@ -322,6 +322,7 @@ public class FutureService {
             //throw new TradingException(tradingEntity);
         } finally {
             eventRepository.save(currentEvent);
+            System.out.println("openTradingEntity >>>>> " + tradingEntity);
         }
     }
 
@@ -341,6 +342,7 @@ public class FutureService {
             //throw new TradingException(tradingEntity);
         } finally {
             eventRepository.save(positionEvent);
+            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             autoTradingRestart(tradingEntity);
         }
     }
