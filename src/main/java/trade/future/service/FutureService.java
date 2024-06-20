@@ -3,7 +3,6 @@ package trade.future.service;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.types.Symbol;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +34,7 @@ import trade.future.model.enums.ADX_GRADE;
 import trade.future.repository.EventRepository;
 import trade.future.repository.PositionRepository;
 import trade.future.repository.TradingRepository;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -670,7 +670,7 @@ public class FutureService {
         }
 
         ArrayList<Map<String, Object>> tradingTargetSymbols = new ArrayList<>();
-        System.out.println("selectedStockList : " + selectedStockList);
+        //System.out.println("selectedStockList : " + selectedStockList);
         selectedStockList.parallelStream().forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
             Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
