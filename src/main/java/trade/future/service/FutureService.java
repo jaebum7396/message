@@ -224,11 +224,17 @@ public class FutureService {
 
             TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
             if(technicalIndicatorReportEntity.getAdxSignal() == -1){
-                eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> {
+                eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
                     String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                     PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                     if(closePosition.getPositionStatus().equals("OPEN")){
                         makeCloseOrder(eventEntity, klineEvent, remark);
+                    }
+                }, () -> {
+                    try {
+                        autoTradingRestart(tradingEntity);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
                 });
             }else if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
@@ -310,6 +316,7 @@ public class FutureService {
             //주문 제출
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "OPEN"));
             eventRepository.save(currentEvent);
+            tradingRepository.save(tradingEntity);
         } catch (Exception e) {
             e.printStackTrace();
             throw new TradingException(tradingEntity);
@@ -362,7 +369,6 @@ public class FutureService {
             paramMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
             JSONObject currentPosition = getPosition(symbol, positionSide).orElseThrow(() -> new RuntimeException("포지션을 찾을 수 없습니다."));
             paramMap.put("quantity", currentPosition.get("positionAmt"));
-            paramMap.put("quantity", getMaxQty(symbol));
         }
         paramMap.put("type", "MARKET");
         return paramMap;
