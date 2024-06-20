@@ -3,6 +3,7 @@ package trade.future.service;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.Symbol;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static trade.common.CommonUtils.parseKlineEntity;
@@ -253,7 +255,7 @@ public class FutureService {
         }
     }
 
-    public void allPositionsClose(){
+    public void closeAllPositions(){
         log.info("모든 포지션 종료");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         /*JSONArray balanceInfo = new JSONArray(client.account().futuresAccountBalance(new LinkedHashMap<>()));
@@ -264,10 +266,11 @@ public class FutureService {
             JSONObject symbolObj = new JSONObject(position.toString());
             if(new BigDecimal(String.valueOf(symbolObj.get("positionAmt"))).compareTo(new BigDecimal("0")) != 0){
                 LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-                paramMap.put("symbol", symbolObj.get("symbol"));
+                String symbol = String.valueOf(symbolObj.get("symbol"));
+                paramMap.put("symbol", symbol);
                 paramMap.put("positionSide", symbolObj.get("positionSide"));
                 paramMap.put("side", symbolObj.get("positionSide").equals("LONG") ? "SELL" : "BUY");
-                paramMap.put("quantity", "100");
+                paramMap.put("quantity", symbolObj.get("positionAmt"));
                 paramMap.put("type", "MARKET");
                 try {
                     Map<String,Object> resultMap = orderSubmit(paramMap);
@@ -297,6 +300,14 @@ public class FutureService {
             openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
             openPosition.setPositionSide(positionSide);
             openPosition.setRemark(remark);
+
+            //레버리지 변경
+            LinkedHashMap<String,Object> leverageParamMap = new LinkedHashMap<>();
+            leverageParamMap.put("symbol", tradingEntity.getSymbol());
+            leverageParamMap.put("leverage", tradingEntity.getLeverage());
+            leverageChange(leverageParamMap);
+
+            //주문 제출
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "OPEN"));
             eventRepository.save(currentEvent);
         } catch (Exception e) {
@@ -333,15 +344,13 @@ public class FutureService {
         if (intent.equals("OPEN")) {
             BigDecimal openPrice = tradingEntity.getOpenPrice();
             side = positionSide.equals("LONG") ? "BUY" : "SELL";
-            paramMap.put("leverage", tradingEntity.getLeverage());
             paramMap.put("positionSide", positionSide);
             paramMap.put("side", side);
-            BigDecimal notional = tradingEntity.getCollateral().multiply(new BigDecimal("3"));
+            BigDecimal notional = tradingEntity.getCollateral().multiply(new BigDecimal(tradingEntity.getLeverage()));
             if (notional.compareTo(getNotional(symbol)) > 0) {
                 BigDecimal quantity = notional.divide(openPrice, 10, RoundingMode.UP);
                 BigDecimal stepSize = getStepSize(symbol);
                 quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
-
                 paramMap.put("quantity", quantity);
             }else{
                 System.out.println("명목가치(" + notional+ ")가 최소주문가능금액보다 작습니다.");
@@ -351,20 +360,45 @@ public class FutureService {
             BigDecimal closePrice = tradingEntity.getClosePrice();
             paramMap.put("positionSide", positionSide);
             paramMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
+            JSONObject currentPosition = getPosition(symbol, positionSide).orElseThrow(() -> new RuntimeException("포지션을 찾을 수 없습니다."));
+            paramMap.put("quantity", currentPosition.get("positionAmt"));
             paramMap.put("quantity", getMaxQty(symbol));
         }
         paramMap.put("type", "MARKET");
         return paramMap;
     }
 
+    public Optional<JSONObject> getPosition(String symbol, String positionSide){
+        AtomicReference<Optional<JSONObject>> positionOpt = new AtomicReference<>(Optional.empty());
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        JSONArray positions = accountInfo.getJSONArray("positions");
+        positions.forEach(position -> { //포지션을 찾는다.
+            JSONObject positionObj = new JSONObject(position.toString());
+            if(positionObj.get("symbol").equals(symbol) && positionObj.get("positionSide").equals(positionSide)){
+                System.out.println("포지션 : " + positionObj);
+                positionOpt.set(Optional.of(positionObj));
+            }
+        });
+        return positionOpt.get();
+    }
+
+    public Map<String, Object> leverageChange(LinkedHashMap<String, Object> leverageParam) throws Exception {
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        try{
+            UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+            String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
+            resultMap.put("result", leverageChangeResult);
+        } catch (Exception e) {
+            throw e;
+        }
+        return resultMap;
+    }
+
     public Map<String, Object> orderSubmit(LinkedHashMap<String, Object> requestParam) throws Exception {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-            LinkedHashMap<String, Object> leverageParam = new LinkedHashMap<>();
-            leverageParam.put("symbol", requestParam.get("symbol"));
-            leverageParam.put("leverage", requestParam.get("leverage"));
-            String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
             requestParam.remove("leverage");
             System.out.println("new Order : " + requestParam);
             String orderResult = client.account().newOrder(requestParam);
@@ -586,7 +620,7 @@ public class FutureService {
 
     @Transactional
     public void autoTradingClose(TradingEntity tradingEntity) { //특정 심볼의 트레이딩 종료
-        log.info("모든 스트림 종료");
+        log.info("스트림 종료");
         if(tradingEntity.getTradingStatus().equals("OPEN")){
             tradingEntity.setTradingStatus("CLOSE");
             tradingRepository.save(tradingEntity);
@@ -615,10 +649,10 @@ public class FutureService {
 
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> selectedStockList;
-        //allPositionsClose();
+        //closeAllPositions();
         System.out.println("symbolParam : " + targetSymbol);
         if(targetSymbol == null || targetSymbol.isEmpty()) {
-            selectedStockList = (List<Map<String, Object>>) getStockSelection(stockSelectionCount).get("overlappingData");
+            selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount).get("overlappingData");
         } else {
             LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
             paramMap.put("symbol", targetSymbol);
@@ -630,6 +664,7 @@ public class FutureService {
         }
 
         ArrayList<Map<String, Object>> tradingTargetSymbols = new ArrayList<>();
+        System.out.println("selectedStockList : " + selectedStockList);
         selectedStockList.parallelStream().forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
             Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
@@ -668,7 +703,7 @@ public class FutureService {
 
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
         tradingRepository.save(tradingEntity);
-        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 500);
+        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 50);
         log.info("klineStreamOpen >>>>> ");
         ArrayList<String> streams = new ArrayList<>();
 
@@ -709,6 +744,34 @@ public class FutureService {
         BigDecimal averageQuoteAssetVolume = totalQuoteAssetVolume.divide(new BigDecimal(klineArray.length()));
         System.out.println(interval+"("+klineArray.length()+") 평균 거래량 : " + averageQuoteAssetVolume);
         return averageQuoteAssetVolume;
+    }
+
+    public Map<String, Object> getStockFind(String interval, int limit) throws Exception {
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+
+        String resultStr = umFuturesClientImpl.market().ticker24H(paramMap);
+        //String resultStr = umFuturesClientImpl.market().tickerSymbol(paramMap);
+        JSONArray resultArray = new JSONArray(resultStr);
+        //printPrettyJson(resultArray);
+        // 거래량(QuoteVolume - 기준 화폐)을 기준으로 내림차순으로 정렬해서 가져옴
+        List<Map<String, Object>> sortedByQuoteVolume = getSort(resultArray, "quoteVolume", "DESC", limit);
+        //System.out.println("sortedByQuoteVolume : " + sortedByQuoteVolume);
+        List<Map<String, Object>> overlappingData = new ArrayList<>();
+        List<TechnicalIndicatorReportEntity> reports = new ArrayList<>();
+        sortedByQuoteVolume.forEach(item -> {
+            String tempCd = String.valueOf(UUID.randomUUID());
+            String symbol = String.valueOf(item.get("symbol"));
+            getKlines(tempCd, symbol, interval, 50);
+            TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
+            if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
+                overlappingData.add(item);
+                reports.add(tempReport);
+            }
+        });
+        resultMap.put("reports", reports);
+        resultMap.put("overlappingData", overlappingData);
+        return resultMap;
     }
 
     public Map<String, Object> getStockSelection(int limit) throws Exception {
@@ -757,9 +820,9 @@ public class FutureService {
         // 상위 5개 항목 선택
         List<Map<String, Object>> topLimitItems = sortedBy.stream()
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("busd"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("usdc"))
                 .limit(limit)
                 .collect(Collectors.toList());
-
         topLimitItems.forEach(item -> {
             System.out.println(item.get("symbol") + " : " + item.get(sortBy));
         });
@@ -873,7 +936,7 @@ public class FutureService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
 
-        UMFuturesClientImpl client = new UMFuturesClientImpl();
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
 
         paramMap.put("symbol", symbol);
         paramMap.put("interval", interval);
@@ -881,7 +944,10 @@ public class FutureService {
 
         String resultStr = client.market().klines(paramMap);
 
-        JSONArray jsonArray = new JSONArray(resultStr);
+        //System.out.println("resultStr : "+ resultStr);
+        String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
+        System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
+        JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
         List<KlineEntity> klineEntities = new ArrayList<>();
         BaseBarSeries series = new BaseBarSeries();
         series.setMaximumBarCount(WINDOW_SIZE);
@@ -935,11 +1001,11 @@ public class FutureService {
         return new BigDecimal(lotSizeFilter.getString("minQty"));
     }
 
-    private BigDecimal getMaxQty(String symbol) { //최소 주문가능 금액
+    private BigDecimal getMaxQty(String symbol) { //최대 주문가능 금액
         JSONArray symbols = getSymbols(exchangeInfo);
         JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
         JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
-        return new BigDecimal(lotSizeFilter.getString("maxQty"));
+        return new BigDecimal(lotSizeFilter.getString("maxQty")).subtract(getStepSize(symbol));
     }
 
     private BigDecimal getStepSize(String symbol) { //최소 주문가능 금액
@@ -955,7 +1021,6 @@ public class FutureService {
     private JSONArray getSymbols(JSONObject exchangeInfo) {
         return new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
     }
-
     private JSONObject getSymbolInfo(JSONArray symbols, String symbol) {
         for (int i = 0; i < symbols.length(); i++) {
             JSONObject symbolObject = symbols.getJSONObject(i);
@@ -1021,6 +1086,7 @@ public class FutureService {
         String direction = technicalIndicatorCalculator.getDirection(series, 14, series.getEndIndex());
 
         double adxGap = currentAdx - previousAdx;
+
         /*if (adxGap > 0) {
             System.out.println("추세증가 : " + adxGap);
         } else if (adxGap < 0) {
@@ -1063,6 +1129,7 @@ public class FutureService {
                 .previousAdx(previousAdx)
                 .previousAdxGrade(previousAdxGrade)
                 .adxSignal(adxSignal)
+                .adxGap(adxGap)
                 .plusDi(plusDi)
                 .minusDi(minusDi)
                 .directionDi(direction)

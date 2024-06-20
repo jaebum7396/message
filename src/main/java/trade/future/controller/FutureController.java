@@ -53,8 +53,8 @@ public class FutureController {
     }
     @GetMapping(value = "/future/positions/close")
     @Operation(summary="모든 포지션을 종료합니다.", description="모든 포지션을 종료합니다.")
-    public void allPositionsClose() {
-        futureService.allPositionsClose();
+    public void closeAllPositions() {
+        futureService.closeAllPositions();
     }
     @GetMapping(value = "/future/stream/close")
     @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
@@ -66,6 +66,12 @@ public class FutureController {
     @Operation(summary="거래량과 변동폭 기준으로 종목을 가져옵니다.", description="거래량과 변동폭 기준으로 종목을 가져옵니다.")
     public ResponseEntity getStockSelection(@RequestParam int limit) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getStockSelection(limit));
+    }
+
+    @GetMapping(value = "/future/stock/find")
+    @Operation(summary="거래량과 변동폭 기준으로 종목을 가져옵니다.", description="거래량과 변동폭 기준으로 종목을 가져옵니다.")
+    public ResponseEntity getStockFind(@RequestParam String interval, @RequestParam int limit) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.getStockFind(interval, limit));
     }
 
     @GetMapping(value = "/future/klines/")

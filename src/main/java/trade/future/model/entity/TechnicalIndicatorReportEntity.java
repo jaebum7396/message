@@ -45,6 +45,9 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "ADX_SIGNAL")
     private int adxSignal;
 
+    @Column( name = "ADX_GAP")
+    private double adxGap;
+
     @Column( name = "PLUS_DI")
     private double plusDi;
 
