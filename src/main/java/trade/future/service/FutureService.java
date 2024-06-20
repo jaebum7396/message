@@ -108,6 +108,7 @@ public class FutureService {
         log.info("[OPEN] >>>>> " + streamId + " 번 스트림("+tradingEntity.getSymbol()+")을 오픈합니다.");
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
+        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 50);
         /*if (streamId.equals("1")){
             throw new RuntimeException("강제예외 발생");
         }*/
@@ -684,7 +685,7 @@ public class FutureService {
 
         BigDecimal finalAvailableBalance = availableBalance;
         System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
-        tradingTargetSymbols.forEach(selectedStock -> {
+        tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
             System.out.println("symbol : " + symbol);
             // 해당 페어의 평균 거래량을 구합니다.
@@ -709,7 +710,6 @@ public class FutureService {
 
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
         //tradingRepository.save(tradingEntity);
-        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 50);
         log.info("klineStreamOpen >>>>> ");
         ArrayList<String> streams = new ArrayList<>();
 
