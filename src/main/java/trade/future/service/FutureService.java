@@ -105,7 +105,7 @@ public class FutureService {
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
-        System.out.println("[OPEN] >>>>> " + streamId + " 번 스트림을 오픈합니다.");
+        log.info("[OPEN] >>>>> " + streamId + " 번 스트림("+tradingEntity.getSymbol()+")을 오픈합니다.");
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
         /*if (streamId.equals("1")){
@@ -684,7 +684,7 @@ public class FutureService {
 
         BigDecimal finalAvailableBalance = availableBalance;
         System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
-        tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
+        tradingTargetSymbols.forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
             System.out.println("symbol : " + symbol);
             // 해당 페어의 평균 거래량을 구합니다.
