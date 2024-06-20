@@ -12,8 +12,8 @@ spring:
   application:
     name: trade
   profiles:
-    #active: local
-    active: deploy
+    active: local
+    #active: deploy
   redis:
     host: ${REDIS_URI}
     port: ${REDIS_PORT}
@@ -44,7 +44,7 @@ spring:
       naming:
         implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-      ddl-auto: 'update'
+      ddl-auto: 'create'
       #ddl-auto=none:
     #show-sql: 'true'
     defer-datasource-initialization: 'true' #import data
