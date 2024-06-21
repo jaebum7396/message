@@ -33,8 +33,9 @@ public class FutureController {
             , @RequestParam int leverage
             , @RequestParam int goalPricePercent
             , @RequestParam int stockSelectionCount
-            , @RequestParam BigDecimal quoteAssetVolumeStandard) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.autoTradingOpen(symbol, interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard));
+            , @RequestParam BigDecimal quoteAssetVolumeStandard
+            , @RequestParam int maxPositionCount) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.autoTradingOpen(symbol, interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard, maxPositionCount));
     }
     @GetMapping(value = "/future/stream/close/all")
     @Operation(summary="모든 스트림을 종료합니다.", description="모든 스트림을 종료합니다.")
@@ -70,8 +71,8 @@ public class FutureController {
 
     @GetMapping(value = "/future/stock/find")
     @Operation(summary="거래량과 변동폭 기준으로 종목을 가져옵니다.", description="거래량과 변동폭 기준으로 종목을 가져옵니다.")
-    public ResponseEntity getStockFind(@RequestParam String interval, @RequestParam int limit) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.getStockFind(interval, limit));
+    public ResponseEntity getStockFind(@RequestParam String interval, @RequestParam int searchRange, @RequestParam int targetRange) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.getStockFind(interval, searchRange, targetRange));
     }
 
     @GetMapping(value = "/future/klines/")

@@ -18,7 +18,7 @@ import javax.annotation.PostConstruct;
 @EnableDiscoveryClient
 @EnableJpaAuditing
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
-@EnableMongoRepositories(basePackages = "trade.future.mongo")
+//@EnableMongoRepositories(basePackages = "trade.future.mongo")
 @EnableJpaRepositories(basePackages = "trade.future.repository")
 public class Application {
 	private static final int waitTime = 3000;

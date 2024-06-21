@@ -69,6 +69,9 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "STOCK_SELECTION_COUNT")
     int stockSelectionCount;
 
+    @Column( name = "MAX_POSITION_COUNT")
+    int maxPositionCount;
+
     @Column( name = "QUOTE_ASSET_VOLUME_STANDARD")
     BigDecimal quoteAssetVolumeStandard; // 평균거래량 기준
 

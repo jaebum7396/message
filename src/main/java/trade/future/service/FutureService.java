@@ -640,11 +640,11 @@ public class FutureService {
 
     public void autoTradingRestart(TradingEntity tradingEntity){
         tradingEntity = autoTradingClose(tradingEntity);
-        autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard());
+        autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
     }
 
     @Transactional
-    public Map<String, Object> autoTradingOpen(String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard) {
+    public Map<String, Object> autoTradingOpen(String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard, int maxPositionCount) {
         log.info("autoTrading >>>>>");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
@@ -661,8 +661,12 @@ public class FutureService {
         List<Map<String, Object>> selectedStockList;
         //closeAllPositions();
         System.out.println("symbolParam : " + targetSymbol);
+
+        List<TradingEntity> openTradingList = tradingRepository.findByTradingStatus("OPEN");
+        int availablePositionCount = maxPositionCount - openTradingList.size();
+
         if(targetSymbol == null || targetSymbol.isEmpty()) {
-            selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount).get("overlappingData");
+            selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, availablePositionCount).get("overlappingData");
         } else {
             LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
             paramMap.put("symbol", targetSymbol);
@@ -675,6 +679,7 @@ public class FutureService {
 
         ArrayList<Map<String, Object>> tradingTargetSymbols = new ArrayList<>();
         //System.out.println("selectedStockList : " + selectedStockList);
+
         selectedStockList.parallelStream().forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
             Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
@@ -701,6 +706,7 @@ public class FutureService {
                     .goalPricePercent(goalPricePercent)
                     .stockSelectionCount(stockSelectionCount)
                     .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
+                    .maxPositionCount(maxPositionCount)
                     .collateral(finalAvailableBalance)
                     .build();
             if (targetSymbol != null && !targetSymbol.isEmpty()) {
@@ -755,7 +761,7 @@ public class FutureService {
         return averageQuoteAssetVolume;
     }
 
-    public Map<String, Object> getStockFind(String interval, int limit){
+    public Map<String, Object> getStockFind(String interval, int limit, int availablePositionCount){
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
 
@@ -768,7 +774,9 @@ public class FutureService {
         //System.out.println("sortedByQuoteVolume : " + sortedByQuoteVolume);
         List<Map<String, Object>> overlappingData = new ArrayList<>();
         List<TechnicalIndicatorReportEntity> reports = new ArrayList<>();
-        sortedByQuoteVolume.forEach(item -> {
+
+        int count = 0;
+        for (Map<String, Object> item : sortedByQuoteVolume) {
             String tempCd = String.valueOf(UUID.randomUUID());
             String symbol = String.valueOf(item.get("symbol"));
             getKlines(tempCd, symbol, interval, 50);
@@ -776,8 +784,12 @@ public class FutureService {
             if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
                 overlappingData.add(item);
                 reports.add(tempReport);
+                count++;
             }
-        });
+            if(count >= availablePositionCount){
+                break;
+            }
+        }
         resultMap.put("reports", reports);
         resultMap.put("overlappingData", overlappingData);
         return resultMap;
