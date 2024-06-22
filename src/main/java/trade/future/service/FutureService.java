@@ -1168,6 +1168,8 @@ public class FutureService {
             macdCrossSignal = -1;
         }
 
+        //log.error(String.valueOf(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN)));
+        //BigDecimal decimalValue = new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue());
         TechnicalIndicatorReportEntity technicalIndicatorReport = TechnicalIndicatorReportEntity.builder()
                 .symbol(symbol)
                 .endTime(kstEndTime.toLocalDateTime())
@@ -1187,7 +1189,7 @@ public class FutureService {
                 .mbb(CommonUtils.truncate(middleBBand.getValue(series.getEndIndex()), tickSize))
                 .lbb(CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize))
                 .rsi(CommonUtils.truncate(rsi.getValue(series.getEndIndex()), new BigDecimal(2)))
-                .macd(CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(10)))
+                .macd(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN))
                 .macdPreliminarySignal(macdPreliminarySignal)
                 .macdCrossSignal(macdCrossSignal)
                 .build();
