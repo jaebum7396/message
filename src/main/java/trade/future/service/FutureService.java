@@ -252,7 +252,7 @@ public class FutureService {
                 }*/
                 if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
                     int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                    if(technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("200")) > 0 && macdCrossSignal<0){ //MACD가 200을 넘어서 데드크로스가 일어났을때.
+                    if(macdCrossSignal<0){ //MACD가 200을 넘어서 데드크로스가 일어났을때.
                         eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
                             String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -260,7 +260,7 @@ public class FutureService {
                                 makeCloseOrder(eventEntity, klineEvent, remark);
                             }
                         });
-                    } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){ //MACD가 -200을 넘어서 골든크로스가 일어났을때.
+                    } else if (macdCrossSignal > 0){ //MACD가 -200을 넘어서 골든크로스가 일어났을때.
                         eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
                             String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -516,44 +516,50 @@ public class FutureService {
                                         klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
                         .build();
                 klineEvent.getKlineEntity().setPositionEntity(positionEntity);
-                if (DEV_FLAG) {
-                    String remark = "테스트모드 진입시그널";
-                    try {
-                        makeOpenOrder(klineEvent, "LONG", remark);
-                    } catch (Exception e) {
-                        throw new TradingException(tradingEntity);
-                    }
-                } else {
-                    /*if (technicalIndicatorReportEntity.getAdxSignal() == 1){
-                        String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                EventEntity finalKlineEvent = klineEvent;
+                eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN").ifPresentOrElse(currentPositionKlineEvent -> {
+                    System.out.println("포지션 오픈중 : " + currentPositionKlineEvent.getKlineEntity().getPositionEntity());
+                }, () -> {
+                    //System.out.println("포지션 없음");
+                    if (DEV_FLAG) {
+                        String remark = "테스트모드 진입시그널";
                         try {
-                            makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
+                            makeOpenOrder(finalKlineEvent, "LONG", remark);
                         } catch (Exception e) {
-                            e.printStackTrace();
-                            //throw new TradingException(tradingEntity);
+                            throw new TradingException(tradingEntity);
                         }
-                    }*/
-                    if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
-                        int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                        if(technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("200")) > 0 && macdCrossSignal<0){
-                            String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                    } else {
+                        /*if (technicalIndicatorReportEntity.getAdxSignal() == 1){
+                            String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             try {
-                                makeOpenOrder(klineEvent, "SHORT", remark);
+                                makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
                             } catch (Exception e) {
                                 e.printStackTrace();
                                 //throw new TradingException(tradingEntity);
                             }
-                        } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){
-                            String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                            try {
-                                makeOpenOrder(klineEvent, "LONG", remark);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                //throw new TradingException(tradingEntity);
+                        }*/
+                        if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
+                            int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
+                            if(macdCrossSignal<0){
+                                String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                try {
+                                    makeOpenOrder(finalKlineEvent, "SHORT", remark);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    //throw new TradingException(tradingEntity);
+                                }
+                            } else if (macdCrossSignal > 0){
+                                String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                try {
+                                    makeOpenOrder(finalKlineEvent, "LONG", remark);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    //throw new TradingException(tradingEntity);
+                                }
                             }
                         }
                     }
-                }
+                });
                 klineEvent = eventRepository.save(klineEvent);
                 break;
             } catch (Exception e) {
