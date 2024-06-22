@@ -540,7 +540,7 @@ public class FutureService {
                         }*/
                         if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
                             int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                            if(macdCrossSignal<0){
+                            if(macdCrossSignal<0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) > 0){
                                 String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                                 try {
                                     makeOpenOrder(finalKlineEvent, "SHORT", remark);
@@ -548,7 +548,7 @@ public class FutureService {
                                     e.printStackTrace();
                                     //throw new TradingException(tradingEntity);
                                 }
-                            } else if (macdCrossSignal > 0){
+                            } else if (macdCrossSignal > 0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) < 0){
                                 String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                                 try {
                                     makeOpenOrder(finalKlineEvent, "LONG", remark);
@@ -1187,7 +1187,7 @@ public class FutureService {
                 .mbb(CommonUtils.truncate(middleBBand.getValue(series.getEndIndex()), tickSize))
                 .lbb(CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize))
                 .rsi(CommonUtils.truncate(rsi.getValue(series.getEndIndex()), new BigDecimal(2)))
-                .macd(CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(0)))
+                .macd(CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(10)))
                 .macdPreliminarySignal(macdPreliminarySignal)
                 .macdCrossSignal(macdCrossSignal)
                 .build();
