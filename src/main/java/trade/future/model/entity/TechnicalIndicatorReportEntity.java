@@ -84,6 +84,9 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MACD_CROSS_SIGNAL")
     private int macdCrossSignal;
 
+    @Column( name = "MACD_PRELIMINARY_SIGNAL")
+    private int macdPreliminarySignal;
+
     @Override
     public String toString() {
         return null;

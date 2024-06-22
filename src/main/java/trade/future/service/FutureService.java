@@ -224,7 +224,7 @@ public class FutureService {
             EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
 
             TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
-            if(technicalIndicatorReportEntity.getAdxSignal() == -1){
+            /*if(technicalIndicatorReportEntity.getAdxSignal() == -1){
                 eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
                     String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                     PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -238,9 +238,10 @@ public class FutureService {
                         throw new RuntimeException(e);
                     }
                 });
-            }else if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
+            }*/
+            if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
                 int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                if(technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("200")) > 0 && macdCrossSignal<0){ //MACD가 200을 넘어서 데드크로스가 일어났을때.
+                if(macdCrossSignal<0){ //데드크로스가 일어났을때.
                     eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
                         String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -248,7 +249,7 @@ public class FutureService {
                             makeCloseOrder(eventEntity, klineEvent, remark);
                         }
                     });
-                } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){ //MACD가 -200을 넘어서 골든크로스가 일어났을때.
+                } else if (macdCrossSignal > 0){ //골든크로스가 일어났을때.
                     eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
                         String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -500,7 +501,7 @@ public class FutureService {
                                         klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
                         .build();
                 klineEvent.getKlineEntity().setPositionEntity(positionEntity);
-                if (technicalIndicatorReportEntity.getAdxSignal() == 1){
+                /*if (technicalIndicatorReportEntity.getAdxSignal() == 1){
                     String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                     try {
                         makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
@@ -508,9 +509,10 @@ public class FutureService {
                         e.printStackTrace();
                         //throw new TradingException(tradingEntity);
                     }
-                } else if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
+                }*/
+                if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
                     int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                    if(technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("200")) > 0 && macdCrossSignal<0){
+                    if(macdCrossSignal<0){
                         String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         try {
                             makeOpenOrder(klineEvent, "SHORT", remark);
@@ -518,7 +520,7 @@ public class FutureService {
                             e.printStackTrace();
                             //throw new TradingException(tradingEntity);
                         }
-                    } else if (technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("-200")) < 0 && macdCrossSignal > 0){
+                    } else if (macdCrossSignal > 0){
                         String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                         try {
                             makeOpenOrder(klineEvent, "LONG", remark);
@@ -748,7 +750,11 @@ public class FutureService {
             String symbol = String.valueOf(item.get("symbol"));
             getKlines(tempCd, symbol, interval, 50);
             TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
-            if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
+            //if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
+            //    overlappingData.add(item);
+            //    reports.add(tempReport);
+            //}
+            if(tempReport.getMacdPreliminarySignal() != 0){
                 overlappingData.add(item);
                 reports.add(tempReport);
             }
@@ -1049,6 +1055,7 @@ public class FutureService {
         RSIIndicator rsi = new RSIIndicator(closePrice, 6);
         // Calculate MACD
         MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
+        EMAIndicator macdSignal = new EMAIndicator(macd, 9);
 
         // Determine current trend
         String currentTrend = technicalIndicatorCalculator.determineTrend(series, sma);
@@ -1097,6 +1104,19 @@ public class FutureService {
         }
         //System.out.println("방향(MA기준): " + currentTrend);
 
+        // MACD 고점 및 저점 검증 로직 추가
+        int macdPreliminarySignal = 0;
+        boolean isMacdHighAndDeadCrossSoon = macd.getValue(series.getEndIndex() - 1).isGreaterThan(macdSignal.getValue(series.getEndIndex() - 1))
+                && macd.getValue(series.getEndIndex()).isLessThan(macdSignal.getValue(series.getEndIndex()));
+        boolean isMacdLowAndGoldenCrossSoon = macd.getValue(series.getEndIndex() - 1).isLessThan(macdSignal.getValue(series.getEndIndex() - 1))
+                && macd.getValue(series.getEndIndex()).isGreaterThan(macdSignal.getValue(series.getEndIndex()));
+
+        if (isMacdHighAndDeadCrossSoon) {
+            macdPreliminarySignal = -1;
+        } else if (isMacdLowAndGoldenCrossSoon) {
+            macdPreliminarySignal = 1;
+        }
+
         int macdCrossSignal =0 ;
         if(technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9)){
             macdCrossSignal = 1;
@@ -1125,6 +1145,7 @@ public class FutureService {
                 .lbb(CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize))
                 .rsi(CommonUtils.truncate(rsi.getValue(series.getEndIndex()), new BigDecimal(2)))
                 .macd(CommonUtils.truncate(macd.getValue(series.getEndIndex()), new BigDecimal(0)))
+                .macdPreliminarySignal(macdPreliminarySignal)
                 .macdCrossSignal(macdCrossSignal)
                 .build();
         return technicalIndicatorReport;
