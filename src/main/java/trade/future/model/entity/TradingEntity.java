@@ -27,6 +27,9 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "TRADING_CD")
     private String tradingCd; // ID 필드 추가 (데이터베이스 식별자)
 
+    @Column( name = "USER_CD")
+    private String userCd; // 유저 식별자
+
     @Column( name = "TRADING_STATUS")
     private String tradingStatus; // 포지션 상태
 
@@ -65,6 +68,9 @@ public class TradingEntity extends BaseEntity implements Serializable {
 
     @Column( name = "STOCK_SELECTION_COUNT")
     int stockSelectionCount;
+
+    @Column( name = "MAX_POSITION_COUNT")
+    int maxPositionCount;
 
     @Column( name = "QUOTE_ASSET_VOLUME_STANDARD")
     BigDecimal quoteAssetVolumeStandard; // 평균거래량 기준
