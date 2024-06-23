@@ -235,7 +235,7 @@ public class FutureService {
                     }
                 });
             } else {
-                /*if(technicalIndicatorReportEntity.getAdxSignal() == -1){
+                if(technicalIndicatorReportEntity.getAdxSignal() == -1){
                     eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
                         String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                         PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -249,8 +249,8 @@ public class FutureService {
                             throw new RuntimeException(e);
                         }
                     });
-                }*/
-                if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
+                }
+                /*if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
                     int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
                     if(macdCrossSignal<0){ //MACD가 200을 넘어서 데드크로스가 일어났을때.
                         eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
@@ -269,7 +269,7 @@ public class FutureService {
                             }
                         });
                     }
-                }
+                }*/
             }
             //eventRepository.save(eventEntity);
         }
@@ -529,16 +529,16 @@ public class FutureService {
                             throw new TradingException(tradingEntity);
                         }
                     } else {
-                        /*if (technicalIndicatorReportEntity.getAdxSignal() == 1){
+                        if (technicalIndicatorReportEntity.getAdxSignal() == 1){
                             String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             try {
-                                makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
+                                makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
                             } catch (Exception e) {
                                 e.printStackTrace();
                                 //throw new TradingException(tradingEntity);
                             }
-                        }*/
-                        if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
+                        }
+                        /*if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
                             int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
                             if(macdCrossSignal<0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) > 0){
                                 String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
@@ -557,7 +557,7 @@ public class FutureService {
                                     //throw new TradingException(tradingEntity);
                                 }
                             }
-                        }
+                        }*/
                     }
                 });
                 klineEvent = eventRepository.save(klineEvent);
@@ -789,15 +789,15 @@ public class FutureService {
             String symbol = String.valueOf(item.get("symbol"));
             getKlines(tempCd, symbol, interval, 50);
             TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
-            //if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
-            //    overlappingData.add(item);
-            //    reports.add(tempReport);
-            //}
-            if(tempReport.getMacdPreliminarySignal() != 0){
+            if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
                 overlappingData.add(item);
                 reports.add(tempReport);
-                count++;
             }
+            //if(tempReport.getMacdPreliminarySignal() != 0){
+            //    overlappingData.add(item);
+            //    reports.add(tempReport);
+            //    count++;
+            //}
             if(count >= availablePositionCount){
                 break;
             }
