@@ -469,6 +469,12 @@ public class FutureService {
             tradingEntity.setPositionStatus("CLOSE");
             tradingEntity = tradingRepository.save(tradingEntity);
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+            log.info("스트림 종료");
+            if(tradingEntity.getTradingStatus().equals("OPEN")){
+                tradingEntity.setTradingStatus("CLOSE");
+                tradingEntity = tradingRepository.save(tradingEntity);
+                streamClose(tradingEntity.getStreamId());
+            }
             autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
             //autoTradingRestart(tradingEntity);
         }
