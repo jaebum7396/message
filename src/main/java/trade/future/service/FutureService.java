@@ -237,7 +237,7 @@ public class FutureService {
                     }
                 });
             } else {
-                //if (ADX_CHECKER){
+                if (ADX_CHECKER){
                     if(technicalIndicatorReportEntity.getAdxSignal() == -1){
                         eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
@@ -253,7 +253,7 @@ public class FutureService {
                             }
                         });
                     }
-                //}
+                }
                 if (MACD_CHECKER){
                     if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
                         BigDecimal macd = technicalIndicatorReportEntity.getMacd();
@@ -711,7 +711,7 @@ public class FutureService {
 
         availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
         BigDecimal maxPositionAmount = totalWalletBalance
-                .divide(new BigDecimal(tradingTargetSymbols.size()),0, RoundingMode.DOWN)
+                .divide(new BigDecimal(maxPositionCount),0, RoundingMode.DOWN)
                 .multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.DOWN);
 
         BigDecimal finalAvailableBalance = maxPositionAmount;
