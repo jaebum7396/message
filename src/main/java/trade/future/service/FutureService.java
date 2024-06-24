@@ -710,7 +710,9 @@ public class FutureService {
         });
 
         availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
-        BigDecimal maxPositionAmount = totalWalletBalance.multiply(new BigDecimal("0.95")).divide(new BigDecimal(tradingTargetSymbols.size())).setScale(0, RoundingMode.DOWN);
+        BigDecimal maxPositionAmount = totalWalletBalance
+                .divide(new BigDecimal(tradingTargetSymbols.size()),0, RoundingMode.DOWN)
+                .multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.DOWN);
 
         BigDecimal finalAvailableBalance = maxPositionAmount;
         log.info("collateral : " + maxPositionAmount);
