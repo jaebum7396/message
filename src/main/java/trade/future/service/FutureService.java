@@ -449,6 +449,7 @@ public class FutureService {
         }
     }
 
+    @Transactional
     public void makeCloseOrder(EventEntity currentEvent, EventEntity positionEvent, String remark){
         System.out.println(remark);
         TradingEntity tradingEntity = positionEvent.getTradingEntity();
@@ -465,10 +466,11 @@ public class FutureService {
             //throw new TradingException(tradingEntity);
         } finally {
             eventRepository.save(positionEvent);
-            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             tradingEntity.setPositionStatus("CLOSE");
-            tradingRepository.save(tradingEntity);
-            autoTradingRestart(tradingEntity);
+            tradingEntity = tradingRepository.save(tradingEntity);
+            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+            autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
+            //autoTradingRestart(tradingEntity);
         }
     }
 
