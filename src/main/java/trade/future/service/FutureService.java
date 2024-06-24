@@ -803,15 +803,16 @@ public class FutureService {
             String symbol = String.valueOf(item.get("symbol"));
             getKlines(tempCd, symbol, interval, 50);
             TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
-            if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
+            /*if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
                 overlappingData.add(item);
                 reports.add(tempReport);
+                count++;
+            }*/
+            if(tempReport.getMacdPreliminarySignal() != 0){
+                overlappingData.add(item);
+                reports.add(tempReport);
+                count++;
             }
-            //if(tempReport.getMacdPreliminarySignal() != 0){
-            //    overlappingData.add(item);
-            //    reports.add(tempReport);
-            //    count++;
-            //}
             if(count >= availablePositionCount){
                 break;
             }
