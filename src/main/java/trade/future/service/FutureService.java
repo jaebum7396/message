@@ -103,8 +103,8 @@ public class FutureService {
     private static final int WINDOW_SIZE = 500; // For demonstration purposes
 
     private static final boolean DEV_FLAG = false;
-    private static final boolean MACD_CHECKER = true;
-    private static final boolean ADX_CHECKER = false;
+    private static final boolean MACD_CHECKER = false;
+    private static final boolean ADX_CHECKER = true;
 
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
