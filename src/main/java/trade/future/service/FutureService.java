@@ -102,6 +102,8 @@ public class FutureService {
     private static final int WINDOW_SIZE = 500; // For demonstration purposes
 
     private static final boolean DEV_FLAG = false;
+    private static final boolean MACD_CHECKER = true;
+    private static final boolean ADX_CHECKER = false;
 
     @Transactional
     public void onOpenCallback(String streamId) {
@@ -235,44 +237,150 @@ public class FutureService {
                     }
                 });
             } else {
-                if(technicalIndicatorReportEntity.getAdxSignal() == -1){
-                    eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
-                        String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
-                        PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
-                        if(closePosition.getPositionStatus().equals("OPEN")){
-                            makeCloseOrder(eventEntity, klineEvent, remark);
-                        }
-                    }, () -> {
-                        try {
-                            autoTradingRestart(tradingEntity);
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
-                }
-                /*if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
-                    int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                    if(macdCrossSignal<0){ //MACD가 200을 넘어서 데드크로스가 일어났을때.
-                        eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
-                            String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                //if (ADX_CHECKER){
+                    if(technicalIndicatorReportEntity.getAdxSignal() == -1){
+                        eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
+                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
-                            if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
+                            if(closePosition.getPositionStatus().equals("OPEN")){
                                 makeCloseOrder(eventEntity, klineEvent, remark);
                             }
-                        });
-                    } else if (macdCrossSignal > 0){ //MACD가 -200을 넘어서 골든크로스가 일어났을때.
-                        eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
-                            String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                            PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
-                            if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
-                                makeCloseOrder(eventEntity, klineEvent, remark);
+                        }, () -> {
+                            try {
+                                autoTradingRestart(tradingEntity);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
                             }
                         });
                     }
-                }*/
+                //}
+                if (MACD_CHECKER){
+                    if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
+                        BigDecimal macd = technicalIndicatorReportEntity.getMacd();
+                        int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
+                        if(macdCrossSignal<0){ //MACD가 양수일때 데드크로스가 일어났을때.
+                            eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
+                                String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
+                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
+                                    makeCloseOrder(eventEntity, klineEvent, remark);
+                                }
+                            });
+                        } else if (macdCrossSignal > 0){ //MACD가 음수일때 골든크로스가 일어났을때.
+                            eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
+                                String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
+                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
+                                    makeCloseOrder(eventEntity, klineEvent, remark);
+                                }
+                            });
+                        }
+                    }
+                }
             }
             //eventRepository.save(eventEntity);
         }
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
+        EventEntity klineEvent = null;
+        // 최대 재시도 횟수와 초기 재시도 간격 설정
+        int maxRetries = 1;
+        int initialDelayMillis = 1000;
+        for (int retry = 0; retry < maxRetries; retry++) {
+            try {
+                klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
+                klineEvent.setTradingEntity(tradingEntity);
+                int goalPricePercent = tradingEntity.getGoalPricePercent();
+                int leverage = tradingEntity.getLeverage();
+
+                // 캔들데이터 분석을 위한 bar 세팅
+                settingBar(tradingEntity.getTradingCd(),event);
+                TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
+                klineEvent.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
+
+                // 포지션 엔티티 생성
+                PositionEntity positionEntity = PositionEntity.builder()
+                        .positionStatus("NONE")
+                        .goalPricePercent(goalPricePercent)
+                        .klineEntity(klineEvent.getKlineEntity())
+                        .plusGoalPrice(
+                                CommonUtils.calculateGoalPrice(
+                                        klineEvent.getKlineEntity().getClosePrice(), "LONG", leverage, goalPricePercent))
+                        .minusGoalPrice(
+                                CommonUtils.calculateGoalPrice(
+                                        klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
+                        .build();
+                klineEvent.getKlineEntity().setPositionEntity(positionEntity);
+                EventEntity finalKlineEvent = klineEvent;
+                eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN").ifPresentOrElse(currentPositionKlineEvent -> {
+                    System.out.println("포지션 오픈중 : " + currentPositionKlineEvent.getKlineEntity().getPositionEntity());
+                }, () -> {
+                    //System.out.println("포지션 없음");
+                    if (DEV_FLAG) {
+                        String remark = "테스트모드 진입시그널";
+                        try {
+                            makeOpenOrder(finalKlineEvent, "LONG", remark);
+                        } catch (Exception e) {
+                            throw new TradingException(tradingEntity);
+                        }
+                    } else {
+                        if(ADX_CHECKER){
+                            if (technicalIndicatorReportEntity.getAdxSignal() == 1){
+                                String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                                try {
+                                    makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    //throw new TradingException(tradingEntity);
+                                }
+                            }
+                        }
+                        if (MACD_CHECKER){
+                            if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
+                                int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
+                                if(macdCrossSignal<0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) > 0){
+                                    String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                    try {
+                                        makeOpenOrder(finalKlineEvent, "SHORT", remark);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                        //throw new TradingException(tradingEntity);
+                                    }
+                                } else if (macdCrossSignal > 0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) < 0){
+                                    String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                    try {
+                                        makeOpenOrder(finalKlineEvent, "LONG", remark);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                        //throw new TradingException(tradingEntity);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                klineEvent = eventRepository.save(klineEvent);
+                break;
+            } catch (Exception e) {
+                e.printStackTrace();
+                if (retry >= maxRetries - 1) {
+                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
+                    throw e;
+                }
+                // 재시도 간격을 설정한 시간만큼 대기
+                try {
+                    Thread.sleep(initialDelayMillis);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+
+                // 재시도 간격을 증가시킴 (예: 백오프 전략)
+                initialDelayMillis *= 2;
+            }
+        }
+        return klineEvent;
     }
 
     public void closeAllPositions(){
@@ -485,103 +593,6 @@ public class FutureService {
         return quantity.divide(tickSize, 0, RoundingMode.UP).multiply(tickSize);
     }
 
-    @Transactional(isolation = Isolation.READ_COMMITTED)
-    public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
-        EventEntity klineEvent = null;
-        // 최대 재시도 횟수와 초기 재시도 간격 설정
-        int maxRetries = 1;
-        int initialDelayMillis = 1000;
-        for (int retry = 0; retry < maxRetries; retry++) {
-            try {
-                klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
-                klineEvent.setTradingEntity(tradingEntity);
-                int goalPricePercent = tradingEntity.getGoalPricePercent();
-                int leverage = tradingEntity.getLeverage();
-
-                // 캔들데이터 분석을 위한 bar 세팅
-                settingBar(tradingEntity.getTradingCd(),event);
-                TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
-                klineEvent.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
-
-                // 포지션 엔티티 생성
-                PositionEntity positionEntity = PositionEntity.builder()
-                        .positionStatus("NONE")
-                        .goalPricePercent(goalPricePercent)
-                        .klineEntity(klineEvent.getKlineEntity())
-                        .plusGoalPrice(
-                                CommonUtils.calculateGoalPrice(
-                                        klineEvent.getKlineEntity().getClosePrice(), "LONG", leverage, goalPricePercent))
-                        .minusGoalPrice(
-                                CommonUtils.calculateGoalPrice(
-                                        klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
-                        .build();
-                klineEvent.getKlineEntity().setPositionEntity(positionEntity);
-                EventEntity finalKlineEvent = klineEvent;
-                eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN").ifPresentOrElse(currentPositionKlineEvent -> {
-                    System.out.println("포지션 오픈중 : " + currentPositionKlineEvent.getKlineEntity().getPositionEntity());
-                }, () -> {
-                    //System.out.println("포지션 없음");
-                    if (DEV_FLAG) {
-                        String remark = "테스트모드 진입시그널";
-                        try {
-                            makeOpenOrder(finalKlineEvent, "LONG", remark);
-                        } catch (Exception e) {
-                            throw new TradingException(tradingEntity);
-                        }
-                    } else {
-                        if (technicalIndicatorReportEntity.getAdxSignal() == 1){
-                            String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
-                            try {
-                                makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                //throw new TradingException(tradingEntity);
-                            }
-                        }
-                        /*if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
-                            int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                            if(macdCrossSignal<0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) > 0){
-                                String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                                try {
-                                    makeOpenOrder(finalKlineEvent, "SHORT", remark);
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                    //throw new TradingException(tradingEntity);
-                                }
-                            } else if (macdCrossSignal > 0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) < 0){
-                                String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                                try {
-                                    makeOpenOrder(finalKlineEvent, "LONG", remark);
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                    //throw new TradingException(tradingEntity);
-                                }
-                            }
-                        }*/
-                    }
-                });
-                klineEvent = eventRepository.save(klineEvent);
-                break;
-            } catch (Exception e) {
-                e.printStackTrace();
-                if (retry >= maxRetries - 1) {
-                    // 최대 재시도 횟수에 도달한 경우 예외를 던짐
-                    throw e;
-                }
-                // 재시도 간격을 설정한 시간만큼 대기
-                try {
-                    Thread.sleep(initialDelayMillis);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-
-                // 재시도 간격을 증가시킴 (예: 백오프 전략)
-                initialDelayMillis *= 2;
-            }
-        }
-        return klineEvent;
-    }
-
     private void settingBar(String tradingCd, String event) {
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
@@ -664,6 +675,7 @@ public class FutureService {
         System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
 
         BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
 
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> selectedStockList;
@@ -698,8 +710,10 @@ public class FutureService {
         });
 
         availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
+        BigDecimal maxPositionAmount = totalWalletBalance.multiply(new BigDecimal("0.95")).divide(new BigDecimal(tradingTargetSymbols.size())).setScale(0, RoundingMode.DOWN);
 
-        BigDecimal finalAvailableBalance = availableBalance;
+        BigDecimal finalAvailableBalance = maxPositionAmount;
+        log.info("collateral : " + maxPositionAmount);
         System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
         tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
             String symbol = String.valueOf(selectedStock.get("symbol"));
