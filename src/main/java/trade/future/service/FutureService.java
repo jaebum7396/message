@@ -53,6 +53,7 @@ import static trade.common.CommonUtils.parseKlineEntity;
 
 @Slf4j
 @Service
+@Transactional
 public class FutureService {
     public FutureService(
           @Value("${binance.real.api.key}") String BINANCE_REAL_API_KEY
@@ -105,7 +106,6 @@ public class FutureService {
     private static final boolean MACD_CHECKER = true;
     private static final boolean ADX_CHECKER = false;
 
-    @Transactional
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
@@ -113,13 +113,13 @@ public class FutureService {
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
         getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 50);
+        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), "5m", 50);
         /*if (streamId.equals("1")){
             throw new RuntimeException("강제예외 발생");
         }*/
         log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
     }
 
-    @Transactional
     public void onCloseCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
@@ -128,7 +128,6 @@ public class FutureService {
         tradingRepository.save(tradingEntity);
     }
 
-    @Transactional
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
@@ -157,7 +156,6 @@ public class FutureService {
         }
     }
 
-    @Transactional
     public void onMessageCallback(String event){
         // 최대 재시도 횟수와 초기 재시도 간격 설정
         int maxRetries = 1;
@@ -282,7 +280,6 @@ public class FutureService {
         }
     }
 
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
         EventEntity klineEvent = null;
         // 최대 재시도 횟수와 초기 재시도 간격 설정
@@ -449,7 +446,6 @@ public class FutureService {
         }
     }
 
-    @Transactional
     public void makeCloseOrder(EventEntity currentEvent, EventEntity positionEvent, String remark){
         System.out.println(remark);
         TradingEntity tradingEntity = positionEvent.getTradingEntity();
@@ -640,7 +636,6 @@ public class FutureService {
         umWebSocketStreamClient.closeConnection(streamId);
     }
 
-    @Transactional
     public void allStreamClose() {
         log.info("모든 스트림 종료");
         List<TradingEntity> tradingEntityList = tradingRepository.findAll();
@@ -654,7 +649,6 @@ public class FutureService {
         //umWebSocketStreamClient.closeAllConnections();
     }
 
-    @Transactional
     public TradingEntity autoTradingClose(TradingEntity tradingEntity) { //특정 심볼의 트레이딩 종료
         log.info("스트림 종료");
         if(tradingEntity.getTradingStatus().equals("OPEN")){
@@ -670,7 +664,6 @@ public class FutureService {
         autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
     }
 
-    @Transactional
     public Map<String, Object> autoTradingOpen(String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard, int maxPositionCount) {
         log.info("autoTrading >>>>>");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
