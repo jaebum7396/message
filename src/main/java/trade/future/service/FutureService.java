@@ -2,11 +2,16 @@ package trade.future.service;
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,14 +34,18 @@ import org.ta4j.core.num.Num;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.TradingException;
+import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
 import trade.future.model.enums.ADX_GRADE;
 import trade.future.repository.EventRepository;
 import trade.future.repository.PositionRepository;
 import trade.future.repository.TradingRepository;
 
+import javax.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -97,6 +106,7 @@ public class FutureService {
     // 원하는 형식의 날짜 포맷 지정
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    @Value("${jwt.secret.key}") private String JWT_SECRET_KEY;
     int failureCount = 0;
     private HashMap<String, List<KlineEntity>> klines = new HashMap<String, List<KlineEntity>>();
     private HashMap<String, BaseBarSeries> seriesMap = new HashMap<String, BaseBarSeries>();
@@ -471,7 +481,7 @@ public class FutureService {
                 tradingEntity = tradingRepository.save(tradingEntity);
                 streamClose(tradingEntity.getStreamId());
             }
-            autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
+            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
             //autoTradingRestart(tradingEntity);
         }
     }
@@ -661,10 +671,19 @@ public class FutureService {
 
     public void autoTradingRestart(TradingEntity tradingEntity){
         tradingEntity = autoTradingClose(tradingEntity);
-        autoTradingOpen(tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
+        autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
     }
 
-    public Map<String, Object> autoTradingOpen(String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard, int maxPositionCount) {
+    public Map<String, Object> autoTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
+        Claims claims = getClaims(request);
+        String userCd = String.valueOf(claims.get("userCd"));
+        if (userCd == null || userCd.isEmpty()) {
+            throw new RuntimeException("사용자 정보가 없습니다.");
+        }
+        return autoTradingOpen(userCd, tradingDTO.getSymbol(), tradingDTO.getInterval(), tradingDTO.getLeverage(), tradingDTO.getGoalPricePercent(), tradingDTO.getStockSelectionCount(), tradingDTO.getQuoteAssetVolumeStandard(), tradingDTO.getMaxPositionCount());
+    }
+
+    public Map<String, Object> autoTradingOpen(String userCd, String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard, int maxPositionCount) {
         log.info("autoTrading >>>>>");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
@@ -733,6 +752,7 @@ public class FutureService {
                     .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
                     .maxPositionCount(maxPositionCount)
                     .collateral(finalAvailableBalance)
+                    .userCd(userCd)
                     .build();
             if (targetSymbol != null && !targetSymbol.isEmpty()) {
                 tradingEntity.setTargetSymbol(targetSymbol);
@@ -902,12 +922,23 @@ public class FutureService {
         return overlappingData;
     }
 
-    public Map<String, Object> autoTradingInfo() throws Exception {
+    public Map<String, Object> autoTradingInfo(HttpServletRequest request) throws Exception {
         log.info("autoTradingInfo >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        List<TradingEntity> tradingEntityList = tradingRepository.findAll();
-        tradingEntityList = tradingEntityList.stream().filter(tradingEntity -> tradingEntity.getTradingStatus().equals("OPEN")).collect(Collectors.toList());
+        //List<TradingEntity> tradingEntityList = tradingRepository.findAll();
+        Claims claims = getClaims(request);
+        String userCd = String.valueOf(claims.get("userCd"));
+        System.out.println("userCd : " + userCd);
+        List<TradingEntity> tradingEntityList = tradingRepository.findByUserCd(userCd);
         resultMap.put("tradingEntityList", tradingEntityList);
+        return resultMap;
+    }
+
+    public Map<String, Object> getReports(String tradingCd) throws Exception {
+        log.info("getReports >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        List<EventEntity> eventEntityList = eventRepository.findEventsByTradingCd(tradingCd);
+        resultMap.put("eventEntityList", eventEntityList);
         return resultMap;
     }
 
@@ -1212,5 +1243,20 @@ public class FutureService {
                 .macdCrossSignal(macdCrossSignal)
                 .build();
         return technicalIndicatorReport;
+    }
+
+    public Claims getClaims(HttpServletRequest request){
+        try{
+            Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+            System.out.println("JWT_SECRET_KEY : " + JWT_SECRET_KEY);
+            System.out.println("authorization : " + request.getHeader("authorization"));
+            Claims claim = Jwts.parserBuilder().setSigningKey(secretKey).build()
+                    .parseClaimsJws(request.getHeader("authorization")).getBody();
+            return claim;
+        } catch (ExpiredJwtException e) {
+            throw new ExpiredJwtException(null, null, "로그인 시간이 만료되었습니다.");
+        } catch (Exception e) {
+            throw new BadCredentialsException("인증 정보에 문제가 있습니다.");
+        }
     }
 }

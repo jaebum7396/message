@@ -13,4 +13,5 @@ public interface EventRepositoryQ {
     Optional<EventEntity> findEventBySymbolAndPositionStatus(String symbol, String positionStatus);
 
     List<EventEntity> findEventByPositionStatus(String positionStatus);
+    List<EventEntity> findEventsByTradingCd(String tradingCd);
 }

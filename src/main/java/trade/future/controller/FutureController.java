@@ -9,8 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import trade.common.CommonUtils;
+import trade.future.model.dto.TradingDTO;
 import trade.future.service.FutureService;
 
+import javax.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -25,17 +27,10 @@ public class FutureController {
     @Autowired FutureService futureService;
     @Autowired CommonUtils commonUtils;
 
-    @GetMapping(value = "/future/auto/open")
+    @PostMapping(value = "/future/auto/open")
     @Operation(summary="자동매매를 시작합니다.", description="자동매매를 시작합니다.")
-    public ResponseEntity autoTradingOpen(
-              @RequestParam(required = false) String symbol
-            , @RequestParam String interval
-            , @RequestParam int leverage
-            , @RequestParam int goalPricePercent
-            , @RequestParam int stockSelectionCount
-            , @RequestParam BigDecimal quoteAssetVolumeStandard
-            , @RequestParam int maxPositionCount) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.autoTradingOpen(symbol, interval, leverage, goalPricePercent, stockSelectionCount, quoteAssetVolumeStandard, maxPositionCount));
+    public ResponseEntity autoTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.autoTradingOpen(request, tradingDTO));
     }
     @GetMapping(value = "/future/stream/close/all")
     @Operation(summary="모든 스트림을 종료합니다.", description="모든 스트림을 종료합니다.")
@@ -75,7 +70,7 @@ public class FutureController {
         return commonUtils.okResponsePackaging(futureService.getStockFind(interval, searchRange, targetRange));
     }
 
-    @GetMapping(value = "/future/klines/")
+    @GetMapping(value = "/future/klines")
     @Operation(summary="해당 심볼의 캔들 데이터를 가져옵니다(기본값 500개)", description="해당 심볼의 캔들 데이터를 가져옵니다.")
     public ResponseEntity getKlines(@RequestParam String symbol, @RequestParam String interval, @RequestParam int limit) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getKlines(String.valueOf(UUID.randomUUID()), symbol, interval, limit));
@@ -83,8 +78,14 @@ public class FutureController {
 
     @GetMapping(value = "/future/auto/info")
     @Operation(summary="스트림 정보를 가져옵니다.", description="스트림 정보를 가져옵니다.")
-    public ResponseEntity autoTradingInfo() throws Exception {
-        return commonUtils.okResponsePackaging(futureService.autoTradingInfo());
+    public ResponseEntity autoTradingInfo(HttpServletRequest request) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.autoTradingInfo(request));
+    }
+
+    @GetMapping(value = "/future/trading/reports")
+    @Operation(summary="해당 트레이딩의 리포트들을 가져옵니다", description="해당 트레이딩의 리포트들을 가져옵니다")
+    public ResponseEntity getReportss(@RequestParam String tradingCd) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.getReports(tradingCd));
     }
 
     @GetMapping(value = "/future/account/info")
