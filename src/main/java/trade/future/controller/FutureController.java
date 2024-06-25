@@ -84,7 +84,7 @@ public class FutureController {
 
     @GetMapping(value = "/future/trading/reports")
     @Operation(summary="해당 트레이딩의 리포트들을 가져옵니다", description="해당 트레이딩의 리포트들을 가져옵니다")
-    public ResponseEntity getReportss(@RequestParam String tradingCd) throws Exception {
+    public ResponseEntity getReports(@RequestParam String tradingCd) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getReports(tradingCd));
     }
 
