@@ -824,7 +824,7 @@ public class FutureService {
         for (Map<String, Object> item : sortedByQuoteVolume) {
             String tempCd = String.valueOf(UUID.randomUUID());
             String symbol = String.valueOf(item.get("symbol"));
-            getKlines(tempCd, symbol, interval, 50);
+            getKlines(tempCd, symbol, interval, 1500);
             TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
             /*if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
                 overlappingData.add(item);
@@ -1182,7 +1182,7 @@ public class FutureService {
         if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() > 0){
             if (previousAdxGrade.getGrade() == 1 && currentAdxGrade.getGrade() == 2) {
                 adxSignal = 1;
-                System.out.println("!!! 포지션 진입 시그널("+kstEndTime+")");
+                System.out.println("!!! ADX 포지션 진입 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"["+direction+"]");
             }
             //System.out.println("추세등급 증가: " + (previousAdxGrade +" > "+ currentAdxGrade));
             //System.out.println("방향(DI기준): " + direction);
@@ -1190,6 +1190,7 @@ public class FutureService {
             //System.out.println("추세등급 감소: " + previousAdxGrade +" > "+ currentAdxGrade);
             //System.out.println("방향(DI기준): " + direction);
             adxSignal = -1;
+            System.out.println("!!! ADX 포지션 청산 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex()));
         } else {
             //System.out.println("추세등급 유지: " + currentAdxGrade);
             //System.out.println("방향(DI기준): " + direction);
@@ -1212,9 +1213,11 @@ public class FutureService {
         int macdCrossSignal =0 ;
         if(technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9)){
             macdCrossSignal = 1;
+            System.out.println("!!! MACD 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"[골든크로스]"+macd.getValue(series.getEndIndex()));
         }
         if(technicalIndicatorCalculator.isDeadCross(series, 12, 26, 9)){
             macdCrossSignal = -1;
+            System.out.println("!!! MACD 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"[데드크로스]"+macd.getValue(series.getEndIndex()));
         }
 
         //log.error(String.valueOf(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN)));
