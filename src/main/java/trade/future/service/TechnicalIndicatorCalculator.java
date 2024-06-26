@@ -207,10 +207,10 @@ public class TechnicalIndicatorCalculator {
         if(adx <= 20){
             adx_grade = ADX_GRADE.횡보;
         }
-        else if(adx > 20 && adx <= 30){
+        else if(adx > 20 && adx <= 25){
             adx_grade = ADX_GRADE.약한추세;
         }
-        else if(adx > 30 && adx <= 40){
+        else if(adx > 25 && adx <= 40){
             adx_grade = ADX_GRADE.추세확정;
         }
         else if(adx > 40 && adx <= 50){

@@ -246,7 +246,7 @@ public class FutureService {
                 });
             } else {
                 if (ADX_CHECKER){
-                    if(technicalIndicatorReportEntity.getAdxSignal() == -1){
+                    if(technicalIndicatorReportEntity.getAdxSignal() == -1||technicalIndicatorReportEntity.getAdxGap()<-1){
                         eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
@@ -827,7 +827,7 @@ public class FutureService {
             getKlines(tempCd, symbol, interval, 1500);
             TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
             if (ADX_CHECKER){
-                if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0 && tempReport.getCurrentAdx() - 25 > 0){
+                if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0){
                     overlappingData.add(item);
                     reports.add(tempReport);
                     count++;
