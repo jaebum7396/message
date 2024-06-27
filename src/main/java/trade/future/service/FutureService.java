@@ -796,14 +796,15 @@ public class FutureService {
         return averageQuoteAssetVolume;
     }
 
-    public Map<String, Object> getStockFind(String interval, int limit, int availablePositionCount){
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+    public Map<String, Object> getStockFind(String interval, int limit, int availablePositionCount) {
+        Map<String, Object> resultMap = new LinkedHashMap<>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
 
         String resultStr = umFuturesClientImpl.market().ticker24H(paramMap);
         //String resultStr = umFuturesClientImpl.market().tickerSymbol(paramMap);
         JSONArray resultArray = new JSONArray(resultStr);
         //printPrettyJson(resultArray);
+
         // 거래량(QuoteVolume - 기준 화폐)을 기준으로 내림차순으로 정렬해서 가져옴
         List<Map<String, Object>> sortedByQuoteVolume = getSort(resultArray, "quoteVolume", "DESC", limit);
         //System.out.println("sortedByQuoteVolume : " + sortedByQuoteVolume);
@@ -811,37 +812,53 @@ public class FutureService {
         List<TechnicalIndicatorReportEntity> reports = new ArrayList<>();
 
         AtomicInteger count = new AtomicInteger(0);
+        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-        sortedByQuoteVolume.parallelStream().takeWhile(item -> count.get() < availablePositionCount).forEach(item -> {
-            String tempCd = String.valueOf(UUID.randomUUID());
-            String symbol = String.valueOf(item.get("symbol"));
-            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
-
-            if (tradingEntityOpt.isEmpty()) {
-                getKlines(tempCd, symbol, interval, 1500);
-                TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
-
-                if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap() > 0) {
-                    synchronized (this) {
-                        if (count.get() < availablePositionCount) {
-                            overlappingData.add(item);
-                            reports.add(tempReport);
-                            count.incrementAndGet();
-                        }
-                    }
-                }
-
-                if (MACD_CHECKER && tempReport.getMacdPreliminarySignal() != 0) {
-                    synchronized (this) {
-                        if (count.get() < availablePositionCount) {
-                            overlappingData.add(item);
-                            reports.add(tempReport);
-                            count.incrementAndGet();
-                        }
-                    }
-                }
+        for (Map<String, Object> item : sortedByQuoteVolume) {
+            if (count.get() >= availablePositionCount) {
+                break;
             }
-        });
+
+            executor.submit(() -> {
+                String tempCd = String.valueOf(UUID.randomUUID());
+                String symbol = String.valueOf(item.get("symbol"));
+                Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+
+                if (tradingEntityOpt.isEmpty()) {
+                    getKlines(tempCd, symbol, interval, 1500);
+                    TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
+
+                    synchronized (this) {
+                        if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap() > 0) {
+                            if (count.get() < availablePositionCount) {
+                                overlappingData.add(item);
+                                reports.add(tempReport);
+                                count.incrementAndGet();
+                            }
+                        }
+
+                        if (MACD_CHECKER && tempReport.getMacdPreliminarySignal() != 0) {
+                            if (count.get() < availablePositionCount) {
+                                overlappingData.add(item);
+                                reports.add(tempReport);
+                                count.incrementAndGet();
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(60, TimeUnit.MINUTES)) { // 60분 내에 모든 작업이 완료되지 않으면 강제 종료
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
         resultMap.put("reports", reports);
         resultMap.put("overlappingData", overlappingData);
         return resultMap;
