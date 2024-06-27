@@ -122,8 +122,8 @@ public class FutureService {
         log.info("[OPEN] >>>>> " + streamId + " 번 스트림("+tradingEntity.getSymbol()+")을 오픈합니다.");
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
-        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 50);
-        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), "5m", 50);
+        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 1500);
+        //getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), "5m", 50);
         /*if (streamId.equals("1")){
             throw new RuntimeException("강제예외 발생");
         }*/
@@ -717,19 +717,10 @@ public class FutureService {
             selectedStockList = list;
         }
 
-        ArrayList<Map<String, Object>> tradingTargetSymbols = new ArrayList<>();
+        List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
         //System.out.println("selectedStockList : " + selectedStockList);
-
-        selectedStockList.parallelStream().forEach(selectedStock -> {
-            String symbol = String.valueOf(selectedStock.get("symbol"));
-            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
-            // 해당 심볼의 오픈된 트레이딩이 없으면 트레이딩 타겟 심볼 리스트에 넣습니다.
-            if(tradingEntityOpt.isEmpty()) {
-                tradingTargetSymbols.add(selectedStock);
-            }
-        });
-
         availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
+
         BigDecimal maxPositionAmount = totalWalletBalance
                 .divide(new BigDecimal(maxPositionCount),0, RoundingMode.DOWN)
                 .multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.DOWN);
@@ -824,24 +815,28 @@ public class FutureService {
         for (Map<String, Object> item : sortedByQuoteVolume) {
             String tempCd = String.valueOf(UUID.randomUUID());
             String symbol = String.valueOf(item.get("symbol"));
-            getKlines(tempCd, symbol, interval, 1500);
-            TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
-            if (ADX_CHECKER){
-                if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0){
-                    overlappingData.add(item);
-                    reports.add(tempReport);
-                    count++;
+            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+            // 해당 심볼의 오픈된 트레이딩이 없으면 트레이딩 타겟 심볼 리스트에 넣습니다.
+            if(tradingEntityOpt.isEmpty()) {
+                getKlines(tempCd, symbol, interval, 1500);
+                TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
+                if (ADX_CHECKER){
+                    if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0){
+                        overlappingData.add(item);
+                        reports.add(tempReport);
+                        count++;
+                    }
                 }
-            }
-            if (MACD_CHECKER) {
-                if (tempReport.getMacdPreliminarySignal() != 0) {
-                    overlappingData.add(item);
-                    reports.add(tempReport);
-                    count++;
+                if (MACD_CHECKER) {
+                    if (tempReport.getMacdPreliminarySignal() != 0) {
+                        overlappingData.add(item);
+                        reports.add(tempReport);
+                        count++;
+                    }
                 }
-            }
-            if(count >= availablePositionCount){
-                break;
+                if(count >= availablePositionCount){
+                    break;
+                }
             }
         }
         resultMap.put("reports", reports);
