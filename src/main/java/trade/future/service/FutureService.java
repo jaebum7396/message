@@ -52,9 +52,11 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -473,14 +475,11 @@ public class FutureService {
         } finally {
             eventRepository.save(positionEvent);
             tradingEntity.setPositionStatus("CLOSE");
+            tradingEntity.setTradingStatus("CLOSE");
             tradingEntity = tradingRepository.save(tradingEntity);
+            streamClose(tradingEntity.getStreamId());
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
-            if(tradingEntity.getTradingStatus().equals("OPEN")){
-                tradingEntity.setTradingStatus("CLOSE");
-                tradingEntity = tradingRepository.save(tradingEntity);
-                streamClose(tradingEntity.getStreamId());
-            }
             autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
             //autoTradingRestart(tradingEntity);
         }
@@ -811,34 +810,38 @@ public class FutureService {
         List<Map<String, Object>> overlappingData = new ArrayList<>();
         List<TechnicalIndicatorReportEntity> reports = new ArrayList<>();
 
-        int count = 0;
-        for (Map<String, Object> item : sortedByQuoteVolume) {
+        AtomicInteger count = new AtomicInteger(0);
+
+        sortedByQuoteVolume.parallelStream().takeWhile(item -> count.get() < availablePositionCount).forEach(item -> {
             String tempCd = String.valueOf(UUID.randomUUID());
             String symbol = String.valueOf(item.get("symbol"));
             Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
-            // 해당 심볼의 오픈된 트레이딩이 없으면 트레이딩 타겟 심볼 리스트에 넣습니다.
-            if(tradingEntityOpt.isEmpty()) {
+
+            if (tradingEntityOpt.isEmpty()) {
                 getKlines(tempCd, symbol, interval, 1500);
                 TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
-                if (ADX_CHECKER){
-                    if (tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap()>0){
-                        overlappingData.add(item);
-                        reports.add(tempReport);
-                        count++;
+
+                if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap() > 0) {
+                    synchronized (this) {
+                        if (count.get() < availablePositionCount) {
+                            overlappingData.add(item);
+                            reports.add(tempReport);
+                            count.incrementAndGet();
+                        }
                     }
                 }
-                if (MACD_CHECKER) {
-                    if (tempReport.getMacdPreliminarySignal() != 0) {
-                        overlappingData.add(item);
-                        reports.add(tempReport);
-                        count++;
+
+                if (MACD_CHECKER && tempReport.getMacdPreliminarySignal() != 0) {
+                    synchronized (this) {
+                        if (count.get() < availablePositionCount) {
+                            overlappingData.add(item);
+                            reports.add(tempReport);
+                            count.incrementAndGet();
+                        }
                     }
-                }
-                if(count >= availablePositionCount){
-                    break;
                 }
             }
-        }
+        });
         resultMap.put("reports", reports);
         resultMap.put("overlappingData", overlappingData);
         return resultMap;
