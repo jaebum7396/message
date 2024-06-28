@@ -268,21 +268,6 @@ public class FutureService {
                             }
                         }
                     });
-                    if(technicalIndicatorReportEntity.getAdxSignal() == -1||technicalIndicatorReportEntity.getAdxGap()<-1){
-                        openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
-                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
-                            PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
-                            if(closePosition.getPositionStatus().equals("OPEN")){
-                                makeCloseOrder(eventEntity, klineEvent, remark);
-                            }
-                        }, () -> {
-                            try {
-                                autoTradingRestart(tradingEntity);
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
-                        });
-                    }
                 }
                 if (MACD_CHECKER){
                     if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
