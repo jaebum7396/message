@@ -22,6 +22,7 @@ public class EventRepositoryQImpl implements EventRepositoryQ {
         QTradingEntity qTradingEntity = QTradingEntity.tradingEntity;
         QKlineEntity qKline = QKlineEntity.klineEntity;
         QPositionEntity qPosition = QPositionEntity.positionEntity;
+        QTechnicalIndicatorReportEntity qTechnicalIndicatorReport = QTechnicalIndicatorReportEntity.technicalIndicatorReportEntity;
 
         Optional<EventEntity> result = Optional.ofNullable(
                 queryFactory
@@ -29,6 +30,7 @@ public class EventRepositoryQImpl implements EventRepositoryQ {
                 .join(qKlineEvent.klineEntity, qKline).fetchJoin()
                 .join(qKlineEvent.tradingEntity, qTradingEntity).fetchJoin()
                 .join(qKline.positionEntity, qPosition).fetchJoin()
+                .join(qKline.technicalIndicatorReportEntity, qTechnicalIndicatorReport).fetchJoin()
                 .where(
                         qKlineEvent.klineEntity.symbol.eq(symbol),
                         qPosition.positionStatus.eq(positionStatus)
