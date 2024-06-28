@@ -191,10 +191,12 @@ public class TechnicalIndicatorCalculator {
 
         String direction = "";
         if(plusDI > minusDI){
-            direction = "LONG";
+            //direction = "LONG";
+            direction = "SHORT";
         }
         else if(plusDI < minusDI){
-            direction = "SHORT";
+            //direction = "SHORT";
+            direction = "LONG";
         }
         else{
             direction = "SIDE";
