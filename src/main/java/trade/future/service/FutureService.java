@@ -728,6 +728,13 @@ public class FutureService {
 
         List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
         //System.out.println("selectedStockList : " + selectedStockList);
+        try{
+            if(tradingTargetSymbols.size() == 0){
+                throw new RuntimeException("선택된 종목이 없습니다.");
+            }
+        } catch (Exception e) {
+            autoTradingOpen(userCd, targetSymbol, interval, leverage, goalPricePercent, stockSelectionCount, maxPositionCount);
+        }
         availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
 
         BigDecimal maxPositionAmount = totalWalletBalance
