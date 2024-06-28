@@ -555,9 +555,9 @@ public class FutureService {
         try{
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
             requestParam.remove("leverage");
-            System.out.println("new Order : " + requestParam);
+            log.info("!!!new Order : " + requestParam);
             String orderResult = client.account().newOrder(requestParam);
-            System.out.println("result : " + orderResult);
+            log.info("!!!result : " + orderResult);
             resultMap.put("result", orderResult);
         } catch (Exception e) {
             throw e;
