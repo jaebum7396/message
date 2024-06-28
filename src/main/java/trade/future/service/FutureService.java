@@ -341,7 +341,7 @@ public class FutureService {
                         }
                     } else {
                         if(ADX_CHECKER){
-                            if (technicalIndicatorReportEntity.getAdxSignal() == 1){
+                            if (technicalIndicatorReportEntity.getAdxSignal() == 1&&technicalIndicatorReportEntity.getAdxGap()<2){
                                 String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                                 try {
                                     makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
@@ -1151,6 +1151,12 @@ public class FutureService {
 
     private TechnicalIndicatorReportEntity technicalIndicatorCalculate(String tradingCd, String symbol, String interval) {
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
+        // 포맷 적용하여 문자열로 변환
+        ZonedDateTime utcEndTime = series.getBar(series.getEndIndex()).getEndTime();
+        ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
+        String formattedEndTime = formatter.format(kstEndTime);
+        //System.out.println("[캔들종료시간] : "+symbol+"/"+ formattedEndTime);
+
         // Define indicators
         OpenPriceIndicator openPrice = new OpenPriceIndicator(series);
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -1172,14 +1178,49 @@ public class FutureService {
         MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
         EMAIndicator macdSignal = new EMAIndicator(macd, 9);
 
+        // Initialize MACD Histogram peaks and bottoms
+        /*int candleCount = 5;
+        int macdPeakSignal = 0;
+        int macdReversalSignal = 0;
+        Num currentCandleMacdHistogram = null;
+        Num previousCandleMacdHistogram = null;
+        Num prePreviousCandleMacdHistogram = null;
+        // Loop through the last N candles to identify MACD peak/bottom and trend reversal
+        for (int i = series.getEndIndex() - candleCount + 1; i <= series.getEndIndex(); i++) {
+            Num macdHistogram = macd.getValue(i).minus(macdSignal.getValue(i));
+            Num previousMacdHistogram = macd.getValue(i - 1).minus(macdSignal.getValue(i - 1));
+            Num prePreviousMacdHistogram = macd.getValue(i - 2).minus(macdSignal.getValue(i - 2));
+
+            if (macdHistogram.isGreaterThan(previousMacdHistogram) &&
+                    previousMacdHistogram.isGreaterThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2)))) {
+                macdPeakSignal = 1;
+            } else if (macdHistogram.isLessThan(previousMacdHistogram) &&
+                    previousMacdHistogram.isLessThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2)))) {
+                macdPeakSignal = -1;
+            }
+
+            if (previousMacdHistogram.isGreaterThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2))) &&
+                    previousMacdHistogram.isGreaterThan(macdHistogram)) {
+                currentCandleMacdHistogram = macdHistogram;
+                previousCandleMacdHistogram = previousMacdHistogram;
+                prePreviousCandleMacdHistogram = prePreviousMacdHistogram;
+                macdReversalSignal = 1;
+            } else if (previousMacdHistogram.isLessThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2))) &&
+                    previousMacdHistogram.isLessThan(macdHistogram)) {
+                currentCandleMacdHistogram = macdHistogram;
+                previousCandleMacdHistogram = previousMacdHistogram;
+                prePreviousCandleMacdHistogram = prePreviousMacdHistogram;
+                macdReversalSignal = -1;
+            }
+        }
+        if (macdReversalSignal == 1) {
+            log.info("!!! MACD 고점 반전 시그널("+kstEndTime+") 전직전 : "+prePreviousCandleMacdHistogram +" 직전 :"+ previousCandleMacdHistogram+" 현재 : "+currentCandleMacdHistogram);
+        } else if (macdReversalSignal == -1) {
+            log.info("!!! MACD 저점 반전 시그널("+kstEndTime+") 전직전 : "+prePreviousCandleMacdHistogram +" 직전 :"+ previousCandleMacdHistogram+" 현재 : "+currentCandleMacdHistogram);
+        }*/
+
         // Determine current trend
         String currentTrend = technicalIndicatorCalculator.determineTrend(series, sma);
-
-        // 포맷 적용하여 문자열로 변환
-        ZonedDateTime utcEndTime = series.getBar(series.getEndIndex()).getEndTime();
-        ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
-        String formattedEndTime = formatter.format(kstEndTime);
-        //System.out.println("[캔들종료시간] : "+symbol+"/"+ formattedEndTime);
 
         BigDecimal tickSize = getTickSize(symbol.toUpperCase());
         //adx
@@ -1267,6 +1308,8 @@ public class FutureService {
                 .macd(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN))
                 .macdPreliminarySignal(macdPreliminarySignal)
                 .macdCrossSignal(macdCrossSignal)
+                //.macdPeakSignal(macdPeakSignal)
+                //.macdReversalSignal(macdReversalSignal)
                 .build();
         return technicalIndicatorReport;
     }

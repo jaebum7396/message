@@ -87,6 +87,12 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MACD_PRELIMINARY_SIGNAL")
     private int macdPreliminarySignal;
 
+    @Column( name = "MACD_PEAK_SIGNAL")
+    private int macdPeakSignal;
+
+    @Column( name = "MACD_REVERSAL_SIGNAL")
+    private int macdReversalSignal;
+
     @Override
     public String toString() {
         return null;
