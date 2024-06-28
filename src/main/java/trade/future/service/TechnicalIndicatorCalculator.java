@@ -204,19 +204,19 @@ public class TechnicalIndicatorCalculator {
 
     public ADX_GRADE calculateADXGrade(double adx){
         ADX_GRADE adx_grade = ADX_GRADE.횡보;
-        if(adx <= 20){
+        if(adx <= 10){
             adx_grade = ADX_GRADE.횡보;
         }
-        else if(adx > 20 && adx <= 25){
+        else if(adx > 10 && adx <= 20){
             adx_grade = ADX_GRADE.약한추세;
         }
-        else if(adx > 25 && adx <= 40){
+        else if(adx > 20 && adx <= 30){
             adx_grade = ADX_GRADE.추세확정;
         }
-        else if(adx > 40 && adx <= 50){
+        else if(adx > 30 && adx <= 40){
             adx_grade = ADX_GRADE.강한추세;
         }
-        else if(adx > 50){
+        else if(adx > 40){
             adx_grade = ADX_GRADE.매우강한추세;
         }
         return adx_grade;

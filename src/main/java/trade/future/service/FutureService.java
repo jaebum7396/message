@@ -250,7 +250,9 @@ public class FutureService {
                 if (ADX_CHECKER){
                     Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                     openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
-                        if(technicalIndicatorReportEntity.getAdxSignal() == -1||technicalIndicatorReportEntity.getAdxGap()<-1){
+                        if(technicalIndicatorReportEntity.getAdxSignal() == -1
+                            ||technicalIndicatorReportEntity.getAdxGap()<-2
+                            ||klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getCurrentAdx()-technicalIndicatorReportEntity.getCurrentAdx()<-2){
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
