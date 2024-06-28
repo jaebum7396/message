@@ -112,7 +112,7 @@ public class FutureService {
     int failureCount = 0;
     private HashMap<String, List<KlineEntity>> klines = new HashMap<String, List<KlineEntity>>();
     private HashMap<String, BaseBarSeries> seriesMap = new HashMap<String, BaseBarSeries>();
-    private static final int WINDOW_SIZE = 500; // For demonstration purposes
+    private static final int WINDOW_SIZE = 100; // For demonstration purposes
 
     private static final boolean DEV_FLAG = false;
     private static final boolean MACD_CHECKER = false;
@@ -124,7 +124,7 @@ public class FutureService {
         log.info("[OPEN] >>>>> " + streamId + " 번 스트림("+tradingEntity.getSymbol()+")을 오픈합니다.");
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
-        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), 500);
+        getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval(), WINDOW_SIZE);
         //getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), "5m", 50);
         /*if (streamId.equals("1")){
             throw new RuntimeException("강제예외 발생");
@@ -260,7 +260,7 @@ public class FutureService {
                     },() -> {
                         if(technicalIndicatorReportEntity.getAdxSignal() == -1
                             ||technicalIndicatorReportEntity.getAdxGap()<-1
-                            ||technicalIndicatorReportEntity.getCurrentAdxGrade().getGrade()>ADX_GRADE.추세확정.getGrade()){
+                            ||technicalIndicatorReportEntity.getCurrentAdx()>25){
                             try {
                                 autoTradingRestart(tradingEntity);
                             } catch (Exception e) {
@@ -341,7 +341,7 @@ public class FutureService {
                         }
                     } else {
                         if(ADX_CHECKER){
-                            if (technicalIndicatorReportEntity.getAdxSignal() == 1&&technicalIndicatorReportEntity.getAdxGap()<2){
+                            if (technicalIndicatorReportEntity.getAdxSignal() == 1&&technicalIndicatorReportEntity.getAdxGap()<3){
                                 String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                                 try {
                                     makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
@@ -736,7 +736,7 @@ public class FutureService {
             String symbol = String.valueOf(selectedStock.get("symbol"));
             System.out.println("symbol : " + symbol);
             // 해당 페어의 평균 거래량을 구합니다.
-            //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, 500).get("result"), interval);
+            //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, WINDOW_SIZE).get("result"), interval);
             TradingEntity tradingEntity = TradingEntity.builder()
                     .symbol(symbol)
                     .tradingStatus("OPEN")
@@ -829,7 +829,7 @@ public class FutureService {
                 Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
 
                 if (tradingEntityOpt.isEmpty()) {
-                    getKlines(tempCd, symbol, interval, 500);
+                    getKlines(tempCd, symbol, interval, WINDOW_SIZE);
                     TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
 
                     synchronized (this) {
