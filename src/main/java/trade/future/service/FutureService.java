@@ -248,8 +248,28 @@ public class FutureService {
                 });
             } else {
                 if (ADX_CHECKER){
+                    Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
+                    openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
+                        if(technicalIndicatorReportEntity.getAdxSignal() == -1||technicalIndicatorReportEntity.getAdxGap()<-1){
+                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                            PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
+                            if(closePosition.getPositionStatus().equals("OPEN")){
+                                makeCloseOrder(eventEntity, klineEvent, remark);
+                            }
+                        }
+                    },() -> {
+                        if(technicalIndicatorReportEntity.getAdxSignal() == -1
+                            ||technicalIndicatorReportEntity.getAdxGap()<-1
+                            ||technicalIndicatorReportEntity.getCurrentAdxGrade().getGrade()>ADX_GRADE.추세확정.getGrade()){
+                            try {
+                                autoTradingRestart(tradingEntity);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    });
                     if(technicalIndicatorReportEntity.getAdxSignal() == -1||technicalIndicatorReportEntity.getAdxGap()<-1){
-                        eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresentOrElse(klineEvent -> {
+                        openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
@@ -480,7 +500,7 @@ public class FutureService {
             streamClose(tradingEntity.getStreamId());
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
-            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
+            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
             //autoTradingRestart(tradingEntity);
         }
     }
@@ -670,7 +690,7 @@ public class FutureService {
 
     public void autoTradingRestart(TradingEntity tradingEntity){
         tradingEntity = autoTradingClose(tradingEntity);
-        autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getQuoteAssetVolumeStandard(), tradingEntity.getMaxPositionCount());
+        autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
     }
 
     public Map<String, Object> autoTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
@@ -679,10 +699,10 @@ public class FutureService {
         if (userCd == null || userCd.isEmpty()) {
             throw new RuntimeException("사용자 정보가 없습니다.");
         }
-        return autoTradingOpen(userCd, tradingDTO.getSymbol(), tradingDTO.getInterval(), tradingDTO.getLeverage(), tradingDTO.getGoalPricePercent(), tradingDTO.getStockSelectionCount(), tradingDTO.getQuoteAssetVolumeStandard(), tradingDTO.getMaxPositionCount());
+        return autoTradingOpen(userCd, tradingDTO.getSymbol(), tradingDTO.getInterval(), tradingDTO.getLeverage(), tradingDTO.getGoalPricePercent(), tradingDTO.getStockSelectionCount(), tradingDTO.getMaxPositionCount());
     }
 
-    public Map<String, Object> autoTradingOpen(String userCd, String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, BigDecimal quoteAssetVolumeStandard, int maxPositionCount) {
+    public Map<String, Object> autoTradingOpen(String userCd, String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, int maxPositionCount) {
         log.info("autoTrading >>>>>");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
@@ -739,7 +759,6 @@ public class FutureService {
                     .leverage(leverage)
                     .goalPricePercent(goalPricePercent)
                     .stockSelectionCount(stockSelectionCount)
-                    .quoteAssetVolumeStandard(quoteAssetVolumeStandard)
                     .maxPositionCount(maxPositionCount)
                     .collateral(finalAvailableBalance)
                     .userCd(userCd)
