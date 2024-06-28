@@ -144,7 +144,9 @@ public class FutureService {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
         if(tradingEntityOpt.isPresent()){
-            System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
+            TradingEntity tradingEntity = tradingEntityOpt.get();
+            autoTradingRestart(tradingEntity);
+            /*System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
             TradingEntity tradingEntity = tradingEntityOpt.get();
             tradingEntity.setTradingStatus("CLOSE");
             tradingRepository.save(tradingEntity);
@@ -161,7 +163,7 @@ public class FutureService {
                 };
                 // 5초 후에 task 실행
                 scheduler.schedule(task, 5, TimeUnit.SECONDS);
-            }
+            }*/
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
             //onFailureCallback(streamId);
