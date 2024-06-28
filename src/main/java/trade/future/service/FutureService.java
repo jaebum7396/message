@@ -262,7 +262,7 @@ public class FutureService {
                     },() -> {
                         if(technicalIndicatorReportEntity.getAdxSignal() == -1
                             ||technicalIndicatorReportEntity.getAdxGap()<-1
-                            ||technicalIndicatorReportEntity.getCurrentAdx()>25){
+                            ||technicalIndicatorReportEntity.getCurrentAdx()>20){
                             try {
                                 autoTradingRestart(tradingEntity);
                             } catch (Exception e) {
