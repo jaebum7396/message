@@ -279,7 +279,7 @@ public class FutureService {
                             }
                         }*/
                     },() -> {
-                        if(technicalIndicatorReportEntity.getAdxSignal() == -1
+                        /*if(technicalIndicatorReportEntity.getAdxSignal() == -1
                             ||technicalIndicatorReportEntity.getAdxGap()<-1
                             ||technicalIndicatorReportEntity.getCurrentAdx()>20){
                             try {
@@ -287,7 +287,7 @@ public class FutureService {
                             } catch (Exception e) {
                                 throw new RuntimeException(e);
                             }
-                        }
+                        }*/
                     });
                 }
                 if (MACD_CHECKER){
