@@ -42,6 +42,7 @@ import trade.future.repository.PositionRepository;
 import trade.future.repository.TradingRepository;
 
 import javax.servlet.http.HttpServletRequest;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -856,7 +857,7 @@ public class FutureService {
                 Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
 
                 if (tradingEntityOpt.isEmpty()) {
-                    //getKlines(tempCd, symbol, interval, WINDOW_SIZE);
+                    getKlines(tempCd, symbol, interval, WINDOW_SIZE);
                     TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
 
                     synchronized (this) {
@@ -1085,6 +1086,7 @@ public class FutureService {
         series.setMaximumBarCount(WINDOW_SIZE);
         seriesMap.put(tradingCd + "_" + interval, series);
 
+        ArrayList<TechnicalIndicatorReportEntity> technicalIndicatorReportEntityArr = new ArrayList<>();
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
             KlineEntity klineEntity = parseKlineEntity(klineArray);
@@ -1100,11 +1102,12 @@ public class FutureService {
             series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
 
             if(i!=0){
-                technicalIndicatorCalculate(tradingCd, symbol, interval);
+                technicalIndicatorReportEntityArr.add(technicalIndicatorCalculate(tradingCd, symbol, interval));
             }
         }
         klines.put(symbol, klineEntities);
         resultMap.put("result", klineEntities);
+        resultMap.put("technicalIndicatorReportEntityArr", technicalIndicatorReportEntityArr);
 
         long endTime = System.currentTimeMillis(); // 종료 시간 기록
         long elapsedTime = endTime - startTime; // 실행 시간 계산
