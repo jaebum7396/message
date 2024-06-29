@@ -252,16 +252,31 @@ public class FutureService {
                 if (ADX_CHECKER){
                     Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                     openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
-                        if(technicalIndicatorReportEntity.getAdxSignal() == -1
-                            ||technicalIndicatorReportEntity.getAdxGap()<-2
-                            ||klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getCurrentAdx()-technicalIndicatorReportEntity.getCurrentAdx()<-2
+                        if(klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
+                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                            PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
+                            if(closePosition.getPositionStatus().equals("OPEN")){
+                                makeCloseOrder(eventEntity, klineEvent, remark);
+                            }
+                        } else if (klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
+                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                            PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
+                            if(closePosition.getPositionStatus().equals("OPEN")){
+                                makeCloseOrder(eventEntity, klineEvent, remark);
+                            }
+                        }else{
+                            //autoTradingRestart(tradingEntity);
+                        }
+                        /*if(technicalIndicatorReportEntity.getAdxGap()>1 // ADX가 1이상(추세가 강해질때)
+                            ||klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getCurrentAdx()-technicalIndicatorReportEntity.getCurrentAdx()<-1  // 현재 ADX가 포지션 진입당시 ADX보다 2이상 높아졌을때(추세가 강해질때)
+
                         ){
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
                                 makeCloseOrder(eventEntity, klineEvent, remark);
                             }
-                        }
+                        }*/
                     },() -> {
                         if(technicalIndicatorReportEntity.getAdxSignal() == -1
                             ||technicalIndicatorReportEntity.getAdxGap()<-1
@@ -346,7 +361,7 @@ public class FutureService {
                         }
                     } else {
                         if(ADX_CHECKER){
-                            if (technicalIndicatorReportEntity.getAdxSignal() == 1&&technicalIndicatorReportEntity.getAdxGap()<3){
+                            if (technicalIndicatorReportEntity.getAdxSignal() != 0){
                                 String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                                 try {
                                     makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
@@ -841,11 +856,11 @@ public class FutureService {
                 Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
 
                 if (tradingEntityOpt.isEmpty()) {
-                    getKlines(tempCd, symbol, interval, WINDOW_SIZE);
+                    //getKlines(tempCd, symbol, interval, WINDOW_SIZE);
                     TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
 
                     synchronized (this) {
-                        if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.약한추세) && tempReport.getAdxGap() > 1) {
+                        if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)|| tempReport.getCurrentAdxGrade().getGrade()>ADX_GRADE.추세확정.getGrade()) {
                             if (count.get() < availablePositionCount) {
                                 overlappingData.add(item);
                                 reports.add(tempReport);
@@ -1176,7 +1191,7 @@ public class FutureService {
         LowPriceIndicator lowPrice = new LowPriceIndicator(series);
 
         // Calculate SMA
-        SMAIndicator sma = new SMAIndicator(closePrice, 7);
+        SMAIndicator sma = new SMAIndicator(closePrice, 5);
         // Calculate EMA
         EMAIndicator ema = new EMAIndicator(closePrice, 7);
         // Calculate Bollinger Bands
@@ -1190,47 +1205,6 @@ public class FutureService {
         MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
         EMAIndicator macdSignal = new EMAIndicator(macd, 9);
 
-        // Initialize MACD Histogram peaks and bottoms
-        /*int candleCount = 5;
-        int macdPeakSignal = 0;
-        int macdReversalSignal = 0;
-        Num currentCandleMacdHistogram = null;
-        Num previousCandleMacdHistogram = null;
-        Num prePreviousCandleMacdHistogram = null;
-        // Loop through the last N candles to identify MACD peak/bottom and trend reversal
-        for (int i = series.getEndIndex() - candleCount + 1; i <= series.getEndIndex(); i++) {
-            Num macdHistogram = macd.getValue(i).minus(macdSignal.getValue(i));
-            Num previousMacdHistogram = macd.getValue(i - 1).minus(macdSignal.getValue(i - 1));
-            Num prePreviousMacdHistogram = macd.getValue(i - 2).minus(macdSignal.getValue(i - 2));
-
-            if (macdHistogram.isGreaterThan(previousMacdHistogram) &&
-                    previousMacdHistogram.isGreaterThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2)))) {
-                macdPeakSignal = 1;
-            } else if (macdHistogram.isLessThan(previousMacdHistogram) &&
-                    previousMacdHistogram.isLessThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2)))) {
-                macdPeakSignal = -1;
-            }
-
-            if (previousMacdHistogram.isGreaterThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2))) &&
-                    previousMacdHistogram.isGreaterThan(macdHistogram)) {
-                currentCandleMacdHistogram = macdHistogram;
-                previousCandleMacdHistogram = previousMacdHistogram;
-                prePreviousCandleMacdHistogram = prePreviousMacdHistogram;
-                macdReversalSignal = 1;
-            } else if (previousMacdHistogram.isLessThan(macd.getValue(i - 2).minus(macdSignal.getValue(i - 2))) &&
-                    previousMacdHistogram.isLessThan(macdHistogram)) {
-                currentCandleMacdHistogram = macdHistogram;
-                previousCandleMacdHistogram = previousMacdHistogram;
-                prePreviousCandleMacdHistogram = prePreviousMacdHistogram;
-                macdReversalSignal = -1;
-            }
-        }
-        if (macdReversalSignal == 1) {
-            log.info("!!! MACD 고점 반전 시그널("+kstEndTime+") 전직전 : "+prePreviousCandleMacdHistogram +" 직전 :"+ previousCandleMacdHistogram+" 현재 : "+currentCandleMacdHistogram);
-        } else if (macdReversalSignal == -1) {
-            log.info("!!! MACD 저점 반전 시그널("+kstEndTime+") 전직전 : "+prePreviousCandleMacdHistogram +" 직전 :"+ previousCandleMacdHistogram+" 현재 : "+currentCandleMacdHistogram);
-        }*/
-
         // Determine current trend
         String currentTrend = technicalIndicatorCalculator.determineTrend(series, sma);
 
@@ -1238,40 +1212,55 @@ public class FutureService {
         //adx
         double currentAdx  = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex());
         double previousAdx = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex()-1);
+        double prePreviousAdx = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex()-2);
         //di
         double plusDi = technicalIndicatorCalculator.calculatePlusDI(series, 14, series.getEndIndex());
         double minusDi = technicalIndicatorCalculator.calculateMinusDI(series, 14, series.getEndIndex());
         //direction
         String direction = technicalIndicatorCalculator.getDirection(series, 14, series.getEndIndex());
 
-        double adxGap = currentAdx - previousAdx;
-
-        /*if (adxGap > 0) {
-            System.out.println("추세증가 : " + adxGap);
-        } else if (adxGap < 0) {
-            System.out.println("추세감소 : " + adxGap);
-        }*/
         ADX_GRADE currentAdxGrade  = technicalIndicatorCalculator.calculateADXGrade(currentAdx);
         ADX_GRADE previousAdxGrade = technicalIndicatorCalculator.calculateADXGrade(previousAdx);
+        ADX_GRADE prePreviousAdxGrade = technicalIndicatorCalculator.calculateADXGrade(prePreviousAdx);
 
+        double adxGap = currentAdx - previousAdx;
+        double previousAdxGap = previousAdx - prePreviousAdx;
+
+        boolean isAdxGapPositive = adxGap > 0;
+        boolean isPreviousAdxGapPositive = previousAdxGap > 0;
+
+        System.out.println(" ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
         int adxSignal = 0;
-        if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() > 0){
-            if (previousAdxGrade.getGrade() == 1 && currentAdxGrade.getGrade() == 2) {
-                adxSignal = 1;
-                System.out.println("!!! ADX 포지션 진입 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"["+direction+"]");
-            }
-            //System.out.println("추세등급 증가: " + (previousAdxGrade +" > "+ currentAdxGrade));
-            //System.out.println("방향(DI기준): " + direction);
-        } else if(currentAdxGrade.getGrade() - previousAdxGrade.getGrade() < 0){
-            //System.out.println("추세등급 감소: " + previousAdxGrade +" > "+ currentAdxGrade);
-            //System.out.println("방향(DI기준): " + direction);
-            adxSignal = -1;
-            System.out.println("!!! ADX 포지션 청산 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex()));
+        if (isAdxGapPositive == isPreviousAdxGapPositive) {
+            //System.out.println("추세유지");
         } else {
-            //System.out.println("추세등급 유지: " + currentAdxGrade);
-            //System.out.println("방향(DI기준): " + direction);
+            if (adxGap > 0.5) {
+                if (currentAdxGrade.getGrade() == 0) {
+                    System.out.println("**********************************************************");
+                    System.out.println("추세감소 >>> 추세증가 :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
+                    log.info("!!! " + currentAdxGrade + " !!! " + direction + "/" + currentTrend + " ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
+                    adxSignal = 1;
+                    System.out.println("**********************************************************");
+                }
+            } else if (adxGap < -0.5) {
+                if (currentAdxGrade.getGrade() > 3) {
+                    System.out.println("**********************************************************");
+                    System.out.println("추세증가 >>> 추세감소 :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
+                    log.info("!!! " + currentAdxGrade + " !!! " + direction + "/" + currentTrend + " ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
+                    adxSignal = -1;
+                    System.out.println("**********************************************************");
+                }
+            }
         }
-        //System.out.println("방향(MA기준): " + currentTrend);
+
+        /*if(adxGap > 0){ // 추세강화
+            if (currentAdxGrade.getGrade() > 1) {
+                adxSignal = 1;
+            }
+        } else if(adxGap < 0){ //추세반전
+            adxSignal = -1;
+        } else {
+        }*/
 
         // MACD 고점 및 저점 검증 로직 추가
         int macdPreliminarySignal = 0;
@@ -1289,11 +1278,11 @@ public class FutureService {
         int macdCrossSignal =0 ;
         if(technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9)){
             macdCrossSignal = 1;
-            System.out.println("!!! MACD 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"[골든크로스]"+macd.getValue(series.getEndIndex()));
+            //System.out.println("!!! MACD 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"[골든크로스]"+macd.getValue(series.getEndIndex()));
         }
         if(technicalIndicatorCalculator.isDeadCross(series, 12, 26, 9)){
             macdCrossSignal = -1;
-            System.out.println("!!! MACD 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"[데드크로스]"+macd.getValue(series.getEndIndex()));
+            //System.out.println("!!! MACD 시그널("+kstEndTime+") : "+ closePrice.getValue(series.getEndIndex())+"[데드크로스]"+macd.getValue(series.getEndIndex()));
         }
 
         //log.error(String.valueOf(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN)));
