@@ -362,7 +362,7 @@ public class FutureService {
                         }
                     } else {
                         if(ADX_CHECKER){
-                            if (technicalIndicatorReportEntity.getAdxSignal() != 0){
+                            if (technicalIndicatorReportEntity.getAdxSignal() != 0 && (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)) {
                                 String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                                 try {
                                     makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
