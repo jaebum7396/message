@@ -1225,7 +1225,7 @@ public class FutureService {
         if (isAdxGapPositive == isPreviousAdxGapPositive) {
             //System.out.println("추세유지");
         } else {
-            if (adxGap > 0.5) {
+            if (adxGap > 0) {
                 if (currentAdxGrade.getGrade() == 0) {
                     System.out.println("**********************************************************");
                     System.out.println("추세감소 >>> 추세증가 :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
@@ -1233,8 +1233,8 @@ public class FutureService {
                     adxSignal = 1;
                     System.out.println("**********************************************************");
                 }
-            } else if (adxGap < -0.5) {
-                if (currentAdxGrade.getGrade() > 3) {
+            } else if (adxGap < 0) {
+                if (currentAdxGrade.getGrade() > 2) {
                     System.out.println("**********************************************************");
                     System.out.println("추세증가 >>> 추세감소 :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
                     log.info("!!! " + currentAdxGrade + " !!! " + direction + "/" + currentTrend + " ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
