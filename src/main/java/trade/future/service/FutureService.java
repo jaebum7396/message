@@ -254,7 +254,9 @@ public class FutureService {
                     Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                     openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
                         TechnicalIndicatorReportEntity positionReport = klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
-                        if(positionReport.getEndTime() == technicalIndicatorReportEntity.getEndTime()){
+                        System.out.println("positionReport : " + positionReport.toString());
+                        System.out.println("technicalIndicatorReportEntity : " + technicalIndicatorReportEntity.toString());
+                        if(positionReport.getEndTime().equals(technicalIndicatorReportEntity.getEndTime())){
                             return;
                         }
                         if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
