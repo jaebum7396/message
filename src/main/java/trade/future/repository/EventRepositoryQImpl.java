@@ -29,8 +29,8 @@ public class EventRepositoryQImpl implements EventRepositoryQ {
                 .selectFrom(qKlineEvent)
                 .join(qKlineEvent.klineEntity, qKline).fetchJoin()
                 .join(qKlineEvent.tradingEntity, qTradingEntity).fetchJoin()
-                .join(qKlineEvent.klineEntity.positionEntity, qPosition).fetchJoin()
-                .join(qKlineEvent.klineEntity.technicalIndicatorReportEntity, qTechnicalIndicatorReport).fetchJoin()
+                .join(qKline.positionEntity, qPosition).fetchJoin()
+                .join(qKline.technicalIndicatorReportEntity, qTechnicalIndicatorReport).fetchJoin()
                 .where(
                         qKlineEvent.klineEntity.symbol.eq(symbol),
                         qPosition.positionStatus.eq(positionStatus)
