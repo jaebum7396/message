@@ -851,52 +851,32 @@ public class FutureService {
         List<Map<String, Object>> overlappingData = new ArrayList<>();
         List<TechnicalIndicatorReportEntity> reports = new ArrayList<>();
 
-        AtomicInteger count = new AtomicInteger(0);
-        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-
+        int count = 0;
         for (Map<String, Object> item : sortedByQuoteVolume) {
-            if (count.get() >= availablePositionCount) {
+            if (count >= availablePositionCount) {
                 break;
             }
 
-            executor.submit(() -> {
-                String tempCd = String.valueOf(UUID.randomUUID());
-                String symbol = String.valueOf(item.get("symbol"));
-                Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+            String tempCd = String.valueOf(UUID.randomUUID());
+            String symbol = String.valueOf(item.get("symbol"));
+            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
 
-                if (tradingEntityOpt.isEmpty()) {
-                    getKlines(tempCd, symbol, interval, WINDOW_SIZE);
-                    TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
+            if (tradingEntityOpt.isEmpty()) {
+                getKlines(tempCd, symbol, interval, WINDOW_SIZE);
+                TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
 
-                    synchronized (this) {
-                        if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)|| tempReport.getCurrentAdxGrade().getGrade()>ADX_GRADE.추세확정.getGrade()) {
-                            if (count.get() < availablePositionCount) {
-                                overlappingData.add(item);
-                                reports.add(tempReport);
-                                count.incrementAndGet();
-                            }
-                        }
-
-                        if (MACD_CHECKER && tempReport.getMacdPreliminarySignal() != 0) {
-                            if (count.get() < availablePositionCount) {
-                                overlappingData.add(item);
-                                reports.add(tempReport);
-                                count.incrementAndGet();
-                            }
-                        }
-                    }
+                if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보) || tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.추세확정.getGrade()) {
+                    overlappingData.add(item);
+                    reports.add(tempReport);
+                    count++;
                 }
-            });
-        }
 
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(60, TimeUnit.MINUTES)) { // 60분 내에 모든 작업이 완료되지 않으면 강제 종료
-                executor.shutdownNow();
+                if (MACD_CHECKER && tempReport.getMacdPreliminarySignal() != 0) {
+                    overlappingData.add(item);
+                    reports.add(tempReport);
+                    count++;
+                }
             }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
         }
 
         resultMap.put("reports", reports);
