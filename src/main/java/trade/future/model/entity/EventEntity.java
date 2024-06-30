@@ -23,7 +23,6 @@ public class EventEntity extends BaseEntity implements Serializable {
     @Column( name = "EVENT_CD")
     private String EventCd; // ID 필드 추가 (데이터베이스 식별자)
 
-    @JsonIgnore
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "KLINE_CD")
     private KlineEntity klineEntity;

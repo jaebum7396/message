@@ -34,6 +34,7 @@ public class KlineEntity extends BaseEntity implements Serializable {
     private TechnicalIndicatorReportEntity technicalIndicatorReportEntity;
 
     //연관관계의 주인
+    @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "EVENT_CD")
     private EventEntity Event;
