@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 import trade.future.model.entity.*;
 
 import javax.persistence.EntityManager;
+import javax.persistence.NonUniqueResultException;
 import javax.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,26 +19,34 @@ public class EventRepositoryQImpl implements EventRepositoryQ {
     public Optional<EventEntity> findEventBySymbolAndPositionStatus(String symbol, String positionStatus) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
 
-        QEventEntity qKlineEvent = QEventEntity.eventEntity;
+        QEventEntity qEventEntity = QEventEntity.eventEntity;
         QTradingEntity qTradingEntity = QTradingEntity.tradingEntity;
-        QKlineEntity qKline = QKlineEntity.klineEntity;
-        QPositionEntity qPosition = QPositionEntity.positionEntity;
-        QTechnicalIndicatorReportEntity qTechnicalIndicatorReport = QTechnicalIndicatorReportEntity.technicalIndicatorReportEntity;
+        QKlineEntity qKlineEntity = QKlineEntity.klineEntity;
+        QPositionEntity qPositionEntity = QPositionEntity.positionEntity;
+        QTechnicalIndicatorReportEntity qTechnicalIndicatorReportEntity = QTechnicalIndicatorReportEntity.technicalIndicatorReportEntity;
 
-        Optional<EventEntity> result = Optional.ofNullable(
-                queryFactory
-                .selectFrom(qKlineEvent)
-                .join(qKlineEvent.klineEntity, qKline).fetchJoin()
-                .join(qKlineEvent.tradingEntity, qTradingEntity).fetchJoin()
-                .join(qKline.positionEntity, qPosition).fetchJoin()
-                .join(qKline.technicalIndicatorReportEntity, qTechnicalIndicatorReport).fetchJoin()
-                .where(
-                        qKlineEvent.klineEntity.symbol.eq(symbol),
-                        qPosition.positionStatus.eq(positionStatus)
-                )
-                .fetchOne());
-        return result;
+        try {
+            EventEntity eventEntity = queryFactory
+                    .select(qEventEntity)
+                    .from(qEventEntity)
+                    .join(qEventEntity.klineEntity, qKlineEntity).fetchJoin()
+                    .join(qEventEntity.tradingEntity, qTradingEntity).fetchJoin()
+                    .join(qKlineEntity.positionEntity, qPositionEntity).fetchJoin()
+                    .join(qKlineEntity.technicalIndicatorReportEntity, qTechnicalIndicatorReportEntity).fetchJoin()
+                    .where(
+                            qKlineEntity.symbol.eq(symbol),
+                            qPositionEntity.positionStatus.eq(positionStatus)
+                    )
+                    .fetchOne();
+
+            return Optional.ofNullable(eventEntity);
+        } catch (NonUniqueResultException e) {
+            // 예외 처리: 결과가 둘 이상일 경우 예외가 발생할 수 있습니다.
+            // 적절한 예외 처리 로직을 추가합니다.
+            return Optional.empty();
+        }
     }
+
 
     public List<EventEntity> findEventByPositionStatus(String positionStatus) {
         JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
