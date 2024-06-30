@@ -23,6 +23,7 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Column( name = "POSITION_CD")
     private String positionCd; // ID 필드 추가 (데이터베이스 식별자)
 
+    @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "KLINE_CD")
     private KlineEntity klineEntity;
