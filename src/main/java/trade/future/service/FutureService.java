@@ -253,13 +253,17 @@ public class FutureService {
                 if (ADX_CHECKER){
                     Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                     openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
-                        if(klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
+                        TechnicalIndicatorReportEntity positionReport = klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
+                        if(positionReport.getEndTime() == technicalIndicatorReportEntity.getEndTime()){
+                            return;
+                        }
+                        if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
                                 makeCloseOrder(eventEntity, klineEvent, remark);
                             }
-                        } else if (klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
+                        } else if (positionReport.getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
@@ -362,7 +366,9 @@ public class FutureService {
                         }
                     } else {
                         if(ADX_CHECKER){
-                            if (technicalIndicatorReportEntity.getAdxSignal() != 0 && (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)) {
+                            if (technicalIndicatorReportEntity.getAdxSignal() != 0
+                                //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
+                            ){
                                 String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                                 try {
                                     makeOpenOrder(finalKlineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
