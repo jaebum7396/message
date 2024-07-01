@@ -259,13 +259,13 @@ public class FutureService {
                         if(positionReport.getEndTime().equals(technicalIndicatorReportEntity.getEndTime())){
                             return;
                         }
-                        if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<0){
+                        if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
                                 makeCloseOrder(eventEntity, positionEvent, remark);
                             }
-                        } else if (positionReport.getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>0){
+                        } else if (positionReport.getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
                             String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
                             PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
