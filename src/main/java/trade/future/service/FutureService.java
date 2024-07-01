@@ -110,7 +110,7 @@ public class FutureService {
     private HashMap<String, BaseBarSeries> seriesMap = new HashMap<String, BaseBarSeries>();
     private static final int WINDOW_SIZE = 100; // For demonstration purposes
 
-    private static final boolean DEV_FLAG = false;
+    private static final boolean DEV_FLAG = true;
     private static final boolean MACD_CHECKER = false;
     private static final boolean ADX_CHECKER = true;
 
@@ -236,21 +236,19 @@ public class FutureService {
             EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
 
             TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
-            if(DEV_FLAG){
-                eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> {
+            Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
+            openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
+                TechnicalIndicatorReportEntity positionReport = klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
+                System.out.println("positionReport : " + positionReport.toString());
+                System.out.println("technicalIndicatorReportEntity : " + technicalIndicatorReportEntity.toString());
+                if(DEV_FLAG){
                     String remark = "테스트 청산";
                     PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                     if(closePosition.getPositionStatus().equals("OPEN")){
                         makeCloseOrder(eventEntity, klineEvent, remark);
                     }
-                });
-            } else {
-                if (ADX_CHECKER){
-                    Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
-                    openPositionEntityOpt.ifPresentOrElse(klineEvent -> { // 오픈된 포지션이 있다면
-                        TechnicalIndicatorReportEntity positionReport = klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
-                        System.out.println("positionReport : " + positionReport.toString());
-                        System.out.println("technicalIndicatorReportEntity : " + technicalIndicatorReportEntity.toString());
+                } else {
+                    if (ADX_CHECKER){
                         if(positionReport.getEndTime().equals(technicalIndicatorReportEntity.getEndTime())){
                             return;
                         }
@@ -279,42 +277,30 @@ public class FutureService {
                                 makeCloseOrder(eventEntity, klineEvent, remark);
                             }
                         }*/
-                    },() -> {
-                        /*if(technicalIndicatorReportEntity.getAdxSignal() == -1
-                            ||technicalIndicatorReportEntity.getAdxGap()<-1
-                            ||technicalIndicatorReportEntity.getCurrentAdx()>20){
-                            try {
-                                autoTradingRestart(tradingEntity);
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
-                        }*/
-                    });
-                }
-                if (MACD_CHECKER){
-                    if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
-                        BigDecimal macd = technicalIndicatorReportEntity.getMacd();
-                        int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                        if(macdCrossSignal<0){ //MACD가 양수일때 데드크로스가 일어났을때.
-                            eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
+                    }
+                    if (MACD_CHECKER){
+                        if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
+                            BigDecimal macd = technicalIndicatorReportEntity.getMacd();
+                            int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
+                            if(macdCrossSignal<0){ //MACD가 양수일때 데드크로스가 일어났을때.
                                 String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                                 PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                                 if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
                                     makeCloseOrder(eventEntity, klineEvent, remark);
                                 }
-                            });
-                        } else if (macdCrossSignal > 0){ //MACD가 음수일때 골든크로스가 일어났을때.
-                            eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN").ifPresent(klineEvent -> { //포지션이 오픈되어있는 이벤트를 찾는다.
+                            } else if (macdCrossSignal > 0){ //MACD가 음수일때 골든크로스가 일어났을때.
                                 String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
                                 PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
                                 if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
                                     makeCloseOrder(eventEntity, klineEvent, remark);
                                 }
-                            });
+                            }
                         }
                     }
                 }
-            }
+            },() -> {
+
+            });
             //eventRepository.save(eventEntity);
         }
     }
@@ -328,14 +314,13 @@ public class FutureService {
             try {
                 klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
                 klineEvent.setTradingEntity(tradingEntity);
-                klineEvent = eventRepository.save(klineEvent);
                 int goalPricePercent = tradingEntity.getGoalPricePercent();
                 int leverage = tradingEntity.getLeverage();
 
                 // 캔들데이터 분석을 위한 bar 세팅
                 settingBar(tradingEntity.getTradingCd(),event);
                 TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
-                technicalIndicatorRepository.save(technicalIndicatorReportEntity);
+                technicalIndicatorReportEntity.setKlineEntity(klineEvent.getKlineEntity());
                 klineEvent.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
 
                 // 포지션 엔티티 생성
@@ -350,7 +335,6 @@ public class FutureService {
                                 CommonUtils.calculateGoalPrice(
                                         klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
                         .build();
-                positionRepository.save(positionEntity);
                 klineEvent.getKlineEntity().setPositionEntity(positionEntity);
                 EventEntity finalKlineEvent = klineEvent;
                 eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN").ifPresentOrElse(currentPositionKlineEvent -> {
@@ -977,8 +961,8 @@ public class FutureService {
         Optional<EventEntity> eventEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
         eventEntityOpt.ifPresent(eventEntity -> {
             System.out.println("eventEntity : " + eventEntity);
-            System.out.println("eventEntity : " + eventEntity.getKlineEntity().getPositionEntity());
-            System.out.println("eventEntity : " + eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity());
+            System.out.println("getKlineEntity : " + eventEntity.getKlineEntity().getPositionEntity());
+            System.out.println("getTechnicalIndicatorReportEntity : " + eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity());
             resultMap.put("eventEntity", eventEntity);
         });
         return resultMap;

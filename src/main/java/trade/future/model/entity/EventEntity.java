@@ -24,12 +24,12 @@ public class EventEntity extends BaseEntity implements Serializable {
     private String EventCd; // ID 필드 추가 (데이터베이스 식별자)
 
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "KLINE_CD", nullable = false)
+    @JoinColumn(name = "KLINE_CD")
     private KlineEntity klineEntity;
 
     //연관관계의 주인
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "TRADING_CD", nullable = false)
+    @JoinColumn(name = "TRADING_CD")
     private TradingEntity tradingEntity;
 
     @Column( name = "EVENT_TYPE")

@@ -27,7 +27,7 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
 
     @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "KLINE_CD", nullable = false)
+    @JoinColumn(name = "KLINE_CD")
     private KlineEntity klineEntity;
 
     @Column( name = "SYMBOL")
