@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBar;
@@ -39,10 +38,10 @@ import trade.future.model.entity.*;
 import trade.future.model.enums.ADX_GRADE;
 import trade.future.repository.EventRepository;
 import trade.future.repository.PositionRepository;
+import trade.future.repository.TechnicalIndicatorRepository;
 import trade.future.repository.TradingRepository;
 
 import javax.servlet.http.HttpServletRequest;
-import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -53,11 +52,6 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -98,6 +92,7 @@ public class FutureService {
     @Autowired EventRepository eventRepository;
     @Autowired PositionRepository positionRepository;
     @Autowired TradingRepository tradingRepository;
+    @Autowired TechnicalIndicatorRepository technicalIndicatorRepository;
     @Autowired MyWebSocketClientImpl umWebSocketStreamClient;
     UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     private final WebSocketCallback noopCallback = msg -> {};
@@ -339,6 +334,7 @@ public class FutureService {
                 // 캔들데이터 분석을 위한 bar 세팅
                 settingBar(tradingEntity.getTradingCd(),event);
                 TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
+                technicalIndicatorRepository.save(technicalIndicatorReportEntity);
                 klineEvent.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
 
                 // 포지션 엔티티 생성
@@ -353,6 +349,7 @@ public class FutureService {
                                 CommonUtils.calculateGoalPrice(
                                         klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
                         .build();
+                positionRepository.save(positionEntity);
                 klineEvent.getKlineEntity().setPositionEntity(positionEntity);
                 EventEntity finalKlineEvent = klineEvent;
                 eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN").ifPresentOrElse(currentPositionKlineEvent -> {
