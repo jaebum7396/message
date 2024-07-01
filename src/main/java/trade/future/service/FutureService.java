@@ -832,7 +832,10 @@ public class FutureService {
                 getKlines(tempCd, symbol, interval, WINDOW_SIZE);
                 TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
 
-                if (ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보) || (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.추세확정.getGrade() && tempReport.getAdxGap()>0)) {
+                if (
+                    ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
+                    (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.추세확정.getGrade() && tempReport.getAdxGap()>0)
+                ) {
                     overlappingData.add(item);
                     reports.add(tempReport);
                     count++;
