@@ -328,6 +328,7 @@ public class FutureService {
             try {
                 klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
                 klineEvent.setTradingEntity(tradingEntity);
+                klineEvent = eventRepository.save(klineEvent);
                 int goalPricePercent = tradingEntity.getGoalPricePercent();
                 int leverage = tradingEntity.getLeverage();
 
