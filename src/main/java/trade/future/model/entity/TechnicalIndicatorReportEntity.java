@@ -101,6 +101,31 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
 
     @Override
     public String toString() {
-        return null;
+        return "TechnicalIndicatorReportEntity{" +
+                "technicalIndicatorReportCd='" + technicalIndicatorReportCd + '\'' +
+                ", symbol='" + symbol + '\'' +
+                ", endTime=" + endTime +
+                ", currentAdx=" + currentAdx +
+                ", currentAdxGrade=" + currentAdxGrade +
+                ", previousAdx=" + previousAdx +
+                ", previousAdxGrade=" + previousAdxGrade +
+                ", adxSignal=" + adxSignal +
+                ", adxGap=" + adxGap +
+                ", plusDi=" + plusDi +
+                ", minusDi=" + minusDi +
+                ", directionDi='" + directionDi + '\'' +
+                ", sma=" + sma +
+                ", ema=" + ema +
+                ", directionMa='" + directionMa + '\'' +
+                ", ubb=" + ubb +
+                ", mbb=" + mbb +
+                ", lbb=" + lbb +
+                ", rsi=" + rsi +
+                ", macd=" + macd +
+                ", macdCrossSignal=" + macdCrossSignal +
+                ", macdPreliminarySignal=" + macdPreliminarySignal +
+                ", macdPeakSignal=" + macdPeakSignal +
+                ", macdReversalSignal=" + macdReversalSignal +
+                '}';
     }
 }

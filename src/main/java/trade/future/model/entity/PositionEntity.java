@@ -111,9 +111,32 @@ public class PositionEntity extends BaseEntity implements Serializable {
     public String toString() {
         return "PositionEntity{" +
                 "positionCd='" + positionCd + '\'' +
+                ", positionType='" + positionType + '\'' +
+                ", symbol='" + symbol + '\'' +
+                ", leverage='" + leverage + '\'' +
+                ", maxNotional=" + maxNotional +
+                ", maintMargin=" + maintMargin +
+                ", openOrderInitialMargin=" + openOrderInitialMargin +
+                ", notional=" + notional +
+                ", isolatedWallet=" + isolatedWallet +
+                ", breakEvenPrice=" + breakEvenPrice +
+                ", askNotional=" + askNotional +
+                ", positionInitialMargin=" + positionInitialMargin +
                 ", positionSide='" + positionSide + '\'' +
+                ", isolated=" + isolated +
+                ", initialMargin=" + initialMargin +
+                ", entryPrice=" + entryPrice +
+                ", closePrice=" + closePrice +
+                ", positionAmt=" + positionAmt +
+                ", profit=" + profit +
+                ", bidNotional=" + bidNotional +
                 ", positionStatus='" + positionStatus + '\'' +
+                ", goalPriceCheck=" + goalPriceCheck +
+                ", plusGoalPrice=" + plusGoalPrice +
+                ", minusGoalPrice=" + minusGoalPrice +
+                ", goalPricePercent=" + goalPricePercent +
                 ", realizatioPnl=" + realizatioPnl +
+                ", remark='" + remark + '\'' +
                 '}';
     }
 }
