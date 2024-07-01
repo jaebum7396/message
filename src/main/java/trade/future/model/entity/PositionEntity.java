@@ -25,7 +25,7 @@ public class PositionEntity extends BaseEntity implements Serializable {
 
     @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "KLINE_CD")
+    @JoinColumn(name = "KLINE_CD", nullable = false)
     private KlineEntity klineEntity;
 
     @Column( name = "POSITION_TYPE")

@@ -973,6 +973,19 @@ public class FutureService {
         return resultMap;
     }
 
+    public Map<String, Object> getEvent(String symbol) throws Exception {
+        log.info("getEvents >>>>>");
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        Optional<EventEntity> eventEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
+        eventEntityOpt.ifPresent(eventEntity -> {
+            System.out.println("eventEntity : " + eventEntity);
+            System.out.println("eventEntity : " + eventEntity.getKlineEntity().getPositionEntity());
+            System.out.println("eventEntity : " + eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity());
+            resultMap.put("eventEntity", eventEntity);
+        });
+        return resultMap;
+    }
+
     public Map<String, Object> getReports(String tradingCd) throws Exception {
         log.info("getReports >>>>>");
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();

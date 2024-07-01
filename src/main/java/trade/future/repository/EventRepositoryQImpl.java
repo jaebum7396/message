@@ -29,10 +29,10 @@ public class EventRepositoryQImpl implements EventRepositoryQ {
             EventEntity eventEntity = queryFactory
                     .select(qEventEntity)
                     .from(qEventEntity)
-                    .join(qEventEntity.klineEntity, qKlineEntity).fetchJoin()
                     .join(qEventEntity.tradingEntity, qTradingEntity).fetchJoin()
-                    .join(qKlineEntity.positionEntity, qPositionEntity).fetchJoin()
-                    .join(qKlineEntity.technicalIndicatorReportEntity, qTechnicalIndicatorReportEntity).fetchJoin()
+                    .join(qEventEntity.klineEntity, qKlineEntity).fetchJoin()
+                    .leftJoin(qKlineEntity.positionEntity, qPositionEntity).fetchJoin()
+                    .leftJoin(qKlineEntity.technicalIndicatorReportEntity, qTechnicalIndicatorReportEntity).fetchJoin()
                     .where(
                             qKlineEntity.symbol.eq(symbol),
                             qPositionEntity.positionStatus.eq(positionStatus)

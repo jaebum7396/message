@@ -25,12 +25,12 @@ public class KlineEntity extends BaseEntity implements Serializable {
     @Column( name = "KLINE_CD")
     private String kLineCd; // ID 필드 추가 (데이터베이스 식별자)
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "POSITION_CD")
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "POSITION_CD", nullable = false)
     private PositionEntity positionEntity;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "TECHNICAL_INDICATOR_REPORT_CD")
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "TECHNICAL_INDICATOR_REPORT_CD", nullable = false)
     private TechnicalIndicatorReportEntity technicalIndicatorReportEntity;
 
     //연관관계의 주인

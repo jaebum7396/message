@@ -82,6 +82,12 @@ public class FutureController {
         return commonUtils.okResponsePackaging(futureService.autoTradingInfo(request));
     }
 
+    @GetMapping(value = "/future/trading/event")
+    @Operation(summary="해당 트레이딩의 리포트들을 가져옵니다", description="해당 트레이딩의 리포트들을 가져옵니다")
+    public ResponseEntity getEvent(@RequestParam String symbol) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.getEvent(symbol));
+    }
+
     @GetMapping(value = "/future/trading/reports")
     @Operation(summary="해당 트레이딩의 리포트들을 가져옵니다", description="해당 트레이딩의 리포트들을 가져옵니다")
     public ResponseEntity getReports(@RequestParam String tradingCd) throws Exception {
