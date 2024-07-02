@@ -139,10 +139,10 @@ public class FutureService {
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
-        if(tradingEntityOpt.isPresent()){
+        /*if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
             autoTradingRestart(tradingEntity);
-            /*System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
+            System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
             TradingEntity tradingEntity = tradingEntityOpt.get();
             tradingEntity.setTradingStatus("CLOSE");
             tradingRepository.save(tradingEntity);
@@ -159,11 +159,11 @@ public class FutureService {
                 };
                 // 5초 후에 task 실행
                 scheduler.schedule(task, 5, TimeUnit.SECONDS);
-            }*/
+            }
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
             //onFailureCallback(streamId);
-        }
+        }*/
     }
 
     public void onMessageCallback(String event){
@@ -260,13 +260,13 @@ public class FutureService {
                             return;
                         }
                         if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
-                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                            String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
                             PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
                                 makeCloseOrder(eventEntity, positionEvent, remark);
                             }
                         } else if (positionReport.getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
-                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                            String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
                             PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
                                 makeCloseOrder(eventEntity, positionEvent, remark);
@@ -355,7 +355,7 @@ public class FutureService {
                     if (technicalIndicatorReportEntity.getAdxSignal() != 0
                         //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
                     ){
-                        String remark = "ADX 진입시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
+                        String remark = "ADX 진입시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
                         try {
                             makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
                         } catch (Exception e) {
@@ -438,7 +438,7 @@ public class FutureService {
             openPosition.setPositionStatus("OPEN");
             openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
             openPosition.setPositionSide(positionSide);
-            openPosition.setRemark(remark);
+            openPosition.setOpenRemark(remark);
 
             //레버리지 변경
             LinkedHashMap<String,Object> leverageParamMap = new LinkedHashMap<>();
@@ -465,7 +465,7 @@ public class FutureService {
         PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
         tradingEntity.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
         try { //마켓가로 클로즈 주문을 제출한다.
-            closePosition.setRemark(remark);
+            closePosition.setCloseRemark(remark);
             closePosition.setPositionStatus("CLOSE");
             closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));

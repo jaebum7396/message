@@ -107,6 +107,12 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Column( name = "REMARK")
     private String remark; //
 
+    @Column( name = "OPEN_REMARK")
+    private String openRemark; //
+
+    @Column( name = "CLOSE_REMARK")
+    private String closeRemark; //
+
     @Override
     public String toString() {
         return "PositionEntity{" +
