@@ -484,6 +484,7 @@ public class FutureService {
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
             TRADING_ENTITYS.remove(tradingEntity.getSymbol());
+            System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
             //autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
             autoTradingRestart(tradingEntity);
         }
@@ -657,6 +658,7 @@ public class FutureService {
                 tradingEntity.setTradingStatus("CLOSE");
                 tradingRepository.save(tradingEntity);
                 TRADING_ENTITYS.remove(tradingEntity.getSymbol());
+                System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
                 streamClose(tradingEntity.getStreamId());
             }
         });
@@ -735,6 +737,7 @@ public class FutureService {
                 reTradingEntity.setTargetSymbol(tradingEntity.getTargetSymbol());
             }
             TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(reTradingEntity));
+            System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
         });
     }
 
@@ -791,6 +794,7 @@ public class FutureService {
                     String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
                     Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
                     if(tradingEntityOpt.isPresent()){
+                        System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
                         throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
                     }
                 }
@@ -826,7 +830,8 @@ public class FutureService {
             if (targetSymbol != null && !targetSymbol.isEmpty()) {
                 tradingEntity.setTargetSymbol(targetSymbol);
             }
-            autoTradeStreamOpen(tradingEntity);
+            TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(tradingEntity));
+            System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
         });
         return resultMap;
     }
