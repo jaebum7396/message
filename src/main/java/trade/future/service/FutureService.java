@@ -484,9 +484,9 @@ public class FutureService {
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
             TRADING_ENTITYS.remove(tradingEntity.getSymbol());
-            System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
-            //autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
-            autoTradingRestart(tradingEntity);
+            printTradingEntitys();
+            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
+            //autoTradingRestart(tradingEntity);
         }
     }
 
@@ -658,7 +658,7 @@ public class FutureService {
                 tradingEntity.setTradingStatus("CLOSE");
                 tradingRepository.save(tradingEntity);
                 TRADING_ENTITYS.remove(tradingEntity.getSymbol());
-                System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
+                printTradingEntitys();
                 streamClose(tradingEntity.getStreamId());
             }
         });
@@ -737,7 +737,7 @@ public class FutureService {
                 reTradingEntity.setTargetSymbol(tradingEntity.getTargetSymbol());
             }
             TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(reTradingEntity));
-            System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
+            printTradingEntitys();
         });
     }
 
@@ -770,7 +770,18 @@ public class FutureService {
         System.out.println("symbolParam : " + targetSymbol);
 
         List<TradingEntity> openTradingList = tradingRepository.findByTradingStatus("OPEN");
-        int availablePositionCount = maxPositionCount - openTradingList.size();
+        int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
+        try {
+            if (availablePositionCount <= 0) {
+                throw new RuntimeException("오픈 가능한 포지션이 없습니다.");
+            }
+        } catch (Exception e){
+            System.out.println("오픈 가능한 포지션이 없습니다.");
+            System.out.println("현재 오픈된 포지션");
+            TRADING_ENTITYS.forEach((symbol, tradingEntity) -> {
+                System.out.println("symbol : " + symbol);
+            });
+        }
 
         if(targetSymbol == null || targetSymbol.isEmpty()) {
             selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, availablePositionCount).get("overlappingData");
@@ -794,7 +805,7 @@ public class FutureService {
                     String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
                     Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
                     if(tradingEntityOpt.isPresent()){
-                        System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
+                        printTradingEntitys();
                         throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
                     }
                 }
@@ -830,10 +841,27 @@ public class FutureService {
             if (targetSymbol != null && !targetSymbol.isEmpty()) {
                 tradingEntity.setTargetSymbol(targetSymbol);
             }
-            TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(tradingEntity));
-            System.out.println("TRADING_ENTITYS >>>>> " + TRADING_ENTITYS);
+            try{
+                Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
+                if(tradingEntityOpt.isPresent()){
+                    printTradingEntitys();
+                    throw new RuntimeException(tradingEntityOpt.get().getSymbol() + "이미 오픈된 트레이딩이 존재합니다.");
+                }else{
+                    TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(tradingEntity));
+                }
+            } catch (Exception e) {
+                autoTradingOpen(userCd, targetSymbol, interval, leverage, goalPricePercent, stockSelectionCount, maxPositionCount);
+            }
+            printTradingEntitys();
         });
         return resultMap;
+    }
+
+    public void printTradingEntitys(){
+        System.out.println("현재 오픈된 포지션 >>>>>");
+        TRADING_ENTITYS.forEach((symbol, tradingEntity) -> {
+            System.out.println("symbol : " + symbol);
+        });
     }
 
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
