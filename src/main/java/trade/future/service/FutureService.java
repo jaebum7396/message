@@ -481,8 +481,8 @@ public class FutureService {
             streamClose(tradingEntity.getStreamId());
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
-            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
-            //autoTradingRestart(tradingEntity);
+            //autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
+            autoTradingRestart(tradingEntity);
         }
     }
 
@@ -670,8 +670,59 @@ public class FutureService {
     }
 
     public void autoTradingRestart(TradingEntity tradingEntity){
-        tradingEntity = autoTradingClose(tradingEntity);
-        autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
+        log.info("autoTradingRestart >>>>>");
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        // printPrettyJson(accountInfo);
+
+        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
+
+        List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockFind(tradingEntity.getCandleInterval(), tradingEntity.getStockSelectionCount(), 1).get("overlappingData");
+        List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
+
+        try{
+            if(tradingTargetSymbols.size() == 0){
+                throw new RuntimeException("선택된 종목이 없습니다.");
+            }
+        } catch (Exception e) {
+            autoTradingRestart(tradingEntity);
+        }
+        availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
+
+        BigDecimal maxPositionAmount = totalWalletBalance
+                .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
+                .multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.DOWN);
+
+        BigDecimal finalAvailableBalance = maxPositionAmount;
+        log.info("collateral : " + maxPositionAmount);
+        System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
+        tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
+            String symbol = String.valueOf(selectedStock.get("symbol"));
+            System.out.println("symbol : " + symbol);
+            // 해당 페어의 평균 거래량을 구합니다.
+            //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, WINDOW_SIZE).get("result"), interval);
+            TradingEntity reTradingEntity = TradingEntity.builder()
+                    .symbol(symbol)
+                    .tradingStatus("OPEN")
+                    .candleInterval(tradingEntity.getCandleInterval())
+                    .leverage(tradingEntity.getLeverage())
+                    .goalPricePercent(tradingEntity.getGoalPricePercent())
+                    .stockSelectionCount(tradingEntity.getStockSelectionCount())
+                    .maxPositionCount(tradingEntity.getMaxPositionCount())
+                    .collateral(finalAvailableBalance)
+                    .userCd(tradingEntity.getUserCd())
+                    .build();
+            if (reTradingEntity.getTargetSymbol() != null && !reTradingEntity.getTargetSymbol().isEmpty()) {
+                reTradingEntity.setTargetSymbol(tradingEntity.getTargetSymbol());
+            }
+            autoTradeStreamOpen(reTradingEntity);
+        });
     }
 
     public Map<String, Object> autoTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
