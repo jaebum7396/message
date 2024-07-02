@@ -656,6 +656,7 @@ public class FutureService {
             if(tradingEntity.getTradingStatus().equals("OPEN")){
                 tradingEntity.setTradingStatus("CLOSE");
                 tradingRepository.save(tradingEntity);
+                TRADING_ENTITYS.remove(tradingEntity.getSymbol());
                 streamClose(tradingEntity.getStreamId());
             }
         });
