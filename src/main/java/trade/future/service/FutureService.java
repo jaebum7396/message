@@ -139,9 +139,10 @@ public class FutureService {
     public void onFailureCallback(String streamId) {
         System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
-        /*if(tradingEntityOpt.isPresent()){
+        if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
-            autoTradingRestart(tradingEntity);
+            log.error("[FAILURE] >>>>> "+tradingEntity.getTradingCd()+ "/" +tradingEntity.getSymbol());
+           /* autoTradingRestart(tradingEntity);
             System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
             TradingEntity tradingEntity = tradingEntityOpt.get();
             tradingEntity.setTradingStatus("CLOSE");
@@ -159,11 +160,11 @@ public class FutureService {
                 };
                 // 5초 후에 task 실행
                 scheduler.schedule(task, 5, TimeUnit.SECONDS);
-            }
+            }*/
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
             //onFailureCallback(streamId);
-        }*/
+        }
     }
 
     public void onMessageCallback(String event){
@@ -240,13 +241,12 @@ public class FutureService {
             Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
             openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
                 TechnicalIndicatorReportEntity positionReport = positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
-                System.out.println("position positionEvent : " + positionEvent);
-                System.out.println("position kline : " + positionEvent.getKlineEntity());
-                System.out.println("position technicalIndicatorReportEntity : " + positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity());
-
-                System.out.println("event klineEvent : " + eventEntity);
-                System.out.println("event kline : " + eventEntity.getKlineEntity());
-                System.out.println("event technicalIndicatorReportEntity : " + eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity());
+                //System.out.println("position positionEvent : " + positionEvent);
+                //System.out.println("position kline : " + positionEvent.getKlineEntity());
+                //System.out.println("position technicalIndicatorReportEntity : " + positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity());
+                //System.out.println("event klineEvent : " + eventEntity);
+                //System.out.println("event kline : " + eventEntity.getKlineEntity());
+                //System.out.println("event technicalIndicatorReportEntity : " + eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity());
 
                 if(DEV_FLAG){
                     String remark = "테스트 청산";
