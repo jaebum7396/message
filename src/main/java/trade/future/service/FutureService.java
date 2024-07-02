@@ -114,6 +114,8 @@ public class FutureService {
     private static final boolean MACD_CHECKER = false;
     private static final boolean ADX_CHECKER = true;
 
+    private final Map<String, TradingEntity> TRADING_ENTITYS = new HashMap<>();
+
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
@@ -481,6 +483,7 @@ public class FutureService {
             streamClose(tradingEntity.getStreamId());
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
+            TRADING_ENTITYS.remove(tradingEntity.getSymbol());
             //autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
             autoTradingRestart(tradingEntity);
         }
@@ -689,6 +692,15 @@ public class FutureService {
         try{
             if(tradingTargetSymbols.size() == 0){
                 throw new RuntimeException("선택된 종목이 없습니다.");
+
+            }else{
+                for(Map<String,Object> tradingTargetSymbol : tradingTargetSymbols){
+                    String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
+                    Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
+                    if(tradingEntityOpt.isPresent()){
+                        throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
+                    }
+                }
             }
         } catch (Exception e) {
             autoTradingRestart(tradingEntity);
@@ -721,7 +733,7 @@ public class FutureService {
             if (reTradingEntity.getTargetSymbol() != null && !reTradingEntity.getTargetSymbol().isEmpty()) {
                 reTradingEntity.setTargetSymbol(tradingEntity.getTargetSymbol());
             }
-            autoTradeStreamOpen(reTradingEntity);
+            TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(reTradingEntity));
         });
     }
 
@@ -773,6 +785,14 @@ public class FutureService {
         try{
             if(tradingTargetSymbols.size() == 0){
                 throw new RuntimeException("선택된 종목이 없습니다.");
+            }else{
+                for(Map<String,Object> tradingTargetSymbol : tradingTargetSymbols){
+                    String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
+                    Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
+                    if(tradingEntityOpt.isPresent()){
+                        throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
+                    }
+                }
             }
         } catch (Exception e) {
             autoTradingOpen(userCd, targetSymbol, interval, leverage, goalPricePercent, stockSelectionCount, maxPositionCount);

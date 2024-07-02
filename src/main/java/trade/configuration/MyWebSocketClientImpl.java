@@ -93,4 +93,8 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
         Request request = RequestBuilder.buildWebsocketRequest(url);
         return createConnection(tradingEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
     }
+
+    public Map<Integer, TradingEntity> getTradingEntitys() {
+        return TradingEntitys;
+    }
 }
