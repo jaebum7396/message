@@ -175,6 +175,17 @@ public class TechnicalIndicatorCalculator {
         return adxIndicator.getValue(idx).doubleValue();
     }
 
+    public double calculateMACD(ClosePriceIndicator closePriceIndicator, int shortPeriod, int longPeriod, int idx) {
+        MACDIndicator macdIndicator = new MACDIndicator(closePriceIndicator, shortPeriod, longPeriod);
+        return macdIndicator.getValue(idx).doubleValue();
+    }
+
+    public double calculateMACDHistogram(ClosePriceIndicator closePriceIndicator, int shortPeriod, int longPeriod, int idx) {
+        MACDIndicator macdIndicator = new MACDIndicator(closePriceIndicator, shortPeriod, longPeriod);
+        EMAIndicator MACD_신호선 = new EMAIndicator(macdIndicator, 9);
+        return macdIndicator.getValue(idx).doubleValue() - MACD_신호선.getValue(idx).doubleValue();
+    }
+
     public double calculatePlusDI(BaseBarSeries series, int period, int idx) {
         PlusDIIndicator plusDI = new PlusDIIndicator(series, period);
         return plusDI.getValue(idx).doubleValue();

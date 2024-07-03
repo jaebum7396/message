@@ -39,6 +39,18 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "CURRENT_ADX")
     private double currentAdx;
 
+    @Column( name = "OPEN_PRICE")
+    private BigDecimal openPrice;
+
+    @Column( name = "CLOSE_PRICE")
+    private BigDecimal closePrice;
+
+    @Column( name = "HIGH_PRICE")
+    private BigDecimal highPrice;
+
+    @Column( name = "LOW_PRICE")
+    private BigDecimal lowPrice;
+
     @Column( name = "CURRENT_ADX_GRADE")
     private ADX_GRADE currentAdxGrade;
 
