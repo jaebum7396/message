@@ -48,14 +48,14 @@ spring:
       #ddl-auto=none:
     #show-sql: 'true'
     defer-datasource-initialization: 'true' #import data
-  data:
-    mongodb:
-      host: ${SERVER_URI}
-      port: 27017
-      database: trade
-      username: ${AFLK_USERNAME}
-      password: ${AFLK_PASSWORD}
-      authentication-database: admin
+  #data:
+    #mongodb:
+      #host: ${SERVER_URI}
+      #port: 27017
+      #database: trade
+      #username: ${AFLK_USERNAME}
+      #password: ${AFLK_PASSWORD}
+      #authentication-database: admin
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
