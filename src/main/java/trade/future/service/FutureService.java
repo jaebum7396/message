@@ -376,59 +376,20 @@ public class FutureService {
         int maxPositionCount = tradingDTO.getMaxPositionCount();
         BigDecimal colleteralRate = tradingDTO.getColleteralRate();
 
-        if(targetSymbol == null || targetSymbol.isEmpty()) {
-            selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, maxPositionCount).get("overlappingData");
-        } else {
-            LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-            paramMap.put("symbol", targetSymbol);
-            String resultStr = client.market().ticker24H(paramMap);
-            JSONObject result = new JSONObject(resultStr);
-            List<Map<String, Object>> list = new ArrayList<>();
-            list.add(result.toMap());
-            selectedStockList = list;
-        }
+        availableBalance = availableBalance.divide(new BigDecimal(maxPositionCount), 0, RoundingMode.DOWN);
 
-        List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
-        boolean nextFlag = true;
-        try{
-            if(tradingTargetSymbols.size() == 0){
-                throw new RuntimeException("선택된 종목이 없습니다.");
-            }
-        } catch (Exception e) {
-            autoTradingOpen(userCd, targetSymbol, interval, leverage, stockSelectionCount, maxPositionCount);
-            nextFlag = false;
-        }
-        if(nextFlag){
-            availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
+        TradingEntity tradingEntityTemplate = TradingEntity.builder()
+                .tradingStatus("OPEN")
+                .tradingType("BACKTEST")
+                .candleInterval(interval)
+                .leverage(leverage)
+                .stockSelectionCount(stockSelectionCount)
+                .maxPositionCount(maxPositionCount)
+                .userCd(userCd)
+                .build();
 
-            BigDecimal maxPositionAmount = totalWalletBalance
-                    .divide(new BigDecimal(maxPositionCount),0, RoundingMode.DOWN)
-                    .multiply(colleteralRate).setScale(0, RoundingMode.DOWN);
 
-            BigDecimal finalAvailableBalance = maxPositionAmount;
-            log.info("collateral : " + maxPositionAmount);
-            System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
-            tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
-                String symbol = String.valueOf(selectedStock.get("symbol"));
-                System.out.println("symbol : " + symbol);
-                // 해당 페어의 평균 거래량을 구합니다.
-                //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, WINDOW_SIZE).get("result"), interval);
-                TradingEntity tradingEntity = TradingEntity.builder()
-                        .symbol(symbol)
-                        .tradingStatus("OPEN")
-                        .tradingType("BACKTEST")
-                        .candleInterval(interval)
-                        .leverage(leverage)
-                        .stockSelectionCount(stockSelectionCount)
-                        .maxPositionCount(maxPositionCount)
-                        .collateral(finalAvailableBalance)
-                        .userCd(userCd)
-                        .build();
-                if (targetSymbol != null && !targetSymbol.isEmpty()) {
-                    tradingEntity.setTargetSymbol(targetSymbol);
-                }
-            });
-        }
+
         return resultMap;
     }
 
