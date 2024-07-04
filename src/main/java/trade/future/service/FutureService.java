@@ -203,7 +203,6 @@ public class FutureService {
                 }
                 break;
             } catch (Exception e) {
-                e.printStackTrace();
                 if (retry >= maxRetries - 1) {
                     // 최대 재시도 횟수에 도달한 경우 예외를 던짐
                     throw e;
@@ -222,6 +221,217 @@ public class FutureService {
         }
     }
 
+    public Map<String, Object> autoTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
+        Claims claims = getClaims(request);
+        String userCd = String.valueOf(claims.get("userCd"));
+        if (userCd == null || userCd.isEmpty()) {
+            throw new RuntimeException("사용자 정보가 없습니다.");
+        }
+        return autoTradingOpen(userCd, tradingDTO.getSymbol(), tradingDTO.getInterval(), tradingDTO.getLeverage(), tradingDTO.getStockSelectionCount(), tradingDTO.getMaxPositionCount());
+    }
+
+    public Map<String, Object> autoTradingOpen(String userCd, String targetSymbol, String interval, int leverage, int stockSelectionCount, int maxPositionCount) {
+        log.info("autoTrading >>>>>");
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        // printPrettyJson(accountInfo);
+
+        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
+
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        List<Map<String, Object>> selectedStockList;
+        //closeAllPositions();
+        System.out.println("symbolParam : " + targetSymbol);
+
+        List<TradingEntity> openTradingList = tradingRepository.findByTradingStatus("OPEN");
+        int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
+        boolean nextFlag = true;
+        try {
+            if (availablePositionCount <= 0) {
+                throw new RuntimeException("오픈 가능한 트레이딩이 없습니다.");
+            }
+        } catch (Exception e){
+            System.out.println("오픈 가능한 트레이딩이 없습니다.");
+            System.out.println("현재 오픈된 트레이딩");
+            TRADING_ENTITYS.forEach((symbol, tradingEntity) -> {
+                System.out.println("symbol : " + symbol);
+            });
+            nextFlag = false;
+        }
+        if(nextFlag){
+            if(targetSymbol == null || targetSymbol.isEmpty()) {
+                selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, availablePositionCount).get("overlappingData");
+            } else {
+                LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+                paramMap.put("symbol", targetSymbol);
+                String resultStr = client.market().ticker24H(paramMap);
+                JSONObject result = new JSONObject(resultStr);
+                List<Map<String, Object>> list = new ArrayList<>();
+                list.add(result.toMap());
+                selectedStockList = list;
+            }
+
+            List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
+            //System.out.println("selectedStockList : " + selectedStockList);
+            try{
+                if(tradingTargetSymbols.size() == 0){
+                    throw new RuntimeException("선택된 종목이 없습니다.");
+                }else{
+                    for(Map<String,Object> tradingTargetSymbol : tradingTargetSymbols){
+                        String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
+                        Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
+                        if(tradingEntityOpt.isPresent()){
+                            printTradingEntitys();
+                            throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                autoTradingOpen(userCd, targetSymbol, interval, leverage, stockSelectionCount, maxPositionCount);
+                nextFlag = false;
+            }
+            if(nextFlag){
+                availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
+
+                BigDecimal maxPositionAmount = totalWalletBalance
+                        .divide(new BigDecimal(maxPositionCount),0, RoundingMode.DOWN)
+                        .multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.DOWN);
+
+                BigDecimal finalAvailableBalance = maxPositionAmount;
+                log.info("collateral : " + maxPositionAmount);
+                System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
+                tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
+                    String symbol = String.valueOf(selectedStock.get("symbol"));
+                    System.out.println("symbol : " + symbol);
+                    // 해당 페어의 평균 거래량을 구합니다.
+                    //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, WINDOW_SIZE).get("result"), interval);
+                    TradingEntity tradingEntity = TradingEntity.builder()
+                            .symbol(symbol)
+                            .tradingStatus("OPEN")
+                            .candleInterval(interval)
+                            .leverage(leverage)
+                            .stockSelectionCount(stockSelectionCount)
+                            .maxPositionCount(maxPositionCount)
+                            .collateral(finalAvailableBalance)
+                            .userCd(userCd)
+                            .build();
+                    if (targetSymbol != null && !targetSymbol.isEmpty()) {
+                        tradingEntity.setTargetSymbol(targetSymbol);
+                    }
+                    try{
+                        Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
+                        if(tradingEntityOpt.isPresent()){
+                            printTradingEntitys();
+                            throw new RuntimeException(tradingEntityOpt.get().getSymbol() + "이미 오픈된 트레이딩이 존재합니다.");
+                        }else{
+                            TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(tradingEntity));
+                        }
+                    } catch (Exception e) {
+                        autoTradingOpen(userCd, targetSymbol, interval, leverage, stockSelectionCount, maxPositionCount);
+                    }
+                    printTradingEntitys();
+                });
+            }
+        }
+        return resultMap;
+    }
+
+    public Map<String, Object> backTestTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
+        Claims claims = getClaims(request);
+        String userCd = String.valueOf(claims.get("userCd"));
+        if (userCd == null || userCd.isEmpty()) {
+            throw new RuntimeException("사용자 정보가 없습니다.");
+        }
+        return backTestTradingOpen(userCd, tradingDTO);
+    }
+
+    public Map<String, Object> backTestTradingOpen(String userCd, TradingDTO tradingDTO) {
+        log.info("backTestTrading >>>>>");
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        // printPrettyJson(accountInfo);
+
+        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
+
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        List<Map<String, Object>> selectedStockList;
+        System.out.println("symbolParam : " + tradingDTO.getSymbol());
+
+        String targetSymbol = tradingDTO.getSymbol();
+        String interval = tradingDTO.getInterval();
+        int leverage = tradingDTO.getLeverage();
+        int stockSelectionCount = tradingDTO.getStockSelectionCount();
+        int maxPositionCount = tradingDTO.getMaxPositionCount();
+        BigDecimal colleteralRate = tradingDTO.getColleteralRate();
+
+        if(targetSymbol == null || targetSymbol.isEmpty()) {
+            selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, maxPositionCount).get("overlappingData");
+        } else {
+            LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+            paramMap.put("symbol", targetSymbol);
+            String resultStr = client.market().ticker24H(paramMap);
+            JSONObject result = new JSONObject(resultStr);
+            List<Map<String, Object>> list = new ArrayList<>();
+            list.add(result.toMap());
+            selectedStockList = list;
+        }
+
+        List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
+        boolean nextFlag = true;
+        try{
+            if(tradingTargetSymbols.size() == 0){
+                throw new RuntimeException("선택된 종목이 없습니다.");
+            }
+        } catch (Exception e) {
+            autoTradingOpen(userCd, targetSymbol, interval, leverage, stockSelectionCount, maxPositionCount);
+            nextFlag = false;
+        }
+        if(nextFlag){
+            availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
+
+            BigDecimal maxPositionAmount = totalWalletBalance
+                    .divide(new BigDecimal(maxPositionCount),0, RoundingMode.DOWN)
+                    .multiply(colleteralRate).setScale(0, RoundingMode.DOWN);
+
+            BigDecimal finalAvailableBalance = maxPositionAmount;
+            log.info("collateral : " + maxPositionAmount);
+            System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
+            tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
+                String symbol = String.valueOf(selectedStock.get("symbol"));
+                System.out.println("symbol : " + symbol);
+                // 해당 페어의 평균 거래량을 구합니다.
+                //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, WINDOW_SIZE).get("result"), interval);
+                TradingEntity tradingEntity = TradingEntity.builder()
+                        .symbol(symbol)
+                        .tradingStatus("OPEN")
+                        .tradingType("BACKTEST")
+                        .candleInterval(interval)
+                        .leverage(leverage)
+                        .stockSelectionCount(stockSelectionCount)
+                        .maxPositionCount(maxPositionCount)
+                        .collateral(finalAvailableBalance)
+                        .userCd(userCd)
+                        .build();
+                if (targetSymbol != null && !targetSymbol.isEmpty()) {
+                    tradingEntity.setTargetSymbol(targetSymbol);
+                }
+            });
+        }
+        return resultMap;
+    }
+
     private void klineProcess(String event){
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
@@ -238,18 +448,10 @@ public class FutureService {
             // klineEvent를 데이터베이스에 저장
             EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
 
-
             TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
             Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
             openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
                 TechnicalIndicatorReportEntity positionReport = positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
-                //System.out.println("position positionEvent : " + positionEvent);
-                //System.out.println("position kline : " + positionEvent.getKlineEntity());
-                //System.out.println("position technicalIndicatorReportEntity : " + positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity());
-                //System.out.println("event klineEvent : " + eventEntity);
-                //System.out.println("event kline : " + eventEntity.getKlineEntity());
-                //System.out.println("event technicalIndicatorReportEntity : " + eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity());
-
                 if(DEV_FLAG){
                     String remark = "테스트 청산";
                     PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
@@ -318,7 +520,6 @@ public class FutureService {
         EventEntity klineEvent = null;
         klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
         klineEvent.setTradingEntity(tradingEntity);
-        int goalPricePercent = tradingEntity.getGoalPricePercent();
         int leverage = tradingEntity.getLeverage();
 
         // 캔들데이터 분석을 위한 bar 세팅
@@ -332,14 +533,7 @@ public class FutureService {
         // 포지션 엔티티 생성
         PositionEntity positionEntity = PositionEntity.builder()
                 .positionStatus("NONE")
-                .goalPricePercent(goalPricePercent)
                 .klineEntity(klineEvent.getKlineEntity())
-                .plusGoalPrice(
-                        CommonUtils.calculateGoalPrice(
-                                klineEvent.getKlineEntity().getClosePrice(), "LONG", leverage, goalPricePercent))
-                .minusGoalPrice(
-                        CommonUtils.calculateGoalPrice(
-                                klineEvent.getKlineEntity().getClosePrice(), "SHORT", leverage, goalPricePercent))
                 .build();
         klineEvent.getKlineEntity().setPositionEntity(positionEntity);
         klineEvent = eventRepository.save(klineEvent);
@@ -485,7 +679,7 @@ public class FutureService {
             log.info("스트림 종료");
             TRADING_ENTITYS.remove(tradingEntity.getSymbol());
             printTradingEntitys();
-            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getGoalPricePercent(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
+            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
             //autoTradingRestart(tradingEntity);
         }
     }
@@ -550,6 +744,15 @@ public class FutureService {
         return resultMap;
     }
 
+    public Map<String, Object> orderSubmit(HttpServletRequest request, LinkedHashMap<String, Object> requestParam) throws Exception {
+        Claims claims = getClaims(request);
+        String userCd = String.valueOf(claims.get("userCd"));
+        if (userCd == null || userCd.isEmpty()) {
+            throw new RuntimeException("사용자 정보가 없습니다.");
+        }
+        return orderSubmit(requestParam);
+    }
+
     public Map<String, Object> orderSubmit(LinkedHashMap<String, Object> requestParam) throws Exception {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
@@ -565,7 +768,13 @@ public class FutureService {
         return resultMap;
     }
 
-    public Map<String, Object> orderSubmitCollateral(LinkedHashMap<String, Object> requestParam) throws Exception {
+    public Map<String, Object> orderSubmitCollateral(HttpServletRequest request, LinkedHashMap<String, Object> requestParam) throws Exception {
+        Claims claims = getClaims(request);
+        String userCd = String.valueOf(claims.get("userCd"));
+        if (userCd == null || userCd.isEmpty()) {
+            throw new RuntimeException("사용자 정보가 없습니다.");
+        }
+
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
@@ -673,194 +882,6 @@ public class FutureService {
             streamClose(tradingEntity.getStreamId());
         }
         return tradingEntity;
-    }
-
-    public void autoTradingRestart(TradingEntity tradingEntity){
-        log.info("autoTradingRestart >>>>>");
-        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
-        // printPrettyJson(accountInfo);
-
-        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
-        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
-        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
-        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
-
-        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
-        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
-
-        List<Map<String, Object>> selectedStockList = (List<Map<String, Object>>) getStockFind(tradingEntity.getCandleInterval(), tradingEntity.getStockSelectionCount(), 1).get("overlappingData");
-        List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
-
-        try{
-            if(tradingTargetSymbols.size() == 0){
-                throw new RuntimeException("선택된 종목이 없습니다.");
-
-            }else{
-                for(Map<String,Object> tradingTargetSymbol : tradingTargetSymbols){
-                    String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
-                    Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
-                    if(tradingEntityOpt.isPresent()){
-                        throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
-                    }
-                }
-            }
-        } catch (Exception e) {
-            autoTradingRestart(tradingEntity);
-        }
-        availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
-
-        BigDecimal maxPositionAmount = totalWalletBalance
-                .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
-                .multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.DOWN);
-
-        BigDecimal finalAvailableBalance = maxPositionAmount;
-        log.info("collateral : " + maxPositionAmount);
-        System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
-        tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
-            String symbol = String.valueOf(selectedStock.get("symbol"));
-            System.out.println("symbol : " + symbol);
-            // 해당 페어의 평균 거래량을 구합니다.
-            //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, WINDOW_SIZE).get("result"), interval);
-            TradingEntity reTradingEntity = TradingEntity.builder()
-                    .symbol(symbol)
-                    .tradingStatus("OPEN")
-                    .candleInterval(tradingEntity.getCandleInterval())
-                    .leverage(tradingEntity.getLeverage())
-                    .goalPricePercent(tradingEntity.getGoalPricePercent())
-                    .stockSelectionCount(tradingEntity.getStockSelectionCount())
-                    .maxPositionCount(tradingEntity.getMaxPositionCount())
-                    .collateral(finalAvailableBalance)
-                    .userCd(tradingEntity.getUserCd())
-                    .build();
-            if (reTradingEntity.getTargetSymbol() != null && !reTradingEntity.getTargetSymbol().isEmpty()) {
-                reTradingEntity.setTargetSymbol(tradingEntity.getTargetSymbol());
-            }
-            TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(reTradingEntity));
-            printTradingEntitys();
-        });
-    }
-
-    public Map<String, Object> autoTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
-        Claims claims = getClaims(request);
-        String userCd = String.valueOf(claims.get("userCd"));
-        if (userCd == null || userCd.isEmpty()) {
-            throw new RuntimeException("사용자 정보가 없습니다.");
-        }
-        return autoTradingOpen(userCd, tradingDTO.getSymbol(), tradingDTO.getInterval(), tradingDTO.getLeverage(), tradingDTO.getGoalPricePercent(), tradingDTO.getStockSelectionCount(), tradingDTO.getMaxPositionCount());
-    }
-
-    public Map<String, Object> autoTradingOpen(String userCd, String targetSymbol, String interval, int leverage, int goalPricePercent, int stockSelectionCount, int maxPositionCount) {
-        log.info("autoTrading >>>>>");
-        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
-       // printPrettyJson(accountInfo);
-
-        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
-        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
-        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
-        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
-
-        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
-        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
-
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        List<Map<String, Object>> selectedStockList;
-        //closeAllPositions();
-        System.out.println("symbolParam : " + targetSymbol);
-
-        List<TradingEntity> openTradingList = tradingRepository.findByTradingStatus("OPEN");
-        int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
-        boolean nextFlag = true;
-        try {
-            if (availablePositionCount <= 0) {
-                throw new RuntimeException("오픈 가능한 트레이딩이 없습니다.");
-            }
-        } catch (Exception e){
-            System.out.println("오픈 가능한 트레이딩이 없습니다.");
-            System.out.println("현재 오픈된 트레이딩");
-            TRADING_ENTITYS.forEach((symbol, tradingEntity) -> {
-                System.out.println("symbol : " + symbol);
-            });
-            nextFlag = false;
-        }
-        if(nextFlag){
-            if(targetSymbol == null || targetSymbol.isEmpty()) {
-                selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, availablePositionCount).get("overlappingData");
-            } else {
-                LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-                paramMap.put("symbol", targetSymbol);
-                String resultStr = client.market().ticker24H(paramMap);
-                JSONObject result = new JSONObject(resultStr);
-                List<Map<String, Object>> list = new ArrayList<>();
-                list.add(result.toMap());
-                selectedStockList = list;
-            }
-
-            List<Map<String, Object>> tradingTargetSymbols = selectedStockList;
-            //System.out.println("selectedStockList : " + selectedStockList);
-            try{
-                if(tradingTargetSymbols.size() == 0){
-                    throw new RuntimeException("선택된 종목이 없습니다.");
-                }else{
-                    for(Map<String,Object> tradingTargetSymbol : tradingTargetSymbols){
-                        String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
-                        Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
-                        if(tradingEntityOpt.isPresent()){
-                            printTradingEntitys();
-                            throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                autoTradingOpen(userCd, targetSymbol, interval, leverage, goalPricePercent, stockSelectionCount, maxPositionCount);
-                nextFlag = false;
-            }
-            if(nextFlag){
-                availableBalance = availableBalance.divide(new BigDecimal(tradingTargetSymbols.size()), 0, RoundingMode.DOWN);
-
-                BigDecimal maxPositionAmount = totalWalletBalance
-                        .divide(new BigDecimal(maxPositionCount),0, RoundingMode.DOWN)
-                        .multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.DOWN);
-
-                BigDecimal finalAvailableBalance = maxPositionAmount;
-                log.info("collateral : " + maxPositionAmount);
-                System.out.println("tradingTargetSymbols : " + tradingTargetSymbols);
-                tradingTargetSymbols.parallelStream().forEach(selectedStock -> {
-                    String symbol = String.valueOf(selectedStock.get("symbol"));
-                    System.out.println("symbol : " + symbol);
-                    // 해당 페어의 평균 거래량을 구합니다.
-                    //BigDecimal averageQuoteAssetVolume = getKlinesAverageQuoteAssetVolume( (JSONArray)getKlines(symbol, interval, WINDOW_SIZE).get("result"), interval);
-                    TradingEntity tradingEntity = TradingEntity.builder()
-                            .symbol(symbol)
-                            .tradingStatus("OPEN")
-                            .candleInterval(interval)
-                            .leverage(leverage)
-                            .goalPricePercent(goalPricePercent)
-                            .stockSelectionCount(stockSelectionCount)
-                            .maxPositionCount(maxPositionCount)
-                            .collateral(finalAvailableBalance)
-                            .userCd(userCd)
-                            .build();
-                    if (targetSymbol != null && !targetSymbol.isEmpty()) {
-                        tradingEntity.setTargetSymbol(targetSymbol);
-                    }
-                    try{
-                        Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
-                        if(tradingEntityOpt.isPresent()){
-                            printTradingEntitys();
-                            throw new RuntimeException(tradingEntityOpt.get().getSymbol() + "이미 오픈된 트레이딩이 존재합니다.");
-                        }else{
-                            TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(tradingEntity));
-                        }
-                    } catch (Exception e) {
-                        autoTradingOpen(userCd, targetSymbol, interval, leverage, goalPricePercent, stockSelectionCount, maxPositionCount);
-                    }
-                    printTradingEntitys();
-                });
-            }
-        }
-        return resultMap;
     }
 
     public boolean tradingValidate(List<Map<String, Object>> tradingTargetSymbols, int maxPositionCount){

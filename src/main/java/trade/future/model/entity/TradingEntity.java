@@ -30,6 +30,9 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "USER_CD")
     private String userCd; // 유저 식별자
 
+    @Column( name = "TRADING_TYPE")
+    private String tradingType; // 트레이딩 타입(실제, 백테스트)
+
     @Column( name = "TRADING_STATUS")
     private String tradingStatus; // 포지션 상태
 
@@ -63,27 +66,21 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "CANDLE_INTERVAL")
     String candleInterval; // 캔들 기준
 
-    @Column( name = "GOAL_PRICE_PERCENT")
-    int goalPricePercent;
-
     @Column( name = "STOCK_SELECTION_COUNT")
     int stockSelectionCount;
 
     @Column( name = "MAX_POSITION_COUNT")
     int maxPositionCount;
 
-    @Column( name = "QUOTE_ASSET_VOLUME_STANDARD")
-    BigDecimal quoteAssetVolumeStandard; // 평균거래량 기준
-
-    @Column( name = "AVERAGE_QUOTE_ASSET_VOLUME")
-    BigDecimal averageQuoteAssetVolume; // 평균거래량
-
-    @Column( name = "FLUCTUATION_RATE")
-    BigDecimal fluctuationRate; // 변동률
-
     @Column( name = "COLLATERAL")
     BigDecimal collateral; // 할당된 담보금
     
     @Column( name = "COLLATERAL_RATE")
     BigDecimal collateralRate; // 할당된 담보금 비율
+
+    @Column( name = "ADX_CHECKER")
+    boolean adxChecker; //ADX로 매매전략 수립
+
+    @Column( name = "MACD_HISTOGRAM_CHECKER")
+    boolean macdHistogramChecker; //MACD 히스토그램으로 매매전략 수립
 }

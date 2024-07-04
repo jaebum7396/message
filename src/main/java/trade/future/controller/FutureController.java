@@ -32,71 +32,69 @@ public class FutureController {
     public ResponseEntity autoTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
         return commonUtils.okResponsePackaging(futureService.autoTradingOpen(request, tradingDTO));
     }
-    @GetMapping(value = "/future/stream/close/all")
-    @Operation(summary="모든 스트림을 종료합니다.", description="모든 스트림을 종료합니다.")
-    public void allStreamClose() {
-        futureService.allStreamClose();
-    }
-    @PostMapping(value = "/future/order/submit")
-    @Operation(summary="주문제출.", description="주문제출.")
-    public ResponseEntity orderSubmit(@RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.orderSubmit(requestParam));
-    }
-    @PostMapping(value = "/future/order/submit/collateral")
-    @Operation(summary="주문제출.", description="주문제출.")
-    public ResponseEntity orderSubmitCollateral(@RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.orderSubmitCollateral(requestParam));
+    @PostMapping(value = "/future/auto/backtest")
+    @Operation(summary="백테스팅", description="백테스팅")
+    public ResponseEntity backTestTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.backTestTradingOpen(request, tradingDTO));
     }
     @GetMapping(value = "/future/positions/close")
     @Operation(summary="모든 포지션을 종료합니다.", description="모든 포지션을 종료합니다.")
     public void closeAllPositions() {
         futureService.closeAllPositions();
     }
-    @GetMapping(value = "/future/stream/close")
-    @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
-    public void streamClose(@RequestParam int streamId) {
-        futureService.streamClose(streamId);
-    }
-
     @GetMapping(value = "/future/stock/selection")
-    @Operation(summary="거래량과 변동폭 기준으로 종목을 가져옵니다.", description="거래량과 변동폭 기준으로 종목을 가져옵니다.")
+    @Operation(summary="거래량과 변동폭 기준으로 종목을 선정합니다.", description="거래량과 변동폭 기준으로 종목을 선정합니다.")
     public ResponseEntity getStockSelection(@RequestParam int limit) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getStockSelection(limit));
     }
-
     @GetMapping(value = "/future/stock/find")
-    @Operation(summary="거래량과 변동폭 기준으로 종목을 가져옵니다.", description="거래량과 변동폭 기준으로 종목을 가져옵니다.")
+    @Operation(summary="거래량 추세를 기준으로 종목을 선정합니다.", description="거래량과 추세를 기준으로 종목을 선정합니다.")
     public ResponseEntity getStockFind(@RequestParam String interval, @RequestParam int searchRange, @RequestParam int targetRange) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getStockFind(interval, searchRange, targetRange));
     }
-
     @GetMapping(value = "/future/klines")
     @Operation(summary="해당 심볼의 캔들 데이터를 가져옵니다(기본값 500개)", description="해당 심볼의 캔들 데이터를 가져옵니다.")
     public ResponseEntity getKlines(@RequestParam String symbol, @RequestParam String interval, @RequestParam int limit) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getKlines(String.valueOf(UUID.randomUUID()), symbol, interval, limit));
     }
-
-    @GetMapping(value = "/future/auto/info")
+    @GetMapping(value = "/future/trading/streams")
     @Operation(summary="스트림 정보를 가져옵니다.", description="스트림 정보를 가져옵니다.")
     public ResponseEntity autoTradingInfo(HttpServletRequest request) throws Exception {
         return commonUtils.okResponsePackaging(futureService.autoTradingInfo(request));
     }
-
-    @GetMapping(value = "/future/trading/event")
-    @Operation(summary="해당 트레이딩의 리포트들을 가져옵니다", description="해당 트레이딩의 리포트들을 가져옵니다")
+    @PostMapping(value = "/future/stream/close/all")
+    @Operation(summary="모든 스트림을 종료합니다.", description="모든 스트림을 종료합니다.")
+    public void allStreamClose(HttpServletRequest request) {
+        futureService.allStreamClose();
+    }
+    @PostMapping(value = "/future/stream/close")
+    @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
+    public void streamClose(HttpServletRequest request, @RequestParam int streamId) {
+        futureService.streamClose(streamId);
+    }
+    @GetMapping(value = "/future/event")
+    @Operation(summary="해당 심볼의 이벤트들을 가져옵니다", description="해당 심볼의 이벤트들을 가져옵니다")
     public ResponseEntity getEvent(@RequestParam String symbol) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getEvent(symbol));
     }
-
-    @GetMapping(value = "/future/trading/reports")
+    @GetMapping(value = "/future/reports")
     @Operation(summary="해당 트레이딩의 리포트들을 가져옵니다", description="해당 트레이딩의 리포트들을 가져옵니다")
     public ResponseEntity getReports(@RequestParam String tradingCd) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getReports(tradingCd));
     }
-
     @GetMapping(value = "/future/account/info")
     @Operation(summary="계좌 정보를 가져옵니다.", description="계좌 정보를 가져옵니다.")
     public ResponseEntity accountInfo() throws Exception {
         return commonUtils.okResponsePackaging(futureService.accountInfo());
+    }
+    @PostMapping(value = "/future/order/submit")
+    @Operation(summary="주문제출", description="주문제출")
+    public ResponseEntity orderSubmit(HttpServletRequest request, @RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.orderSubmit(request, requestParam));
+    }
+    @PostMapping(value = "/future/order/submit/collateral")
+    @Operation(summary="자산기준 주문제출", description="자산기준 주문제출")
+    public ResponseEntity orderSubmitCollateral(HttpServletRequest request, @RequestBody LinkedHashMap<String,Object> requestParam) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.orderSubmitCollateral(request, requestParam));
     }
 }
