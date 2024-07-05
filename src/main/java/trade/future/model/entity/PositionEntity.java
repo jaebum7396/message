@@ -37,28 +37,28 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Column( name = "LEVERAGE")
     private String leverage;
 
-    @Column( name = "MAX_NOTIONAL")
+    @Column( name = "MAX_NOTIONAL", precision = 19, scale = 8)
     private BigDecimal maxNotional; // 최대 명목 가치입니다. 최대 포지션 크기 제한을 나타냅니다.
 
-    @Column( name = "MAINT_MARGIN")
+    @Column( name = "MAINT_MARGIN", precision = 19, scale = 8)
     private BigDecimal maintMargin; // 유지 마진입니다. 포지션을 유지하는 데 필요한 최소 마진을 의미합니다.
 
-    @Column( name = "OPEN_ORDER_INITIAL_MARGIN")
+    @Column( name = "OPEN_ORDER_INITIAL_MARGIN", precision = 19, scale = 8)
     private BigDecimal openOrderInitialMargin; // 현재 열려있는 주문에 대한 초기 마진입니다.
 
-    @Column( name = "NOTIONAL")
+    @Column( name = "NOTIONAL", precision = 19, scale = 8)
     private BigDecimal notional; // 포지션의 명목 가치입니다. 현재 포지션의 크기를 나타냅니다.
 
-    @Column( name = "ISOLATED_WALLET")
+    @Column( name = "ISOLATED_WALLET", precision = 19, scale = 8)
     private BigDecimal isolatedWallet; // 격리된 마진 지갑의 잔액입니다. 격리 마진 모드에서는 각 포지션에 별도의 마진이 사용됩니다.
 
-    @Column( name = "BREAK_EVEN_PRICE")
+    @Column( name = "BREAK_EVEN_PRICE", precision = 19, scale = 8)
     private BigDecimal breakEvenPrice; // 손익분기점 가격입니다. 포지션의 수익이 0이 되는 가격입니다.
 
-    @Column( name = "ASK_NOTIONAL")
+    @Column( name = "ASK_NOTIONAL", precision = 19, scale = 8)
     private BigDecimal askNotional; // 매수 명목 가치입니다. 매수 주문의 명목 가치를 나타냅니다.
 
-    @Column( name = "POSITION_INITIAL_MARGIN")
+    @Column( name = "POSITION_INITIAL_MARGIN", precision = 19, scale = 8)
     private BigDecimal positionInitialMargin; // 포지션에 대한 초기 마진입니다.
 
     @Column( name = "POSITION_SIDE")
@@ -67,22 +67,22 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Column( name = "ISOLATED")
     private boolean isolated; // 격리 여부입니다. 격리 마진 모드에서는 각 포지션에 별도의 마진이 사용됩니다.
 
-    @Column( name = "INITIAL_MARGIN")
+    @Column( name = "INITIAL_MARGIN", precision = 19, scale = 8)
     private BigDecimal initialMargin; // 초기 마진입니다. 포지션을 열기 위해 필요한 최소 마진을 의미합니다.
 
-    @Column( name = "ENTRY_PRICE")
+    @Column( name = "ENTRY_PRICE", precision = 19, scale = 8)
     private BigDecimal entryPrice;
 
-    @Column( name = "CLOSE_PRICE")
+    @Column( name = "CLOSE_PRICE", precision = 19, scale = 8)
     private BigDecimal closePrice;
 
-    @Column( name = "POSITION_AMT")
+    @Column( name = "POSITION_AMT", precision = 19, scale = 8)
     private BigDecimal positionAmt; // 포지션 수량입니다.
 
-    @Column( name = "PROFIT")
+    @Column( name = "PROFIT", precision = 19, scale = 8)
     private BigDecimal profit; // 수익입니다. 포지션의 수익을 나타냅니다.
 
-    @Column( name = "BID_NOTIONAL")
+    @Column( name = "BID_NOTIONAL", precision = 19, scale = 8)
     private BigDecimal bidNotional; // 매도 명목 가치입니다. 매도 주문의 명목 가치를 나타냅니다.
 
     @Column( name = "POSITION_STATUS")
@@ -101,7 +101,7 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Column( name = "GOAL_PRICE_PERCENT", precision = 19, scale = 8)
     private int goalPricePercent;
 
-    @Column( name = "REALIZATION_PNL")
+    @Column( name = "REALIZATION_PNL", precision = 19, scale = 8)
     private BigDecimal realizatioPnl; // 실현손익
 
     @Column( name = "REMARK")

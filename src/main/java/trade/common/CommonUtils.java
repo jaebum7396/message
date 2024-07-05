@@ -163,7 +163,7 @@ public class CommonUtils {
                 .kLineCd(null) // ID는 자동 생성
                 .startTime(startTime)
                 .endTime(endTime)
-                .symbol("BTCUSDT") // 심볼은 주어진 데이터에 없으므로 임의로 지정
+                //.symbol("BTCUSDT") // 심볼은 주어진 데이터에 없으므로 임의로 지정
                 .candleInterval("1m") // 인터벌도 임의로 지정
                 .firstTradeId(null) // 데이터에 포함되지 않으므로 null로 설정
                 .lastTradeId(null) // 데이터에 포함되지 않으므로 null로 설정

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.GenericGenerator;
 import trade.common.model.BaseEntity;
+import trade.future.model.dto.TradingDTO;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -20,7 +21,7 @@ import java.util.List;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper=false)
 @Entity(name = "TRADING")
-public class TradingEntity extends BaseEntity implements Serializable {
+public class TradingEntity extends BaseEntity implements Serializable, Cloneable {
     @Id
     @GeneratedValue(generator = "uuid")
     @GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
@@ -78,9 +79,61 @@ public class TradingEntity extends BaseEntity implements Serializable {
     @Column( name = "COLLATERAL_RATE")
     BigDecimal collateralRate; // 할당된 담보금 비율
 
+    @Column( name = "TREND_FOLLOW_FLAG")
+    int trendFollowFlag; // 1: trend follow, -1: trend reverse
+
     @Column( name = "ADX_CHECKER")
-    boolean adxChecker; //ADX로 매매전략 수립
+    int adxChecker; //ADX로 매매전략 수립
 
     @Column( name = "MACD_HISTOGRAM_CHECKER")
-    boolean macdHistogramChecker; //MACD 히스토그램으로 매매전략 수립
+    int macdHistogramChecker; //MACD 히스토그램으로 매매전략 수립
+
+    @Column( name = "RSI_CHECKER")
+    int rsiChecker; //RSI로 매매전략 수립
+
+    public TradingDTO toDTO() {
+        return TradingDTO.builder()
+                .symbol(this.symbol)
+                .interval(this.candleInterval)
+                .leverage(this.leverage)
+                .stockSelectionCount(this.stockSelectionCount)
+                .maxPositionCount(this.maxPositionCount)
+                .trendFollowFlag(this.trendFollowFlag)
+                .adxChecker(this.adxChecker)
+                .macdHistogramChecker(this.macdHistogramChecker)
+                .rsiChecker(this.rsiChecker)
+                .collateralRate(this.collateralRate)
+                .build();
+    }
+
+    // 복사 생성자
+    public TradingEntity(TradingEntity original) {
+        this.tradingCd = original.tradingCd;
+        this.userCd = original.userCd;
+        this.tradingType = original.tradingType;
+        this.tradingStatus = original.tradingStatus;
+        this.positionStatus = original.positionStatus;
+        this.symbol = original.symbol;
+        this.targetSymbol = original.targetSymbol;
+        this.leverage = original.leverage;
+        this.positionSide = original.positionSide;
+        this.openPrice = original.openPrice != null ? new BigDecimal(original.openPrice.toString()) : null;
+        this.closePrice = original.closePrice != null ? new BigDecimal(original.closePrice.toString()) : null;
+        this.profit = original.profit != null ? new BigDecimal(original.profit.toString()) : null;
+        this.streamId = original.streamId;
+        this.candleInterval = original.candleInterval;
+        this.stockSelectionCount = original.stockSelectionCount;
+        this.maxPositionCount = original.maxPositionCount;
+        this.collateral = original.collateral != null ? new BigDecimal(original.collateral.toString()) : null;
+        this.collateralRate = original.collateralRate != null ? new BigDecimal(original.collateralRate.toString()) : null;
+        this.trendFollowFlag = original.trendFollowFlag;
+        this.adxChecker = original.adxChecker;
+        this.macdHistogramChecker = original.macdHistogramChecker;
+        this.rsiChecker = original.rsiChecker;
+    }
+
+    @Override
+    public TradingEntity clone() {
+        return new TradingEntity(this);
+    }
 }
