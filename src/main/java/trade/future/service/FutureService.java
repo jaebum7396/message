@@ -144,7 +144,18 @@ public class FutureService {
         if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
             log.error("[FAILURE] >>>>> "+tradingEntity.getTradingCd()+ "/" +tradingEntity.getSymbol());
-           /* autoTradingRestart(tradingEntity);
+
+            streamClose(tradingEntity.getStreamId());
+            tradingEntity.setPositionStatus("CLOSE");
+            tradingEntity.setTradingStatus("CLOSE");
+            tradingEntity = tradingRepository.save(tradingEntity);
+            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+            log.info("스트림 종료");
+            TRADING_ENTITYS.remove(tradingEntity.getSymbol());
+            printTradingEntitys();
+            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.toDTO());
+
+            /* autoTradingRestart(tradingEntity);
             System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
             TradingEntity tradingEntity = tradingEntityOpt.get();
             tradingEntity.setTradingStatus("CLOSE");
