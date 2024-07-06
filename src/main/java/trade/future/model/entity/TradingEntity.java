@@ -93,7 +93,6 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
 
     public TradingDTO toDTO() {
         return TradingDTO.builder()
-                .symbol(this.symbol)
                 .interval(this.candleInterval)
                 .leverage(this.leverage)
                 .stockSelectionCount(this.stockSelectionCount)
