@@ -951,8 +951,8 @@ public class FutureService {
                 TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
 
                 if (
-                        //ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
-                        (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.추세확정.getGrade() && tempReport.getAdxGap()>0)
+                        ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
+                        (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.강한추세.getGrade() && tempReport.getAdxGap()>0)
                 ) {
                     overlappingData.add(item);
                     reports.add(tempReport);
