@@ -196,26 +196,18 @@ public class TechnicalIndicatorCalculator {
         return minusDI.getValue(idx).doubleValue();
     }
 
-    public String getDirection(BaseBarSeries series, int period, int idx, int trendFollowFlag) {
+    public String getDirection(BaseBarSeries series, int period, int idx){
         double plusDI = calculatePlusDI(series, period, idx);
         double minusDI = calculateMinusDI(series, period, idx);
 
         String direction = "";
         if(plusDI > minusDI){
-            if (trendFollowFlag == 1)
-                direction = "LONG";
-            else if (trendFollowFlag == -1)
-                direction = "SHORT";
-            else
-                direction = "LONG";
+            direction = "LONG";
+            //direction = "SHORT";
         }
         else if(plusDI < minusDI){
-            if (trendFollowFlag == 1)
-                direction = "SHORT";
-            else if (trendFollowFlag == -1)
-                direction = "LONG";
-            else
-                direction = "SHORT";
+            direction = "SHORT";
+            //direction = "LONG";
         }
         else{
             direction = "SIDE";
