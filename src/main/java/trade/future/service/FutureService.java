@@ -113,6 +113,7 @@ public class FutureService {
     private static final boolean DEV_FLAG = false;
     private static final boolean MACD_CHECKER = false;
     private static final boolean ADX_CHECKER = true;
+    private static final boolean RSI_CHECKER = false;
 
     private final Map<String, TradingEntity> TRADING_ENTITYS = new HashMap<>();
 
@@ -439,16 +440,6 @@ public class FutureService {
                         }else{
                             //autoTradingRestart(tradingEntity);
                         }
-                        /*if(technicalIndicatorReportEntity.getAdxGap()>1 // ADX가 1이상(추세가 강해질때)
-                            ||klineEvent.getKlineEntity().getTechnicalIndicatorReportEntity().getCurrentAdx()-technicalIndicatorReportEntity.getCurrentAdx()<-1  // 현재 ADX가 포지션 진입당시 ADX보다 2이상 높아졌을때(추세가 강해질때)
-
-                        ){
-                            String remark = "ADX 청산시그널("+ technicalIndicatorReportEntity.getPreviousAdxGrade() +">"+ technicalIndicatorReportEntity.getCurrentAdxGrade() + ")";
-                            PositionEntity closePosition = klineEvent.getKlineEntity().getPositionEntity();
-                            if(closePosition.getPositionStatus().equals("OPEN")){
-                                makeCloseOrder(eventEntity, klineEvent, remark);
-                            }
-                        }*/
                     }
                     if (MACD_CHECKER){
                         if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
@@ -1303,12 +1294,12 @@ public class FutureService {
         // Determine current trend
         String currentTrend = technicalIndicatorCalculator.determineTrend(series, sma);
 
-        //direction
-        String direction = technicalIndicatorCalculator.getDirection(series, 14, series.getEndIndex());
-
         //di
         double plusDi = technicalIndicatorCalculator.calculatePlusDI(series, 14, series.getEndIndex());
         double minusDi = technicalIndicatorCalculator.calculateMinusDI(series, 14, series.getEndIndex());
+
+        //direction
+        String direction = technicalIndicatorCalculator.getDirection(series, 14, series.getEndIndex());
 
         //******************************** 여기서부터 ADX 관련 산식을 정의한다 **********************************
         //adx
@@ -1334,25 +1325,25 @@ public class FutureService {
             //System.out.println("추세유지");
         } else {
             if (adxGap > 0) {
-                if (currentAdxGrade.getGrade() == 0) {
+                //if (currentAdxGrade.getGrade() == 0) {
                     if(ADX_CHECKER){
                         System.out.println("**********************************************************");
-                        System.out.println("추세감소 >>> 추세증가 :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
+                        System.out.println("추세감소 >>> 추세증가["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
                         log.info("!!! " + currentAdxGrade + " !!! " + direction + "/" + currentTrend + " ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
                         System.out.println("**********************************************************");
                     }
                     adxSignal = 1;
-                }
+                //}
             } else if (adxGap < 0) {
-                if (currentAdxGrade.getGrade() > 2) {
+                //if (currentAdxGrade.getGrade() > 2) {
                     if(ADX_CHECKER) {
                         System.out.println("**********************************************************");
-                        System.out.println("추세증가 >>> 추세감소 :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
+                        System.out.println("추세증가 >>> 추세감소["+direction+"] :"+ + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
                         log.info("!!! " + currentAdxGrade + " !!! " + direction + "/" + currentTrend + " ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
                         System.out.println("**********************************************************");
                     }
                     adxSignal = -1;
-                }
+                //}
             }
         }
 
@@ -1366,6 +1357,46 @@ public class FutureService {
         }*/
 
         //****************************************** ADX 끝 **********************************************
+
+        //******************************** 여기서부터 RSI 관련 산식을 정의한다 **********************************
+// RSI
+        double currentRsi = technicalIndicatorCalculator.calculateRSI(series, 14, series.getEndIndex());
+        double previousRsi = technicalIndicatorCalculator.calculateRSI(series, 14, series.getEndIndex() - 1);
+        double prePreviousRsi = technicalIndicatorCalculator.calculateRSI(series, 14, series.getEndIndex() - 2);
+
+        double rsiGap = currentRsi - previousRsi;
+        double previousRsiGap = previousRsi - prePreviousRsi;
+
+        boolean isRsiGapPositive = rsiGap > 0;
+        boolean isPreviousRsiGapPositive = previousRsiGap > 0;
+
+        if (RSI_CHECKER) {
+            System.out.println(" RSI(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentRsi + "[" + rsiGap + "]");
+        }
+
+        int rsiSignal = 0;
+        if (isRsiGapPositive == isPreviousRsiGapPositive) {
+            //System.out.println("추세유지");
+        } else {
+            if (rsiGap > 0) {
+                if (RSI_CHECKER) {
+                    System.out.println("**********************************************************");
+                    System.out.println("RSI 감소 >>> RSI 증가[" + direction + "] :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap + ")");
+                    log.info("!!! RSI 반전 !!! " + direction + "/" + currentTrend + " RSI(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentRsi + "[" + rsiGap + "]");
+                    System.out.println("**********************************************************");
+                }
+                rsiSignal = 1;
+            } else if (rsiGap < 0) {
+                if (RSI_CHECKER) {
+                    System.out.println("**********************************************************");
+                    System.out.println("RSI 증가 >>> RSI 감소[" + direction + "] :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap + ")");
+                    log.info("!!! RSI 반전 !!! " + direction + "/" + currentTrend + " RSI(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentRsi + "[" + rsiGap + "]");
+                    System.out.println("**********************************************************");
+                }
+                rsiSignal = -1;
+            }
+        }
+
 
 
         //******************************** 여기서부터 MACD 관련 산식을 정의한다 *******************************

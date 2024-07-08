@@ -175,6 +175,11 @@ public class TechnicalIndicatorCalculator {
         return adxIndicator.getValue(idx).doubleValue();
     }
 
+    public double calculateRSI(BaseBarSeries series, int adxPeriod, int idx) {
+        RSIIndicator rsiIndicator = new RSIIndicator(new ClosePriceIndicator(series), adxPeriod);
+        return rsiIndicator.getValue(idx).doubleValue();
+    }
+
     public double calculateMACD(ClosePriceIndicator closePriceIndicator, int shortPeriod, int longPeriod, int idx) {
         MACDIndicator macdIndicator = new MACDIndicator(closePriceIndicator, shortPeriod, longPeriod);
         return macdIndicator.getValue(idx).doubleValue();
@@ -202,12 +207,12 @@ public class TechnicalIndicatorCalculator {
 
         String direction = "";
         if(plusDI > minusDI){
-            //direction = "LONG";
-            direction = "SHORT";
+            direction = "LONG";
+            //direction = "SHORT";
         }
         else if(plusDI < minusDI){
-            //direction = "SHORT";
-            direction = "LONG";
+            direction = "SHORT";
+            //direction = "LONG";
         }
         else{
             direction = "SIDE";
