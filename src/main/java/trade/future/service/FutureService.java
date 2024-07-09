@@ -17,10 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBar;
 import org.ta4j.core.BaseBarSeries;
-import org.ta4j.core.indicators.EMAIndicator;
-import org.ta4j.core.indicators.MACDIndicator;
-import org.ta4j.core.indicators.RSIIndicator;
-import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
@@ -114,6 +111,7 @@ public class FutureService {
     private static final boolean MACD_CHECKER = false;
     private static final boolean ADX_CHECKER = true;
     private static final boolean RSI_CHECKER = false;
+    private static final boolean STOCHRSI_CHECKER = true;
 
     private final Map<String, TradingEntity> TRADING_ENTITYS = new HashMap<>();
 
@@ -1317,8 +1315,47 @@ public class FutureService {
         boolean isAdxGapPositive = adxGap > 0;
         boolean isPreviousAdxGapPositive = previousAdxGap > 0;
 
+        String commonRemark = "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] ";
+        String specialRemark = "";
+
+        //******************************** 여기서부터 스토캐스틱RSI 관련 산식을 정의한다 *******************************
+
+        StochasticRSIIndicator stochasticRSI = new StochasticRSIIndicator(closePrice, 14);
+        double currentStochRSI = stochasticRSI.getValue(series.getEndIndex()).doubleValue();
+        double previousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 1).doubleValue();
+        double prePreviousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 2).doubleValue();
+
+        double stochRSIGap = currentStochRSI - previousStochRSI;
+        double previousStochRSIGap = previousStochRSI - prePreviousStochRSI;
+
+        boolean isStochRSIGapPositive = stochRSIGap > 0;
+        boolean isPreviousStochRSIGapPositive = previousStochRSIGap > 0;
+
+        if (STOCHRSI_CHECKER) {
+            commonRemark += "Stochastic RSI(" + currentStochRSI + "[" + stochRSIGap + "]) ";
+        }
+
+        int stochRSISignal = 0;
+        if (isStochRSIGapPositive == isPreviousStochRSIGapPositive) {
+            // 추세 유지
+        } else {
+            if (stochRSIGap > 0) {
+                if (STOCHRSI_CHECKER&& currentStochRSI<0.2) {
+                    specialRemark += "[Stochastic RSI 롱진입시그널]"+"Stochastic RSI 감소 >>> Stochastic RSI 증가 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRSIGap + ") ";
+                }
+                stochRSISignal = 1;
+            } else if (stochRSIGap < 0) {
+                if (STOCHRSI_CHECKER && currentStochRSI>0.8) {
+                    specialRemark += "[Stochastic RSI 숏진입시그널]"+"Stochastic RSI 증가 >>> Stochastic RSI 감소 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRSIGap + ") ";
+                }
+                stochRSISignal = -1;
+            }
+        }
+
+        //****************************************** 스토캐스틱RSI 끝 ***********************************************
+
         if(ADX_CHECKER){
-            System.out.println(" ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
+            commonRemark += "ADX(" + currentAdx +"[" + adxGap + "]) ";
         }
         int adxSignal = 0;
         if (isAdxGapPositive == isPreviousAdxGapPositive) {
@@ -1327,20 +1364,14 @@ public class FutureService {
             if (adxGap > 0) {
                 //if (currentAdxGrade.getGrade() == 0) {
                     if(ADX_CHECKER){
-                        System.out.println("**********************************************************");
-                        System.out.println("추세감소 >>> 추세증가["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
-                        log.info("!!! " + currentAdxGrade + " !!! " + direction + "/" + currentTrend + " ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
-                        System.out.println("**********************************************************");
+                        specialRemark += "[ADX진입시그널]"+"추세감소 >>> 추세증가["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") ";
                     }
                     adxSignal = 1;
                 //}
             } else if (adxGap < 0) {
                 //if (currentAdxGrade.getGrade() > 2) {
                     if(ADX_CHECKER) {
-                        System.out.println("**********************************************************");
-                        System.out.println("추세증가 >>> 추세감소["+direction+"] :"+ + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ")");
-                        log.info("!!! " + currentAdxGrade + " !!! " + direction + "/" + currentTrend + " ADX(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentAdx + "[" + adxGap + "]");
-                        System.out.println("**********************************************************");
+                        specialRemark += "[ADX진입시그널]"+"추세증가 >>> 추세감소["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") ";
                     }
                     adxSignal = -1;
                 //}
@@ -1359,7 +1390,7 @@ public class FutureService {
         //****************************************** ADX 끝 **********************************************
 
         //******************************** 여기서부터 RSI 관련 산식을 정의한다 **********************************
-// RSI
+        // RSI
         double currentRsi = technicalIndicatorCalculator.calculateRSI(series, 14, series.getEndIndex());
         double previousRsi = technicalIndicatorCalculator.calculateRSI(series, 14, series.getEndIndex() - 1);
         double prePreviousRsi = technicalIndicatorCalculator.calculateRSI(series, 14, series.getEndIndex() - 2);
@@ -1396,8 +1427,6 @@ public class FutureService {
                 rsiSignal = -1;
             }
         }
-
-
 
         //******************************** 여기서부터 MACD 관련 산식을 정의한다 *******************************
         // Calculate MACD
@@ -1462,6 +1491,8 @@ public class FutureService {
 
         //****************************************** MACD 끝 ***********************************************
 
+        System.out.println(commonRemark);
+        System.out.println(specialRemark);
         //log.error(String.valueOf(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN)));
         //BigDecimal decimalValue = new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue());
         TechnicalIndicatorReportEntity technicalIndicatorReport = TechnicalIndicatorReportEntity.builder()
