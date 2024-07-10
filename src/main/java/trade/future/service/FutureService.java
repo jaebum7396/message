@@ -33,6 +33,7 @@ import trade.exception.TradingException;
 import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
 import trade.future.model.enums.ADX_GRADE;
+import trade.future.model.enums.CONSOLE_COLORS;
 import trade.future.repository.EventRepository;
 import trade.future.repository.PositionRepository;
 import trade.future.repository.TechnicalIndicatorRepository;
@@ -109,9 +110,10 @@ public class FutureService {
 
     private static final boolean DEV_FLAG = false;
     private static final boolean MACD_CHECKER = false;
-    private static final boolean ADX_CHECKER = true;
+    private static final boolean ADX_CHECKER = false;
     private static final boolean RSI_CHECKER = false;
-    private static final boolean STOCHRSI_CHECKER = true;
+    private static final boolean STOCHRSI_CHECKER = false;
+    private static final boolean STOCH_CHECKER = true;
 
     private final Map<String, TradingEntity> TRADING_ENTITYS = new HashMap<>();
 
@@ -458,6 +460,24 @@ public class FutureService {
                             }
                         }
                     }
+                    if (STOCH_CHECKER){
+                        if(technicalIndicatorReportEntity.getStochKSignal() != 0){
+                            int stochSignal = technicalIndicatorReportEntity.getStochKSignal();
+                            if(stochSignal<0){
+                                String remark = "STOCH 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
+                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){
+                                    makeCloseOrder(eventEntity, positionEvent, remark);
+                                }
+                            } else if (stochSignal > 0){
+                                String remark = "STOCH 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
+                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){
+                                    makeCloseOrder(eventEntity, positionEvent, remark);
+                                }
+                            }
+                        }
+                    }
                 }
             },() -> {
 
@@ -523,6 +543,28 @@ public class FutureService {
                             }
                         } else if (macdCrossSignal > 0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) < 0){
                             String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                            try {
+                                makeOpenOrder(klineEvent, "LONG", remark);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                //throw new TradingException(tradingEntity);
+                            }
+                        }
+                    }
+                }
+                if (STOCH_CHECKER){
+                    if(technicalIndicatorReportEntity.getStochKSignal() != 0){
+                        int stochSignal = technicalIndicatorReportEntity.getStochKSignal();
+                        if(stochSignal<0){
+                            String remark = "STOCH 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
+                            try {
+                                makeOpenOrder(klineEvent, "SHORT", remark);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                //throw new TradingException(tradingEntity);
+                            }
+                        } else if (stochSignal > 0){
+                            String remark = "STOCH 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
                             try {
                                 makeOpenOrder(klineEvent, "LONG", remark);
                             } catch (Exception e) {
@@ -1299,6 +1341,10 @@ public class FutureService {
         //direction
         String direction = technicalIndicatorCalculator.getDirection(series, 14, series.getEndIndex());
 
+        String currentKrTimeExpression = CONSOLE_COLORS.CYAN+ "["+formattedEndTime+"/"+CONSOLE_COLORS.RESET+CONSOLE_COLORS.BRIGHT_WHITE+closePrice.getValue(series.getEndIndex())+"] "+CONSOLE_COLORS.RESET;
+        String commonRemark = currentKrTimeExpression;
+        String specialRemark = currentKrTimeExpression;
+
         //******************************** 여기서부터 ADX 관련 산식을 정의한다 **********************************
         //adx
         double currentAdx     = technicalIndicatorCalculator.calculateADX(series, 14, series.getEndIndex());
@@ -1315,66 +1361,24 @@ public class FutureService {
         boolean isAdxGapPositive = adxGap > 0;
         boolean isPreviousAdxGapPositive = previousAdxGap > 0;
 
-        String commonRemark = "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] ";
-        String specialRemark = "";
-
-        //******************************** 여기서부터 스토캐스틱RSI 관련 산식을 정의한다 *******************************
-
-        StochasticRSIIndicator stochasticRSI = new StochasticRSIIndicator(closePrice, 14);
-        double currentStochRSI = stochasticRSI.getValue(series.getEndIndex()).doubleValue();
-        double previousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 1).doubleValue();
-        double prePreviousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 2).doubleValue();
-
-        double stochRSIGap = currentStochRSI - previousStochRSI;
-        double previousStochRSIGap = previousStochRSI - prePreviousStochRSI;
-
-        boolean isStochRSIGapPositive = stochRSIGap > 0;
-        boolean isPreviousStochRSIGapPositive = previousStochRSIGap > 0;
-
-        if (STOCHRSI_CHECKER) {
-            commonRemark += "Stochastic RSI(" + currentStochRSI + "[" + stochRSIGap + "]) ";
-        }
-
-        int stochRSISignal = 0;
-        if (isStochRSIGapPositive == isPreviousStochRSIGapPositive) {
-            // 추세 유지
-        } else {
-            if (stochRSIGap > 0) {
-                if (STOCHRSI_CHECKER&& currentStochRSI<0.2) {
-                    specialRemark += "[Stochastic RSI 롱진입시그널]"+"Stochastic RSI 감소 >>> Stochastic RSI 증가 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRSIGap + ") ";
-                }
-                stochRSISignal = 1;
-            } else if (stochRSIGap < 0) {
-                if (STOCHRSI_CHECKER && currentStochRSI>0.8) {
-                    specialRemark += "[Stochastic RSI 숏진입시그널]"+"Stochastic RSI 증가 >>> Stochastic RSI 감소 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRSIGap + ") ";
-                }
-                stochRSISignal = -1;
-            }
-        }
-
-        //****************************************** 스토캐스틱RSI 끝 ***********************************************
-
         if(ADX_CHECKER){
-            commonRemark += "ADX(" + currentAdx +"[" + adxGap + "]) ";
+            commonRemark += CONSOLE_COLORS.YELLOW+"ADX(" + currentAdx +"[" + adxGap + "]) "+CONSOLE_COLORS.RESET;
         }
         int adxSignal = 0;
         if (isAdxGapPositive == isPreviousAdxGapPositive) {
             //System.out.println("추세유지");
         } else {
-            if (adxGap > 0) {
-                //if (currentAdxGrade.getGrade() == 0) {
-                    if(ADX_CHECKER){
-                        specialRemark += "[ADX진입시그널]"+"추세감소 >>> 추세증가["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") ";
-                    }
-                    adxSignal = 1;
+            if (adxGap > 0.5) {
+                if(ADX_CHECKER){
+                    specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[ADX시그널]"+"추세감소 >>> 추세증가["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") "+CONSOLE_COLORS.RESET;
+                }
+                adxSignal = 1;
                 //}
-            } else if (adxGap < 0) {
-                //if (currentAdxGrade.getGrade() > 2) {
-                    if(ADX_CHECKER) {
-                        specialRemark += "[ADX진입시그널]"+"추세증가 >>> 추세감소["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") ";
-                    }
-                    adxSignal = -1;
-                //}
+            } else if (adxGap < -0.5) {
+                if(ADX_CHECKER) {
+                    specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[ADX시그널]"+"추세증가 >>> 추세감소["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") "+CONSOLE_COLORS.RESET;
+                }
+                adxSignal = -1;
             }
         }
 
@@ -1388,6 +1392,49 @@ public class FutureService {
         }*/
 
         //****************************************** ADX 끝 **********************************************
+
+        //******************************** 여기서부터 스토캐스틱 오실레이터 관련 산식을 정의한다 *******************************
+
+        StochasticOscillatorKIndicator stochasticOscillatorK = new StochasticOscillatorKIndicator(series, 21);
+        StochasticOscillatorDIndicator stochasticOscillatorD = new StochasticOscillatorDIndicator(stochasticOscillatorK);
+
+        double currentStochK = stochasticOscillatorK.getValue(series.getEndIndex()).doubleValue();
+        double previousStochK = stochasticOscillatorK.getValue(series.getEndIndex() - 1).doubleValue();
+        double currentStochD = stochasticOscillatorD.getValue(series.getEndIndex()).doubleValue();
+        double previousStochD = stochasticOscillatorD.getValue(series.getEndIndex() - 1).doubleValue();
+
+        boolean isKAboveD = currentStochK > currentStochD;
+        boolean wasKBelowD = previousStochK <= previousStochD;
+        boolean isKBelowD = currentStochK < currentStochD;
+        boolean wasKAboveD = previousStochK >= previousStochD;
+
+        if (STOCH_CHECKER) {
+            String kDExpression = "";
+            if(isKAboveD && wasKBelowD) {
+                kDExpression = CONSOLE_COLORS.BRIGHT_GREEN + "상향 돌파" + CONSOLE_COLORS.RESET;
+            } else if (isKBelowD && wasKAboveD) {
+                kDExpression = CONSOLE_COLORS.BRIGHT_RED + "하향 돌파" + CONSOLE_COLORS.RESET;
+            } else {
+                kDExpression = CONSOLE_COLORS.BRIGHT_WHITE + "변동 없음" + CONSOLE_COLORS.RESET;
+            }
+            commonRemark += CONSOLE_COLORS.BRIGHT_CYAN+ "Stochastic K/D(" + currentStochK + "/" + currentStochD + "[" + kDExpression + "]) "+CONSOLE_COLORS.RESET;
+        }
+
+        int stochKSignal = 0;
+        if (isKAboveD && wasKBelowD) {
+            if (STOCH_CHECKER) {
+                specialRemark += CONSOLE_COLORS.PURPLE+"[Stochastic "+CONSOLE_COLORS.BRIGHT_GREEN+"매수"+CONSOLE_COLORS.PURPLE+" 진입 시그널]"+" Stochastic K/D 상향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
+            }
+            stochKSignal = 1;
+        } else if (isKBelowD && wasKAboveD) {
+            if (STOCH_CHECKER) {
+                specialRemark += CONSOLE_COLORS.PURPLE+"[Stochastic "+CONSOLE_COLORS.BRIGHT_RED+"매도"+CONSOLE_COLORS.PURPLE+" 진입 시그널]"+" Stochastic K/D 하향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
+            }
+            stochKSignal = -1;
+        }
+        //****************************************** 스토캐스틱 오실레이터 끝 ***********************************************
+
+
 
         //******************************** 여기서부터 RSI 관련 산식을 정의한다 **********************************
         // RSI
@@ -1490,9 +1537,12 @@ public class FutureService {
         }
 
         //****************************************** MACD 끝 ***********************************************
-
-        System.out.println(commonRemark);
-        System.out.println(specialRemark);
+        if(!commonRemark.equals(currentKrTimeExpression)){
+            System.out.println(commonRemark);
+        }
+        if (!specialRemark.equals(currentKrTimeExpression)){
+            System.out.println(specialRemark);
+        }
         //log.error(String.valueOf(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN)));
         //BigDecimal decimalValue = new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue());
         TechnicalIndicatorReportEntity technicalIndicatorReport = TechnicalIndicatorReportEntity.builder()
@@ -1523,6 +1573,7 @@ public class FutureService {
                 .macdCrossSignal(macdCrossSignal)
                 //.macdPeakSignal(macdPeakSignal)
                 .macdReversalSignal(macdReversalSignal)
+                .stochKSignal(stochKSignal)
                 .build();
         return technicalIndicatorReport;
     }

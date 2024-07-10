@@ -111,6 +111,9 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MACD_REVERSAL_SIGNAL")
     private int macdReversalSignal;
 
+    @Column( name = "STOCH_K_SIGNAL")
+    private int stochKSignal;
+
     @Override
     public String toString() {
         return "TechnicalIndicatorReportEntity{" +
@@ -138,6 +141,7 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
                 ", macdPreliminarySignal=" + macdPreliminarySignal +
                 ", macdPeakSignal=" + macdPeakSignal +
                 ", macdReversalSignal=" + macdReversalSignal +
+                ", stochKSignal=" + stochKSignal +
                 '}';
     }
 }
