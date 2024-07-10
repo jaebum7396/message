@@ -664,7 +664,6 @@ public class FutureService {
         } finally {
             eventRepository.save(positionEvent);
             tradingEntity.setPositionStatus("CLOSE");
-            tradingEntity = tradingRepository.save(tradingEntity);
             if (tradingEntity.getTargetSymbol() == null){
                 tradingEntity.setTradingStatus("CLOSE");
                 streamClose(tradingEntity.getStreamId());
@@ -672,6 +671,7 @@ public class FutureService {
                 autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
                 System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             }
+            tradingEntity = tradingRepository.save(tradingEntity);
             log.info("스트림 종료");
             printTradingEntitys();
         }
