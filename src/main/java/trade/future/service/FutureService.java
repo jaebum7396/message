@@ -267,7 +267,7 @@ public class FutureService {
         }
         if(nextFlag){
             if(targetSymbol == null || targetSymbol.isEmpty()) {
-                selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, availablePositionCount).get("overlappingData");
+                selectedStockList = (List<Map<String, Object>>) getStockFind(interval, stockSelectionCount, maxPositionCount).get("overlappingData");
             } else {
                 LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
                 paramMap.put("symbol", targetSymbol);
@@ -951,7 +951,7 @@ public class FutureService {
         return averageQuoteAssetVolume;
     }
 
-    public Map<String, Object> getStockFind(String interval, int limit, int availablePositionCount) {
+    public Map<String, Object> getStockFind(String interval, int limit, int maxPositionCount) {
         Map<String, Object> resultMap = new LinkedHashMap<>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
 
@@ -968,6 +968,10 @@ public class FutureService {
 
         int count = 0;
         for (Map<String, Object> item : sortedByQuoteVolume) {
+            int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
+            if (availablePositionCount <= 0) {
+                break;
+            }
             if (count >= availablePositionCount) {
                 break;
             }
