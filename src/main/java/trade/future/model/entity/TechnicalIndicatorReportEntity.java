@@ -111,8 +111,20 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MACD_REVERSAL_SIGNAL")
     private int macdReversalSignal;
 
+    @Column( name = "ADX_DIRECTION_SIGNAL")
+    private int adxDirectionSignal;
+
     @Column( name = "STOCH_K_SIGNAL")
     private int stochKSignal;
+
+    @Column( name = "BOLLINGER_BAND_SIGNAL")
+    private int bollingerBandSignal;
+
+    @Column(name = "STRONG_SIGNAL")
+    private int strongSignal;
+
+    @Column(name = "MID_SIGNAL")
+    private int midSignal;
 
     @Override
     public String toString() {

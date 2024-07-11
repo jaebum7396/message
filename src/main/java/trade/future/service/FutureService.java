@@ -442,60 +442,28 @@ public class FutureService {
                             makeCloseOrder(eventEntity, positionEvent, remark);
                         }
                     } else {
-                        if (ADX_CHECKER){
-                            if(positionReport.getEndTime().equals(technicalIndicatorReportEntity.getEndTime())){
-                                return;
-                            }
-                            if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
-                                String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
-                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                if(closePosition.getPositionStatus().equals("OPEN")){
+                        if(technicalIndicatorReportEntity.getAdxDirectionSignal() != 0
+                        ||technicalIndicatorReportEntity.getStochKSignal() !=0
+                        ||technicalIndicatorReportEntity.getMacdReversalSignal() !=0){
+                            String adxDirectionSignal = technicalIndicatorReportEntity.getAdxDirectionSignal() != 0 ? (technicalIndicatorReportEntity.getAdxDirectionSignal() == 1 ? "LONG" : "SHORT") : "";
+                            String stochKSignal = technicalIndicatorReportEntity.getStochKSignal() != 0 ? (technicalIndicatorReportEntity.getStochKSignal() == 1 ? "LONG" : "SHORT") : "";
+                            String macdReversalSignal = technicalIndicatorReportEntity.getMacdReversalSignal() != 0 ? (technicalIndicatorReportEntity.getMacdReversalSignal() == 1 ? "LONG" : "SHORT") : "";
+                            PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                            if(closePosition.getPositionStatus().equals("OPEN")){
+                                String positionSide = closePosition.getPositionSide();
+                                boolean isClose = false;
+                                if (!adxDirectionSignal.isEmpty() && !adxDirectionSignal.equals(positionSide)){
+                                    isClose = true;
+                                }
+                                if (!stochKSignal.isEmpty() && !stochKSignal.equals(positionSide)){
+                                    isClose = true;
+                                }
+                                if (!macdReversalSignal.isEmpty() && !macdReversalSignal.equals(positionSide)){
+                                    isClose = true;
+                                }
+                                if(isClose){
+                                    String remark = "ADX(" + adxDirectionSignal + ") STOCH(" + stochKSignal + ") MACD(" + macdReversalSignal + ")";
                                     makeCloseOrder(eventEntity, positionEvent, remark);
-                                }
-                            } else if (positionReport.getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
-                                String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
-                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                if(closePosition.getPositionStatus().equals("OPEN")){
-                                    makeCloseOrder(eventEntity, positionEvent, remark);
-                                }
-                            }else{
-                                //autoTradingRestart(tradingEntity);
-                            }
-                        }
-                        if (MACD_CHECKER){
-                            if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
-                                BigDecimal macd = technicalIndicatorReportEntity.getMacd();
-                                int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                                if(macdCrossSignal<0){ //MACD가 양수일때 데드크로스가 일어났을때.
-                                    String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
-                                        makeCloseOrder(eventEntity, positionEvent, remark);
-                                    }
-                                } else if (macdCrossSignal > 0){ //MACD가 음수일때 골든크로스가 일어났을때.
-                                    String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
-                                        makeCloseOrder(eventEntity, positionEvent, remark);
-                                    }
-                                }
-                            }
-                        }
-                        if (STOCH_CHECKER){
-                            if(technicalIndicatorReportEntity.getStochKSignal() != 0){
-                                int stochSignal = technicalIndicatorReportEntity.getStochKSignal();
-                                if(stochSignal<0){
-                                    String remark = "STOCH 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
-                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){
-                                        makeCloseOrder(eventEntity, positionEvent, remark);
-                                    }
-                                } else if (stochSignal > 0){
-                                    String remark = "STOCH 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
-                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){
-                                        makeCloseOrder(eventEntity, positionEvent, remark);
-                                    }
                                 }
                             }
                         }
@@ -538,61 +506,36 @@ public class FutureService {
                     throw new TradingException(tradingEntity);
                 }
             } else {
-                if(ADX_CHECKER){
-                    if (technicalIndicatorReportEntity.getAdxSignal() != 0
-                        //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
-                    ){
-                        String remark = "ADX 진입시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
-                        try {
-                            makeOpenOrder(klineEvent, technicalIndicatorReportEntity.getDirectionDi(), remark);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            //throw new TradingException(tradingEntity);
-                        }
+                if (technicalIndicatorReportEntity.getStrongSignal() != 0
+                   ||technicalIndicatorReportEntity.getMidSignal() != 0
+                    //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
+                ){
+                    int adxDirectionSignal = technicalIndicatorReportEntity.getAdxDirectionSignal();
+                    int bollingerBandSignal = technicalIndicatorReportEntity.getBollingerBandSignal();
+                    int macdReversalSignal = technicalIndicatorReportEntity.getMacdReversalSignal();
+                    int stochKSignal = technicalIndicatorReportEntity.getStochKSignal();
+
+                    String remark = "";
+                    if(bollingerBandSignal != 0){
+                        remark += "BOLLINGER("+(bollingerBandSignal == 1 ? "LONG" : "SHORT") + ") ";
                     }
-                }
-                if (MACD_CHECKER){
-                    if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){
-                        int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                        if(macdCrossSignal<0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) > 0){
-                            String remark = "MACD 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                            try {
-                                makeOpenOrder(klineEvent, "SHORT", remark);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                //throw new TradingException(tradingEntity);
-                            }
-                        } else if (macdCrossSignal > 0 && technicalIndicatorReportEntity.getMacd().compareTo(new BigDecimal("0")) < 0){
-                            String remark = "MACD 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                            try {
-                                makeOpenOrder(klineEvent, "LONG", remark);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                //throw new TradingException(tradingEntity);
-                            }
-                        }
+                    if(adxDirectionSignal != 0){
+                        remark += "ADX("+(adxDirectionSignal == 1 ? "LONG" : "SHORT") + ") ";
                     }
-                }
-                if (STOCH_CHECKER){
-                    if(technicalIndicatorReportEntity.getStochKSignal() != 0){
-                        int stochSignal = technicalIndicatorReportEntity.getStochKSignal();
-                        if(stochSignal<0){
-                            String remark = "STOCH 데드크로스 진입시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
-                            try {
-                                makeOpenOrder(klineEvent, "SHORT", remark);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                //throw new TradingException(tradingEntity);
-                            }
-                        } else if (stochSignal > 0){
-                            String remark = "STOCH 골든크로스 진입시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
-                            try {
-                                makeOpenOrder(klineEvent, "LONG", remark);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                //throw new TradingException(tradingEntity);
-                            }
-                        }
+                    if(macdReversalSignal != 0){
+                        remark += "MACD("+(macdReversalSignal == 1 ? "LONG" : "SHORT") + ") ";
+                    }
+                    if(stochKSignal != 0){
+                        remark += "STOCH("+(stochKSignal == 1 ? "LONG" : "SHORT") + ") ";
+                    }
+
+                    String direction = technicalIndicatorReportEntity.getStrongSignal() != 0
+                            ? (technicalIndicatorReportEntity.getStrongSignal() == 1 ? "LONG" : "SHORT") :
+                            (technicalIndicatorReportEntity.getMidSignal() == 1 ? "LONG" : "SHORT") ;
+                    try {
+                        makeOpenOrder(klineEvent, direction, remark);
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
             }
@@ -1002,6 +945,7 @@ public class FutureService {
                         true
                         /*&& ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
                         (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.강한추세.getGrade() && tempReport.getAdxGap()>0)*/
+                    && (tempReport.getClosePrice().compareTo(tempReport.getUbb())>0 || tempReport.getClosePrice().compareTo(tempReport.getLbb())<0)
                 ) {
                     overlappingData.add(item);
                     reports.add(tempReport);
@@ -1695,6 +1639,9 @@ public class FutureService {
                 //.macdPeakSignal(macdPeakSignal)
                 .macdReversalSignal(macdReversalSignal)
                 .stochKSignal(stochKSignal)
+                .adxDirectionSignal(adxDirectionSignal)
+                .strongSignal(strongSignal)
+                .midSignal(midSignal)
                 .build();
         return technicalIndicatorReport;
     }
