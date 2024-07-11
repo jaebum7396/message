@@ -11,7 +11,7 @@ import java.util.Optional;
 
 @Repository
 public interface TradingRepository extends JpaRepository<TradingEntity, String>, QuerydslPredicateExecutor<TradingEntity>, TradingRepositoryQ {
-    Optional<TradingEntity> findBySymbolAndTradingStatus(String symbol, String tradingStatus);
+    List<TradingEntity> findBySymbolAndTradingStatus(String symbol, String tradingStatus);
     List<TradingEntity> findByTradingStatus(String tradingStatus);
     Optional<TradingEntity> findByStreamId(int streamId);
 }

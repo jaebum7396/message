@@ -394,96 +394,120 @@ public class FutureService {
         return resultMap;
     }
 
+    //해당 트레이딩을 종료하고 다시 오픈하는 코드
+    public void restartTrading(TradingEntity tradingEntity){
+        tradingEntity.setPositionStatus("CLOSE");
+        tradingEntity.setTradingStatus("CLOSE");
+        tradingEntity = tradingRepository.save(tradingEntity);
+        streamClose(tradingEntity.getStreamId());
+        TRADING_ENTITYS.remove(tradingEntity.getSymbol());
+        autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
+    }
+
     private void klineProcess(String event){
-        JSONObject eventObj = new JSONObject(event);
-        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
-        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
-        boolean isFinal = klineObj.getBoolean("x");
+            JSONObject eventObj = new JSONObject(event);
+            JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+            JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
+            boolean isFinal = klineObj.getBoolean("x");
 
-        String seriesNm = String.valueOf(eventObj.get("stream"));
-        String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
-        String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
+            String seriesNm = String.valueOf(eventObj.get("stream"));
+            String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
+            String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
 
-        if (isFinal) {
-            System.out.println("event : " + event);
-            TradingEntity tradingEntity = getTradingEntity(symbol);
-            // klineEvent를 데이터베이스에 저장
-            EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
-
-            TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
-            Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
-            openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
-                TechnicalIndicatorReportEntity positionReport = positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
-                if(DEV_FLAG){
-                    String remark = "테스트 청산";
-                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                    if(closePosition.getPositionStatus().equals("OPEN")){
-                        makeCloseOrder(eventEntity, positionEvent, remark);
-                    }
-                } else {
-                    if (ADX_CHECKER){
-                        if(positionReport.getEndTime().equals(technicalIndicatorReportEntity.getEndTime())){
-                            return;
-                        }
-                        if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
-                            String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
-                            PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                            if(closePosition.getPositionStatus().equals("OPEN")){
-                                makeCloseOrder(eventEntity, positionEvent, remark);
-                            }
-                        } else if (positionReport.getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
-                            String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
-                            PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                            if(closePosition.getPositionStatus().equals("OPEN")){
-                                makeCloseOrder(eventEntity, positionEvent, remark);
-                            }
-                        }else{
-                            //autoTradingRestart(tradingEntity);
-                        }
-                    }
-                    if (MACD_CHECKER){
-                        if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
-                            BigDecimal macd = technicalIndicatorReportEntity.getMacd();
-                            int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
-                            if(macdCrossSignal<0){ //MACD가 양수일때 데드크로스가 일어났을때.
-                                String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
-                                    makeCloseOrder(eventEntity, positionEvent, remark);
-                                }
-                            } else if (macdCrossSignal > 0){ //MACD가 음수일때 골든크로스가 일어났을때.
-                                String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
-                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
-                                    makeCloseOrder(eventEntity, positionEvent, remark);
-                                }
-                            }
-                        }
-                    }
-                    if (STOCH_CHECKER){
-                        if(technicalIndicatorReportEntity.getStochKSignal() != 0){
-                            int stochSignal = technicalIndicatorReportEntity.getStochKSignal();
-                            if(stochSignal<0){
-                                String remark = "STOCH 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
-                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){
-                                    makeCloseOrder(eventEntity, positionEvent, remark);
-                                }
-                            } else if (stochSignal > 0){
-                                String remark = "STOCH 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
-                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                                if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){
-                                    makeCloseOrder(eventEntity, positionEvent, remark);
-                                }
-                            }
-                        }
-                    }
+            boolean nextFlag = true;
+            List<TradingEntity> tradingEntitys = new ArrayList<>();
+            try{
+                tradingEntitys = getTradingEntity(symbol);
+                if(tradingEntitys.size() != 1){
+                    throw new RuntimeException("트레이딩이 존재하지 않거나 중복되어있습니다.");
                 }
-            },() -> {
+            } catch (Exception e){
+                nextFlag = false;
+                e.printStackTrace();
+                for(TradingEntity tradingEntity:tradingEntitys){
+                    restartTrading(tradingEntity);
+                }
+            }
 
-            });
-            //eventRepository.save(eventEntity);
-        }
+            if (isFinal && nextFlag) {
+                System.out.println("event : " + event);
+                // klineEvent를 데이터베이스에 저장
+                EventEntity eventEntity = saveKlineEvent(event, tradingEntitys.get(0));
+
+                TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
+                Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
+                openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
+                    TechnicalIndicatorReportEntity positionReport = positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
+                    if(DEV_FLAG){
+                        String remark = "테스트 청산";
+                        PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                        if(closePosition.getPositionStatus().equals("OPEN")){
+                            makeCloseOrder(eventEntity, positionEvent, remark);
+                        }
+                    } else {
+                        if (ADX_CHECKER){
+                            if(positionReport.getEndTime().equals(technicalIndicatorReportEntity.getEndTime())){
+                                return;
+                            }
+                            if(positionReport.getAdxSignal()>0&&technicalIndicatorReportEntity.getAdxGap()<1){
+                                String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
+                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                if(closePosition.getPositionStatus().equals("OPEN")){
+                                    makeCloseOrder(eventEntity, positionEvent, remark);
+                                }
+                            } else if (positionReport.getAdxSignal()<0&&technicalIndicatorReportEntity.getAdxGap()>-1){
+                                String remark = "ADX 청산시그널("+technicalIndicatorReportEntity.getAdxGap()+")";
+                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                if(closePosition.getPositionStatus().equals("OPEN")){
+                                    makeCloseOrder(eventEntity, positionEvent, remark);
+                                }
+                            }else{
+                                //autoTradingRestart(tradingEntity);
+                            }
+                        }
+                        if (MACD_CHECKER){
+                            if(technicalIndicatorReportEntity.getMacdCrossSignal() != 0){ //MACD 크로스가 일어났을때.
+                                BigDecimal macd = technicalIndicatorReportEntity.getMacd();
+                                int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
+                                if(macdCrossSignal<0){ //MACD가 양수일때 데드크로스가 일어났을때.
+                                    String remark = "MACD 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){ //포지션이 오픈되어있고 롱포지션일때
+                                        makeCloseOrder(eventEntity, positionEvent, remark);
+                                    }
+                                } else if (macdCrossSignal > 0){ //MACD가 음수일때 골든크로스가 일어났을때.
+                                    String remark = "MACD 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getMacd() + ")";
+                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){ //포지션이 오픈되어있고 숏포지션일때
+                                        makeCloseOrder(eventEntity, positionEvent, remark);
+                                    }
+                                }
+                            }
+                        }
+                        if (STOCH_CHECKER){
+                            if(technicalIndicatorReportEntity.getStochKSignal() != 0){
+                                int stochSignal = technicalIndicatorReportEntity.getStochKSignal();
+                                if(stochSignal<0){
+                                    String remark = "STOCH 데드크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
+                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("LONG")){
+                                        makeCloseOrder(eventEntity, positionEvent, remark);
+                                    }
+                                } else if (stochSignal > 0){
+                                    String remark = "STOCH 골든크로스 청산시그널(" + technicalIndicatorReportEntity.getStochKSignal() + ")";
+                                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                                    if(closePosition.getPositionStatus().equals("OPEN") && closePosition.getPositionSide().equals("SHORT")){
+                                        makeCloseOrder(eventEntity, positionEvent, remark);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },() -> {
+
+                });
+                //eventRepository.save(eventEntity);
+            }
     }
 
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
@@ -663,12 +687,7 @@ public class FutureService {
             //throw new TradingException(tradingEntity);
         } finally {
             eventRepository.save(positionEvent);
-            tradingEntity.setPositionStatus("CLOSE");
-            tradingEntity.setTradingStatus("CLOSE");
-            tradingEntity = tradingRepository.save(tradingEntity);
-            streamClose(tradingEntity.getStreamId());
-            TRADING_ENTITYS.remove(tradingEntity.getSymbol());
-            autoTradingOpen(tradingEntity.getUserCd(), tradingEntity.getTargetSymbol(), tradingEntity.getCandleInterval(), tradingEntity.getLeverage(), tradingEntity.getStockSelectionCount(), tradingEntity.getMaxPositionCount());
+            restartTrading(tradingEntity);
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
             printTradingEntitys();
@@ -840,9 +859,8 @@ public class FutureService {
         }
     }
 
-    private TradingEntity getTradingEntity(String symbol) {
-        return tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN")
-                .orElseThrow(() -> new RuntimeException("트레이딩이 존재하지 않습니다."));
+    private List<TradingEntity> getTradingEntity(String symbol) {
+        return tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
     }
 
     public void streamClose(int streamId) {
@@ -978,12 +996,11 @@ public class FutureService {
 
             String tempCd = String.valueOf(UUID.randomUUID());
             String symbol = String.valueOf(item.get("symbol"));
-            Optional<TradingEntity> tradingEntityOpt = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+            List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
 
-            if (tradingEntityOpt.isEmpty()) {
+            if (tradingEntityList.isEmpty()) {
                 getKlines(tempCd, symbol, interval, WINDOW_SIZE);
                 TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempCd, symbol, interval);
-
                 if (
                         true
                         /*&& ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
