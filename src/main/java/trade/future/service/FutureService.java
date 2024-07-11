@@ -507,7 +507,7 @@ public class FutureService {
                 }
             } else {
                 if (technicalIndicatorReportEntity.getStrongSignal() != 0
-                   ||technicalIndicatorReportEntity.getMidSignal() != 0
+                    //||technicalIndicatorReportEntity.getMidSignal() != 0
                     //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
                 ){
                     int adxDirectionSignal = technicalIndicatorReportEntity.getAdxDirectionSignal();
