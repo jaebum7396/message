@@ -1587,27 +1587,25 @@ public class FutureService {
         int strongSignal = 0;
         int midSignal = 0;
         int totalSignal = 0;
-        totalSignal = stochKSignal+adxDirectionSignal+macdReversalSignal+bollingerBandSignal;
-        if (bollingerBandSignal != 0){
-            if(totalSignal > 2|| totalSignal<-2){
-                if(totalSignal>0){
-                    strongSignal = 1;
-                }else if(totalSignal<0){
-                    strongSignal =- 1;
-                }
-            }else if (totalSignal > 1 || totalSignal < -1) {
-                if (totalSignal > 0) {
-                    midSignal = 1;
-                } else if (totalSignal < 0) {
-                    midSignal = -1;
-                }
+        totalSignal = stochKSignal+adxDirectionSignal+macdReversalSignal+bollingerBandSignal*2;
+        if(totalSignal > 2|| totalSignal<-2){
+            if(totalSignal>0){
+                strongSignal = 1;
+            }else if(totalSignal<0){
+                strongSignal =- 1;
+            }
+        }else if (totalSignal > 1 || totalSignal < -1) {
+            if (totalSignal > 0) {
+                midSignal = 1;
+            } else if (totalSignal < 0) {
+                midSignal = -1;
             }
         }
 
-        if(bollingerBandSignal!=0 && strongSignal !=0){
+        if(strongSignal !=0){
             System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_WHITE+""+CONSOLE_COLORS.BRIGHT_BLACK+"강력한 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ strongSignal+CONSOLE_COLORS.RESET);
         }
-        if(bollingerBandSignal!=0 && midSignal !=0 ){
+        if(midSignal !=0){
             System.out.println(CONSOLE_COLORS.BACKGROUND_WHITE+""+CONSOLE_COLORS.BRIGHT_BLACK+"중간 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ midSignal+CONSOLE_COLORS.RESET);
         }
 
