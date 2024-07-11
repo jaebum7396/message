@@ -21,10 +21,7 @@ import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
-import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.helpers.HighPriceIndicator;
-import org.ta4j.core.indicators.helpers.LowPriceIndicator;
-import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
+import org.ta4j.core.indicators.helpers.*;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.Num;
 import trade.common.CommonUtils;
@@ -109,11 +106,11 @@ public class FutureService {
     private static final int WINDOW_SIZE = 100; // For demonstration purposes
 
     private static final boolean DEV_FLAG = false;
-    private static final boolean MACD_CHECKER = false;
-    private static final boolean ADX_CHECKER = false;
+    private static final boolean ADX_CHECKER = true;
+    private static final boolean MACD_CHECKER = true;
+    private static final boolean STOCH_CHECKER = true;
     private static final boolean RSI_CHECKER = false;
     private static final boolean STOCHRSI_CHECKER = false;
-    private static final boolean STOCH_CHECKER = true;
 
     private final Map<String, TradingEntity> TRADING_ENTITYS = new HashMap<>();
 
@@ -1386,20 +1383,35 @@ public class FutureService {
             commonRemark += CONSOLE_COLORS.YELLOW+"ADX(" + currentAdx +"[" + adxGap + "]) "+CONSOLE_COLORS.RESET;
         }
         int adxSignal = 0;
+        int adxDirectionSignal = 0;
+        String adxDirectionExpression = "";
         if (isAdxGapPositive == isPreviousAdxGapPositive) {
             //System.out.println("추세유지");
         } else {
             if (adxGap > 0.5) {
-                if(ADX_CHECKER){
-                    specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[ADX시그널]"+"추세감소 >>> 추세증가["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") "+CONSOLE_COLORS.RESET;
-                }
                 adxSignal = 1;
-                //}
-            } else if (adxGap < -0.5) {
-                if(ADX_CHECKER) {
-                    specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[ADX시그널]"+"추세증가 >>> 추세감소["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") "+CONSOLE_COLORS.RESET;
+                if(direction.equals("LONG")){
+                    adxDirectionSignal = 1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_GREEN+"LONG";
+                } else if(direction.equals("SHORT")){
+                    adxDirectionSignal = -1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_RED+"SHORT";
                 }
+                if(ADX_CHECKER){
+                    specialRemark += CONSOLE_COLORS.YELLOW+"[ADX "+adxDirectionExpression+" 시그널]"+CONSOLE_COLORS.RESET+"추세감소 >>> 추세증가["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") "+CONSOLE_COLORS.RESET;
+                }
+            } else if (adxGap < -0.5) {
                 adxSignal = -1;
+                if(direction.equals("LONG")){
+                    adxDirectionSignal = -1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_RED+"SHORT";
+                } else if(direction.equals("SHORT")){
+                    adxDirectionSignal = 1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_GREEN+"LONG";
+                }
+                if(ADX_CHECKER) {
+                    specialRemark += CONSOLE_COLORS.YELLOW+"[ADX "+adxDirectionExpression+" 시그널]"+CONSOLE_COLORS.RESET+"추세증가 >>> 추세감소["+direction+"] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") "+CONSOLE_COLORS.RESET;
+                }
             }
         }
 
@@ -1429,6 +1441,18 @@ public class FutureService {
         boolean isKBelowD = currentStochK < currentStochD;
         boolean wasKAboveD = previousStochK >= previousStochD;
 
+        // 이동평균 필터 설정
+        EMAIndicator shortEma = new EMAIndicator(closePrice, 50);  // 50-period EMA
+        EMAIndicator longEma = new EMAIndicator(closePrice, 200);  // 200-period EMA
+        // 추세 필터 조건
+        boolean isUptrend = shortEma.getValue(series.getEndIndex()).isGreaterThan(longEma.getValue(series.getEndIndex()));
+        boolean isDowntrend = shortEma.getValue(series.getEndIndex()).isLessThan(longEma.getValue(series.getEndIndex()));
+
+        VolumeIndicator volumeIndicator = new VolumeIndicator(series, 21); // 볼륨 필터를 위한 설정
+        // 볼륨 필터 조건
+        Num currentVolume = volumeIndicator.getValue(series.getEndIndex());
+        Num averageVolume = volumeIndicator.getValue(series.getEndIndex() - 1); // 임의로 설정
+
         if (STOCH_CHECKER) {
             String kDExpression = "";
             if(isKAboveD && wasKBelowD) {
@@ -1444,18 +1468,114 @@ public class FutureService {
         int stochKSignal = 0;
         if (isKAboveD && wasKBelowD) {
             if (STOCH_CHECKER) {
-                specialRemark += CONSOLE_COLORS.PURPLE+"[Stochastic "+CONSOLE_COLORS.BRIGHT_GREEN+"매수"+CONSOLE_COLORS.PURPLE+" 진입 시그널]"+" Stochastic K/D 상향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
+                specialRemark += CONSOLE_COLORS.BRIGHT_CYAN+"[Stochastic "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 진입 시그널]"+CONSOLE_COLORS.RESET+" Stochastic K/D 상향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
             }
             stochKSignal = 1;
         } else if (isKBelowD && wasKAboveD) {
             if (STOCH_CHECKER) {
-                specialRemark += CONSOLE_COLORS.PURPLE+"[Stochastic "+CONSOLE_COLORS.BRIGHT_RED+"매도"+CONSOLE_COLORS.PURPLE+" 진입 시그널]"+" Stochastic K/D 하향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
+                specialRemark += CONSOLE_COLORS.BRIGHT_CYAN+"[Stochastic "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 진입 시그널]"+CONSOLE_COLORS.RESET+" Stochastic K/D 하향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
             }
             stochKSignal = -1;
         }
         //****************************************** 스토캐스틱 오실레이터 끝 ***********************************************
 
+        //******************************** 여기서부터 MACD 관련 산식을 정의한다 *******************************
+        // Calculate MACD
+        MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
 
+        double currentMacdHistogram     = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, 12, 26, series.getEndIndex());
+        double previousMacdHistogram    = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, 12, 26, series.getEndIndex()-1);
+        double prePreviousMacdHistogram = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, 12, 26, series.getEndIndex()-2);
+
+        double macdHistogramGap = currentMacdHistogram - previousMacdHistogram;
+        double previousMacdHistogramGap = previousMacdHistogram - prePreviousMacdHistogram;
+
+        boolean MACD_히스토그램_증가 = macdHistogramGap > 0;
+        boolean 이전_MACD_히스토그램_증가 = previousMacdHistogramGap > 0;
+        //System.out.println(macdGap+" : "+MACD_증가+"_"+이전_MACD_증가);
+        if(MACD_CHECKER){
+            commonRemark += CONSOLE_COLORS.BRIGHT_PURPLE+"MACD(" + currentAdx +"[" + adxGap + "]) "+CONSOLE_COLORS.RESET;
+        }
+        int macdReversalSignal = 0;
+        if (MACD_히스토그램_증가 == 이전_MACD_히스토그램_증가) {
+            //System.out.println("추세유지");
+        } else {
+            //if (currentMacd < 0) {
+            if(!이전_MACD_히스토그램_증가 && MACD_히스토그램_증가){
+                if (MACD_CHECKER) {
+                    specialRemark += CONSOLE_COLORS.PURPLE+"[MACD "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 시그널]"+CONSOLE_COLORS.RESET+"MACD히스토그램감소 >>> MACD히스토그램증가 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap +") "+CONSOLE_COLORS.RESET;
+                }
+                macdReversalSignal = 1;
+            }
+            //}
+            //if (currentMacd > 0) {
+            if(이전_MACD_히스토그램_증가 && !MACD_히스토그램_증가){
+                if (MACD_CHECKER){
+                    specialRemark += CONSOLE_COLORS.PURPLE+"[MACD "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 시그널]"+CONSOLE_COLORS.RESET+"MACD히스토그램증가 >>> MACD히스토그램감소 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap +") "+CONSOLE_COLORS.RESET;
+                }
+                macdReversalSignal = -1;
+            }
+            //}
+        }
+
+        EMAIndicator MACD_신호선 = new EMAIndicator(macd, 9);
+        // MACD 크로스 신호 계산
+        int macdPreliminarySignal = 0;
+        boolean isMacdHighAndDeadCrossSoon = macd.getValue(series.getEndIndex() - 1).isGreaterThan(MACD_신호선.getValue(series.getEndIndex() - 1))
+                && macd.getValue(series.getEndIndex()).isLessThan(MACD_신호선.getValue(series.getEndIndex()));
+        boolean isMacdLowAndGoldenCrossSoon = macd.getValue(series.getEndIndex() - 1).isLessThan(MACD_신호선.getValue(series.getEndIndex() - 1))
+                && macd.getValue(series.getEndIndex()).isGreaterThan(MACD_신호선.getValue(series.getEndIndex()));
+
+        if (isMacdHighAndDeadCrossSoon) {
+            macdPreliminarySignal = -1;
+        } else if (isMacdLowAndGoldenCrossSoon) {
+            macdPreliminarySignal = 1;
+        }
+        int macdCrossSignal = 0 ; // 골든 크로스일시 1, 데드 크로스일시 -1
+        if(technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9)){
+            macdCrossSignal = 1;
+        }
+        if(technicalIndicatorCalculator.isDeadCross(series, 12, 26, 9)){
+            macdCrossSignal = -1;
+        }
+
+        //****************************************** MACD 끝 ***********************************************
+
+        //******************************** 여기서부터 스토캐스틱RSI 관련 산식을 정의한다 *******************************
+
+        StochasticRSIIndicator stochasticRSI = new StochasticRSIIndicator(closePrice, 14);
+        double currentStochRSI = stochasticRSI.getValue(series.getEndIndex()).doubleValue();
+        double previousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 1).doubleValue();
+        double prePreviousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 2).doubleValue();
+
+        double stochRSIGap = currentStochRSI - previousStochRSI;
+        double previousStochRSIGap = previousStochRSI - prePreviousStochRSI;
+
+        boolean isStochRSIGapPositive = stochRSIGap > 0;
+        boolean isPreviousStochRSIGapPositive = previousStochRSIGap > 0;
+
+        if (STOCHRSI_CHECKER) {
+            commonRemark += "Stochastic RSI(" + currentStochRSI + "[" + stochRSIGap + "]) ";
+        }
+
+        int stochRSISignal = 0;
+        if (isStochRSIGapPositive == isPreviousStochRSIGapPositive) {
+            // 추세 유지
+        } else {
+            if (stochRSIGap > 0) {
+                if (STOCHRSI_CHECKER && currentStochRSI<0.2) {
+                    specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[StochasticRSI시그널]"+"Stochastic RSI 감소 >>> Stochastic RSI 증가 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRSIGap + ") "+CONSOLE_COLORS.RESET;
+                }
+                stochRSISignal = 1;
+            } else if (stochRSIGap < 0) {
+                if (STOCHRSI_CHECKER && currentStochRSI>0.8) {
+                    specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[StochasticRSI시그널]"+"Stochastic RSI 증가 >>> Stochastic RSI 감소 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRSIGap + ") "+CONSOLE_COLORS.RESET;
+                }
+                stochRSISignal = -1;
+            }
+        }
+
+        //****************************************** 스토캐스틱RSI 끝 ***********************************************
 
         //******************************** 여기서부터 RSI 관련 산식을 정의한다 **********************************
         // RSI
@@ -1496,74 +1616,54 @@ public class FutureService {
             }
         }
 
-        //******************************** 여기서부터 MACD 관련 산식을 정의한다 *******************************
-        // Calculate MACD
-        MACDIndicator macd = new MACDIndicator(closePrice, 12, 26);
+        //******************************** 여기서부터 볼린저밴드 관련 산식을 정의한다 **********************************
+        int bollingerBandSignal = 0;
+        BigDecimal ubb = CommonUtils.truncate(upperBBand.getValue(series.getEndIndex()), tickSize);
+        BigDecimal mbb = CommonUtils.truncate(middleBBand.getValue(series.getEndIndex()), tickSize);
+        BigDecimal lbb = CommonUtils.truncate(lowerBBand.getValue(series.getEndIndex()), tickSize);
+        BigDecimal currentPrice = CommonUtils.truncate(closePrice.getValue(series.getEndIndex()), tickSize);
 
-        double currentMacdHistogram     = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, 12, 26, series.getEndIndex());
-        double previousMacdHistogram    = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, 12, 26, series.getEndIndex()-1);
-        double prePreviousMacdHistogram = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, 12, 26, series.getEndIndex()-2);
-
-        double macdHistogramGap = currentMacdHistogram - previousMacdHistogram;
-        double previousMacdHistogramGap = previousMacdHistogram - prePreviousMacdHistogram;
-
-        boolean MACD_히스토그램_증가 = macdHistogramGap > 0;
-        boolean 이전_MACD_히스토그램_증가 = previousMacdHistogramGap > 0;
-        //System.out.println(macdGap+" : "+MACD_증가+"_"+이전_MACD_증가);
-        if(MACD_CHECKER){
-            System.out.println(" MACD 히스토그램(" + formattedEndTime + " : " + closePrice.getValue(series.getEndIndex()) + ") : " + currentMacdHistogram + "[" + macdHistogramGap + "]");
-        }
-        int macdReversalSignal = 0;
-        if (MACD_히스토그램_증가 == 이전_MACD_히스토그램_증가) {
-            //System.out.println("추세유지");
-        } else {
-            //if (currentMacd > 0) {
-            if(이전_MACD_히스토그램_증가 && !MACD_히스토그램_증가){
-                if (MACD_CHECKER){
-                    System.out.println("MACD히스토그램증가 >>> MACD히스토그램감소 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap + ")");
-                    log.info("!!!MACD 히스토그램 숏시그널(" + formattedEndTime+") : " + closePrice.getValue(series.getEndIndex()));
-                }
-                macdReversalSignal = -1;
-            }
-            //} else if (currentMacd < 0) {
-            if(!이전_MACD_히스토그램_증가 && MACD_히스토그램_증가){
-                if (MACD_CHECKER) {
-                    System.out.println("MACD히스토그램감소 >>> MACD히스토그램증가 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap + ")");
-                    log.info("!!!MACD 히스토그램 롱시그널(" + formattedEndTime+") : " + closePrice.getValue(series.getEndIndex()));
-                }
-                macdReversalSignal = 1;
-            }
-            //}
+        if(currentPrice.compareTo(ubb) > 0){
+            bollingerBandSignal = -1;
+            specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[볼린저밴드 상단 돌파]"+ubb+"["+currentPrice+"]"+CONSOLE_COLORS.RESET;
+        } else if(currentPrice.compareTo(lbb) < 0){
+            bollingerBandSignal = 1;
+            specialRemark += CONSOLE_COLORS.BRIGHT_GREEN+"[볼린저밴드 하단 돌파]"+lbb+"["+currentPrice+"]"+CONSOLE_COLORS.RESET;
         }
 
-        EMAIndicator MACD_신호선 = new EMAIndicator(macd, 9);
-        // MACD 크로스 신호 계산
-        int macdPreliminarySignal = 0;
-        boolean isMacdHighAndDeadCrossSoon = macd.getValue(series.getEndIndex() - 1).isGreaterThan(MACD_신호선.getValue(series.getEndIndex() - 1))
-                && macd.getValue(series.getEndIndex()).isLessThan(MACD_신호선.getValue(series.getEndIndex()));
-        boolean isMacdLowAndGoldenCrossSoon = macd.getValue(series.getEndIndex() - 1).isLessThan(MACD_신호선.getValue(series.getEndIndex() - 1))
-                && macd.getValue(series.getEndIndex()).isGreaterThan(MACD_신호선.getValue(series.getEndIndex()));
+        //******************************** 볼린저밴드 끝 **********************************
 
-        if (isMacdHighAndDeadCrossSoon) {
-            macdPreliminarySignal = -1;
-        } else if (isMacdLowAndGoldenCrossSoon) {
-            macdPreliminarySignal = 1;
-        }
-        int macdCrossSignal = 0 ; // 골든 크로스일시 1, 데드 크로스일시 -1
-        if(technicalIndicatorCalculator.isGoldenCross(series, 12, 26, 9)){
-            macdCrossSignal = 1;
-        }
-        if(technicalIndicatorCalculator.isDeadCross(series, 12, 26, 9)){
-            macdCrossSignal = -1;
-        }
-
-        //****************************************** MACD 끝 ***********************************************
         if(!commonRemark.equals(currentKrTimeExpression)){
             System.out.println(commonRemark);
         }
         if (!specialRemark.equals(currentKrTimeExpression)){
             System.out.println(specialRemark);
         }
+
+        int strongSignal = 0;
+        int midSignal = 0;
+        int totalSignal = 0;
+        totalSignal = stochKSignal+adxDirectionSignal+macdReversalSignal+bollingerBandSignal;
+        if(totalSignal > 2||totalSignal<-2){
+            if(totalSignal>0){
+                strongSignal =1;
+            }else if(totalSignal<0){
+                strongSignal =-1;
+            }
+        }else if (totalSignal > 1 || totalSignal < -1) {
+            if (totalSignal > 0) {
+                midSignal = 1;
+            } else if (totalSignal < 0) {
+                midSignal = -1;
+            }
+        }
+        if(bollingerBandSignal!=0 && strongSignal !=0){
+            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_WHITE+""+CONSOLE_COLORS.BRIGHT_BLACK+"강력한 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ strongSignal+CONSOLE_COLORS.RESET);
+        }
+        if(bollingerBandSignal!=0 && midSignal !=0 ){
+            System.out.println(CONSOLE_COLORS.BACKGROUND_WHITE+""+CONSOLE_COLORS.BRIGHT_BLACK+"중간 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ midSignal+CONSOLE_COLORS.RESET);
+        }
+
         //log.error(String.valueOf(new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue()).setScale(10, RoundingMode.DOWN)));
         //BigDecimal decimalValue = new BigDecimal(macd.getValue(series.getEndIndex()).doubleValue());
         TechnicalIndicatorReportEntity technicalIndicatorReport = TechnicalIndicatorReportEntity.builder()
