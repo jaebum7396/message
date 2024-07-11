@@ -945,7 +945,7 @@ public class FutureService {
                         true
                         /*&& ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
                         (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.강한추세.getGrade() && tempReport.getAdxGap()>0)*/
-                    && (tempReport.getClosePrice().compareTo(tempReport.getUbb())>0 || tempReport.getClosePrice().compareTo(tempReport.getLbb())<0)
+                        //&& (tempReport.getClosePrice().compareTo(tempReport.getUbb())>0 || tempReport.getClosePrice().compareTo(tempReport.getLbb())<0)
                 ) {
                     overlappingData.add(item);
                     reports.add(tempReport);
