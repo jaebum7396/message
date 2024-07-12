@@ -5,18 +5,19 @@ import org.springframework.stereotype.Service;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBarSeries;
 import org.ta4j.core.Indicator;
-import org.ta4j.core.indicators.EMAIndicator;
-import org.ta4j.core.indicators.MACDIndicator;
-import org.ta4j.core.indicators.RSIIndicator;
-import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.adx.MinusDIIndicator;
 import org.ta4j.core.indicators.adx.PlusDIIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
+import org.ta4j.core.indicators.helpers.VolumeIndicator;
 import org.ta4j.core.num.Num;
 import trade.future.model.enums.ADX_GRADE;
+import trade.future.model.enums.CONSOLE_COLORS;
+
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -129,11 +130,11 @@ public class TechnicalIndicatorCalculator {
 
         if (lastValue.isGreaterThan(secondLastValue)) {
             // Calculate upward trend angle
-            double angle = calculateUpwardAngle(series, 14); // Choose a suitable period
+            //double angle = calculateUpwardAngle(series, 14); // Choose a suitable period
             return "LONG";
         } else if (lastValue.isLessThan(secondLastValue)) {
             // Calculate downward trend angle
-            double angle = calculateDownwardAngle(series, 14); // Choose a suitable period
+            //double angle = calculateDownwardAngle(series, 14); // Choose a suitable period
             return "SHORT";
         } else {
             return "SIDE";
@@ -175,8 +176,8 @@ public class TechnicalIndicatorCalculator {
         return adxIndicator.getValue(idx).doubleValue();
     }
 
-    public double calculateRSI(BaseBarSeries series, int adxPeriod, int idx) {
-        RSIIndicator rsiIndicator = new RSIIndicator(new ClosePriceIndicator(series), adxPeriod);
+    public double calculateRSI(BaseBarSeries series, int rsiPeriod, int idx) {
+        RSIIndicator rsiIndicator = new RSIIndicator(new ClosePriceIndicator(series), rsiPeriod);
         return rsiIndicator.getValue(idx).doubleValue();
     }
 
@@ -202,7 +203,7 @@ public class TechnicalIndicatorCalculator {
     }
 
     public String getDirection(BaseBarSeries series, int period, int idx){
-        double plusDI = calculatePlusDI(series, period, idx);
+        double plusDI  = calculatePlusDI(series, period, idx);
         double minusDI = calculateMinusDI(series, period, idx);
 
         String direction = "";
@@ -238,5 +239,273 @@ public class TechnicalIndicatorCalculator {
             adx_grade = ADX_GRADE.매우강한추세;
         }
         return adx_grade;
+    }
+
+    public HashMap<String,Object> adxStrategy(BaseBarSeries series, int period, String directionDI){
+        HashMap<String,Object> resultMap = new HashMap<>();
+        //adx
+        double currentAdx             = calculateADX(series, period, series.getEndIndex());
+        double previousAdx            = calculateADX(series, period, series.getEndIndex()-1);
+        double prePreviousAdx         = calculateADX(series, period, series.getEndIndex()-2);
+
+        ADX_GRADE currentAdxGrade     = calculateADXGrade(currentAdx);
+        ADX_GRADE previousAdxGrade    = calculateADXGrade(previousAdx);
+        ADX_GRADE prePreviousAdxGrade = calculateADXGrade(prePreviousAdx);
+
+        double adxGap = currentAdx - previousAdx; //adx차
+        double previousAdxGap = previousAdx - prePreviousAdx; //이전adx차
+
+        boolean isAdxGapPositive = adxGap > 0; //adx차가 양수(adx가 올랐는지)
+        boolean isPreviousAdxGapPositive = previousAdxGap > 0;
+
+        int adxSignal = 0;
+        int adxDirectionSignal = 0;
+
+        String commonRemark = CONSOLE_COLORS.YELLOW + "ADX(" + currentAdx + "[" + adxGap + "]) " + CONSOLE_COLORS.RESET;
+        String specialRemark = "";
+        String adxDirectionExpression = "";
+        if (isAdxGapPositive == isPreviousAdxGapPositive) {
+            //System.out.println("추세유지");
+        } else {
+            if (adxGap > 0.5) {
+                adxSignal = 1;
+                if (directionDI.equals("LONG")) {
+                    adxDirectionSignal = 1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_GREEN + "LONG";
+                } else if (directionDI.equals("SHORT")) {
+                    adxDirectionSignal = -1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_RED + "SHORT";
+                }
+                specialRemark += CONSOLE_COLORS.YELLOW + "[ADX " + adxDirectionExpression + " 시그널]" + CONSOLE_COLORS.RESET + "추세감소 >>> 추세증가[" + directionDI + "] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") " + CONSOLE_COLORS.RESET;
+            } else if (adxGap < -0.5) {
+                adxSignal = -1;
+                if (directionDI.equals("LONG")) {
+                    adxDirectionSignal = -1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_RED + "SHORT";
+                } else if (directionDI.equals("SHORT")) {
+                    adxDirectionSignal = 1;
+                    adxDirectionExpression = CONSOLE_COLORS.BRIGHT_GREEN + "LONG";
+                }
+                specialRemark += CONSOLE_COLORS.YELLOW + "[ADX " + adxDirectionExpression + " 시그널]" + CONSOLE_COLORS.RESET + "추세증가 >>> 추세감소[" + directionDI + "] :" + previousAdx + " >>> " + currentAdx + "(" + previousAdxGap + "/" + adxGap + ") " + CONSOLE_COLORS.RESET;
+            }
+        }
+        resultMap.put("currentAdx", currentAdx);
+        resultMap.put("currentAdxGrade", currentAdxGrade);
+        resultMap.put("previousAdx", previousAdx);
+        resultMap.put("previousAdxGrade", previousAdxGrade);
+        resultMap.put("adxGap", adxGap);
+        resultMap.put("adxSignal", adxSignal);
+        resultMap.put("adxDirectionSignal", adxDirectionSignal);
+        resultMap.put("commonRemark", commonRemark);
+        resultMap.put("specialRemark", specialRemark);
+        return resultMap;
+    }
+
+    public HashMap<String,Object> macdStrategy(BaseBarSeries series, ClosePriceIndicator closePrice){
+        HashMap<String,Object> resultMap = new HashMap<>();
+
+        // Calculate MACD
+        MACDIndicator macd = new MACDIndicator(closePrice, 6, 12);
+
+        double currentMacdHistogram     = calculateMACDHistogram(closePrice, 6, 12, series.getEndIndex());
+        double previousMacdHistogram    = calculateMACDHistogram(closePrice, 6, 12, series.getEndIndex()-1);
+        double prePreviousMacdHistogram = calculateMACDHistogram(closePrice, 6, 12, series.getEndIndex()-2);
+
+        double macdHistogramGap = currentMacdHistogram - previousMacdHistogram;
+        double previousMacdHistogramGap = previousMacdHistogram - prePreviousMacdHistogram;
+
+        boolean MACD_히스토그램_증가 = macdHistogramGap > 0;
+        boolean 이전_MACD_히스토그램_증가 = previousMacdHistogramGap > 0;
+
+        String commonRemark = "";
+        String specialRemark = "";
+
+        commonRemark += CONSOLE_COLORS.BRIGHT_PURPLE+"MACD(" + currentMacdHistogram +"[" + macdHistogramGap + "]) "+CONSOLE_COLORS.RESET;
+
+        int macdReversalSignal = 0;
+        if (MACD_히스토그램_증가 == 이전_MACD_히스토그램_증가) {
+            //System.out.println("추세유지");
+        } else {
+            if(!이전_MACD_히스토그램_증가 && MACD_히스토그램_증가){
+                specialRemark += CONSOLE_COLORS.PURPLE+"[MACD "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 시그널]"+CONSOLE_COLORS.RESET+"MACD히스토그램감소 >>> MACD히스토그램증가 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap +") "+CONSOLE_COLORS.RESET;
+                macdReversalSignal = 1;
+            }
+            if(이전_MACD_히스토그램_증가 && !MACD_히스토그램_증가){
+                specialRemark += CONSOLE_COLORS.PURPLE+"[MACD "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 시그널]"+CONSOLE_COLORS.RESET+"MACD히스토그램증가 >>> MACD히스토그램감소 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap +") "+CONSOLE_COLORS.RESET;
+                macdReversalSignal = -1;
+            }
+        }
+
+        EMAIndicator macdSignalLine = new EMAIndicator(macd, 5);
+        // MACD 크로스 신호 계산
+        int macdPreliminarySignal = 0;
+        boolean isMacdHighAndDeadCrossSoon = macd.getValue(series.getEndIndex() - 1).isGreaterThan(macdSignalLine.getValue(series.getEndIndex() - 1))
+                && macd.getValue(series.getEndIndex()).isLessThan(macdSignalLine.getValue(series.getEndIndex()));
+        boolean isMacdLowAndGoldenCrossSoon = macd.getValue(series.getEndIndex() - 1).isLessThan(macdSignalLine.getValue(series.getEndIndex() - 1))
+                && macd.getValue(series.getEndIndex()).isGreaterThan(macdSignalLine.getValue(series.getEndIndex()));
+
+        if (isMacdHighAndDeadCrossSoon) {
+            macdPreliminarySignal = -1;
+        } else if (isMacdLowAndGoldenCrossSoon) {
+            macdPreliminarySignal = 1;
+        }
+        int macdCrossSignal = 0 ; // 골든 크로스일시 1, 데드 크로스일시 -1
+        if(isGoldenCross(series, 6, 12, 5)){
+            macdCrossSignal = 1;
+        }
+        if(isDeadCross(series, 6, 12, 5)){
+            macdCrossSignal = -1;
+        }
+
+        resultMap.put("currentMacd", macd.getValue(series.getEndIndex()).doubleValue());
+        resultMap.put("currentMacdHistogram", currentMacdHistogram);
+        resultMap.put("macdCrossSignal", macdCrossSignal);
+        resultMap.put("macdReversalSignal", macdReversalSignal);
+        resultMap.put("commonRemark", commonRemark);
+        resultMap.put("specialRemark", specialRemark);
+        return resultMap;
+    }
+
+    public HashMap<String,Object> rsiStrategy(BaseBarSeries series, ClosePriceIndicator closePrice, int period){
+        HashMap<String,Object> resultMap = new HashMap<>();
+
+        RSIIndicator rsi = new RSIIndicator(closePrice, period);
+
+        double currentRsi     = rsi.getValue(series.getEndIndex()).doubleValue();
+        double previousRsi    = rsi.getValue(series.getEndIndex() - 1).doubleValue();
+        double prePreviousRsi = rsi.getValue(series.getEndIndex() - 2).doubleValue();
+
+        double rsiGap = currentRsi - previousRsi;
+        double previousRsiGap = previousRsi - prePreviousRsi;
+
+        boolean RSI_증가 = rsiGap > 0;
+        boolean 이전_RSI_증가 = previousRsiGap > 0;
+
+        String commonRemark = "";
+        String specialRemark = "";
+
+        commonRemark += CONSOLE_COLORS.BRIGHT_BLUE+"RSI(" + currentRsi +"[" + rsiGap + "]) "+CONSOLE_COLORS.RESET;
+
+        int rsiSignal = 0;
+        if (RSI_증가 == 이전_RSI_증가) {
+            //System.out.println("추세유지");
+        } else {
+            //if (currentRsi < 0) {
+            if(!이전_RSI_증가 && RSI_증가){
+                specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[RSI "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 시그널]"+CONSOLE_COLORS.RESET+"RSI감소 >>> RSI증가 :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap +") "+CONSOLE_COLORS.RESET;
+                rsiSignal = 1;
+            }
+            //}
+            //if (currentRsi > 0) {
+            if(이전_RSI_증가 && !RSI_증가){
+                specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[RSI "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 시그널]"+CONSOLE_COLORS.RESET+"RSI증가 >>> RSI감소 :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap +") "+CONSOLE_COLORS.RESET;
+                rsiSignal = -1;
+            }
+            //}
+        }
+        resultMap.put("currentRsi", currentRsi);
+        resultMap.put("rsiSignal", rsiSignal);
+        resultMap.put("commonRemark", commonRemark);
+        resultMap.put("specialRemark", specialRemark);
+        return resultMap;
+    }
+
+
+    public HashMap<String,Object> stochStrategy(BaseBarSeries series, ClosePriceIndicator closePrice, int period){
+        HashMap<String,Object> resultMap = new HashMap<>();
+
+        StochasticOscillatorKIndicator stochasticOscillatorK = new StochasticOscillatorKIndicator(series, period);
+        StochasticOscillatorDIndicator stochasticOscillatorD = new StochasticOscillatorDIndicator(stochasticOscillatorK);
+
+        double currentStochK = stochasticOscillatorK.getValue(series.getEndIndex()).doubleValue();
+        double previousStochK = stochasticOscillatorK.getValue(series.getEndIndex() - 1).doubleValue();
+        double currentStochD = stochasticOscillatorD.getValue(series.getEndIndex()).doubleValue();
+        double previousStochD = stochasticOscillatorD.getValue(series.getEndIndex() - 1).doubleValue();
+
+        boolean isKAboveD = currentStochK > currentStochD;
+        boolean wasKBelowD = previousStochK <= previousStochD;
+        boolean isKBelowD = currentStochK < currentStochD;
+        boolean wasKAboveD = previousStochK >= previousStochD;
+
+        // 이동평균 필터 설정
+        EMAIndicator shortEma = new EMAIndicator(closePrice, 20);  // 50-period EMA
+        EMAIndicator longEma = new EMAIndicator(closePrice, 50);  // 200-period EMA
+
+        // 추세 필터 조건
+        boolean isUptrend = shortEma.getValue(series.getEndIndex()).isGreaterThan(longEma.getValue(series.getEndIndex()));
+        boolean isDowntrend = shortEma.getValue(series.getEndIndex()).isLessThan(longEma.getValue(series.getEndIndex()));
+
+        VolumeIndicator volumeIndicator = new VolumeIndicator(series, period); // 볼륨 필터를 위한 설정
+        // 볼륨 필터 조건
+        Num currentVolume = volumeIndicator.getValue(series.getEndIndex());
+        Num averageVolume = volumeIndicator.getValue(series.getEndIndex() - 1); // 임의로 설정
+
+        String commonRemark = "";
+        String specialRemark = "";
+
+        String kDExpression = "";
+        if(isKAboveD && wasKBelowD) {
+            kDExpression = "상향 돌파" + CONSOLE_COLORS.RESET;
+        } else if (isKBelowD && wasKAboveD) {
+            kDExpression = "하향 돌파" + CONSOLE_COLORS.RESET;
+        } else {
+            kDExpression = "변동 없음" + CONSOLE_COLORS.RESET;
+        }
+        commonRemark += CONSOLE_COLORS.BRIGHT_CYAN+ "Stochastic K/D(" + currentStochK + "/" + currentStochD + "[" + kDExpression + "]) "+CONSOLE_COLORS.RESET;
+
+        int stochSignal = 0;
+        if (isKAboveD && wasKBelowD) {
+            specialRemark += CONSOLE_COLORS.BRIGHT_CYAN+"[Stochastic "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 진입 시그널]"+CONSOLE_COLORS.RESET+" Stochastic K/D 상향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
+            stochSignal = 1;
+        } else if (isKBelowD && wasKAboveD) {
+            specialRemark += CONSOLE_COLORS.BRIGHT_CYAN+"[Stochastic "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 진입 시그널]"+CONSOLE_COLORS.RESET+" Stochastic K/D 하향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
+            stochSignal = -1;
+        }
+        resultMap.put("stochK", currentStochK);
+        resultMap.put("stochD", currentStochD);
+        resultMap.put("stochSignal", stochSignal);
+        resultMap.put("commonRemark", commonRemark);
+        resultMap.put("specialRemark", specialRemark);
+
+        return resultMap;
+    }
+
+    public HashMap<String,Object> stochRsiStrategy(BaseBarSeries series, ClosePriceIndicator closePrice, int period){
+        HashMap<String,Object> resultMap = new HashMap<>();
+
+        StochasticRSIIndicator stochasticRSI = new StochasticRSIIndicator(closePrice, period);
+        double currentStochRSI = stochasticRSI.getValue(series.getEndIndex()).doubleValue();
+        double previousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 1).doubleValue();
+        double prePreviousStochRSI = stochasticRSI.getValue(series.getEndIndex() - 2).doubleValue();
+
+        double stochRsiGap = currentStochRSI - previousStochRSI;
+        double previousStochRSIGap = previousStochRSI - prePreviousStochRSI;
+
+        boolean isStochRSIGapPositive = stochRsiGap > 0;
+        boolean isPreviousStochRSIGapPositive = previousStochRSIGap > 0;
+
+        String commonRemark = "";
+        String specialRemark = "";
+
+        commonRemark += "Stochastic RSI(" + currentStochRSI + "[" + stochRsiGap + "]) ";
+
+        int stochRsiSignal = 0;
+        if (isStochRSIGapPositive == isPreviousStochRSIGapPositive) {
+        // 추세 유지
+        } else {
+            if (stochRsiGap > 0 && currentStochRSI < 0.2) {
+                specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[StochasticRSI시그널]"+"Stochastic RSI 감소 >>> Stochastic RSI 증가 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRsiGap + ") "+CONSOLE_COLORS.RESET;
+                stochRsiSignal = 1;
+            } else if (stochRsiGap < 0 && currentStochRSI > 0.8) {
+                specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[StochasticRSI시그널]"+"Stochastic RSI 증가 >>> Stochastic RSI 감소 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRsiGap + ") "+CONSOLE_COLORS.RESET;
+                stochRsiSignal = -1;
+            }
+        }
+
+        resultMap.put("stochRsi", currentStochRSI);
+        resultMap.put("stochRsiSignal", stochRsiSignal);
+        resultMap.put("commonRemark", commonRemark);
+        resultMap.put("specialRemark", specialRemark);
+        return resultMap;
     }
 }

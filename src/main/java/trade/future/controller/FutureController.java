@@ -42,20 +42,21 @@ public class FutureController {
     public void closeAllPositions() {
         futureService.closeAllPositions();
     }
+
     @GetMapping(value = "/future/stock/selection")
     @Operation(summary="거래량과 변동폭 기준으로 종목을 선정합니다.", description="거래량과 변동폭 기준으로 종목을 선정합니다.")
     public ResponseEntity getStockSelection(@RequestParam int limit) throws Exception {
         return commonUtils.okResponsePackaging(futureService.getStockSelection(limit));
     }
-    @GetMapping(value = "/future/stock/find")
+    @PostMapping(value = "/future/stock/find")
     @Operation(summary="거래량 추세를 기준으로 종목을 선정합니다.", description="거래량과 추세를 기준으로 종목을 선정합니다.")
-    public ResponseEntity getStockFind(@RequestParam String interval, @RequestParam int searchRange, @RequestParam int targetRange) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.getStockFind(interval, searchRange, targetRange));
+    public ResponseEntity getStockFind(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.getStockFind(request, tradingDTO));
     }
-    @GetMapping(value = "/future/klines")
+    @PostMapping(value = "/future/klines")
     @Operation(summary="해당 심볼의 캔들 데이터를 가져옵니다(기본값 500개)", description="해당 심볼의 캔들 데이터를 가져옵니다.")
-    public ResponseEntity getKlines(@RequestParam String symbol, @RequestParam String interval, @RequestParam int limit) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.getKlines(String.valueOf(UUID.randomUUID()), symbol, interval, limit));
+    public ResponseEntity getKlines(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
+        return commonUtils.okResponsePackaging(futureService.getKlines(request, tradingDTO));
     }
     @GetMapping(value = "/future/trading/streams")
     @Operation(summary="스트림 정보를 가져옵니다.", description="스트림 정보를 가져옵니다.")
@@ -67,6 +68,7 @@ public class FutureController {
     public void allStreamClose(HttpServletRequest request) {
         futureService.allStreamClose();
     }
+
     @PostMapping(value = "/future/stream/close")
     @Operation(summary="스트림을 클로즈합니다.", description="거래추적 스트림을 클로즈 합니다.")
     public void streamClose(HttpServletRequest request, @RequestParam int streamId) {

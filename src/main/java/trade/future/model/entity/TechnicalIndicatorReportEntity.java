@@ -36,9 +36,6 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "END_TIME")
     private LocalDateTime endTime; // Kline 종료 시간
 
-    @Column( name = "CURRENT_ADX")
-    private double currentAdx;
-
     @Column( name = "OPEN_PRICE")
     private BigDecimal openPrice;
 
@@ -51,20 +48,14 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "LOW_PRICE")
     private BigDecimal lowPrice;
 
-    @Column( name = "CURRENT_ADX_GRADE")
-    private ADX_GRADE currentAdxGrade;
+    @Column( name = "SMA")
+    private BigDecimal sma;
 
-    @Column( name = "PREVIOUS_ADX")
-    private double previousAdx;
+    @Column( name = "EMA")
+    private BigDecimal ema;
 
-    @Column( name = "PREVIOUS_ADX_GRADE")
-    private ADX_GRADE previousAdxGrade;
-
-    @Column( name = "ADX_SIGNAL")
-    private int adxSignal;
-
-    @Column( name = "ADX_GAP")
-    private double adxGap;
+    @Column( name = "DIRECTION_MA")
+    private String directionMa;
 
     @Column( name = "PLUS_DI")
     private double plusDi;
@@ -75,15 +66,6 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "DIRECTION_DI")
     private String directionDi;
 
-    @Column( name = "SMA")
-    private BigDecimal sma;
-
-    @Column( name = "EMA")
-    private BigDecimal ema;
-
-    @Column( name = "DIRECTION_MA")
-    private String directionMa;
-
     @Column( name = "UBB")
     private BigDecimal ubb; // Upper Bollinger Band
 
@@ -93,14 +75,32 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "LBB")
     private BigDecimal lbb; // Lower Bollinger Band
 
-    @Column( name = "RSI")
-    private BigDecimal rsi; // Relative Strength Index
+    @Column( name = "BOLLINGER_BAND_SIGNAL")
+    private int bollingerBandSignal;
+
+    @Column( name = "CURRENT_ADX")
+    private double currentAdx;
+
+    @Column( name = "CURRENT_ADX_GRADE")
+    private ADX_GRADE currentAdxGrade;
+
+    @Column( name = "PREVIOUS_ADX")
+    private double previousAdx;
+
+    @Column( name = "PREVIOUS_ADX_GRADE")
+    private ADX_GRADE previousAdxGrade;
+
+    @Column( name = "ADX_GAP")
+    private double adxGap;
+
+    @Column( name = "ADX_SIGNAL")
+    private int adxSignal;
+
+    @Column( name = "ADX_DIRECTION_SIGNAL")
+    private int adxDirectionSignal;
 
     @Column( name = "MACD")
     private BigDecimal macd; // Moving Average Convergence Divergence
-
-    @Column( name = "MACD_CROSS_SIGNAL")
-    private int macdCrossSignal;
 
     @Column( name = "MACD_PRELIMINARY_SIGNAL")
     private int macdPreliminarySignal;
@@ -108,23 +108,39 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MACD_PEAK_SIGNAL")
     private int macdPeakSignal;
 
+    @Column( name = "MACD_CROSS_SIGNAL")
+    private int macdCrossSignal;
+
     @Column( name = "MACD_REVERSAL_SIGNAL")
     private int macdReversalSignal;
 
-    @Column( name = "ADX_DIRECTION_SIGNAL")
-    private int adxDirectionSignal;
+    @Column( name = "RSI")
+    private BigDecimal rsi; // Relative Strength Index
 
-    @Column( name = "STOCH_K_SIGNAL")
-    private int stochKSignal;
+    @Column( name = "RSI_SIGNAL")
+    private int rsiSignal;
 
-    @Column( name = "BOLLINGER_BAND_SIGNAL")
-    private int bollingerBandSignal;
+    @Column( name = "STOCH_D")
+    private BigDecimal stochD;
+
+    @Column( name = "STOCH_K")
+    private BigDecimal stochK;
+
+    @Column( name = "STOCH_SIGNAL")
+    private int stochSignal;
+
+    @Column( name = "STOCH_RSI")
+    private BigDecimal stochRsi;
+
+    @Column( name = "STOCH_RSI_SIGNAL")
+    private int stochRsiSignal;
+
+    @Column(name = "MID_SIGNAL")
+    private int midSignal;
 
     @Column(name = "STRONG_SIGNAL")
     private int strongSignal;
 
-    @Column(name = "MID_SIGNAL")
-    private int midSignal;
 
     @Override
     public String toString() {
@@ -153,7 +169,7 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
                 ", macdPreliminarySignal=" + macdPreliminarySignal +
                 ", macdPeakSignal=" + macdPeakSignal +
                 ", macdReversalSignal=" + macdReversalSignal +
-                ", stochKSignal=" + stochKSignal +
+                ", stochSignal=" + stochSignal +
                 '}';
     }
 }

@@ -73,6 +73,9 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "MAX_POSITION_COUNT")
     int maxPositionCount;
 
+    @Column( name = "CANDLE_COUNT")
+    int candleCount;
+
     @Column( name = "COLLATERAL")
     BigDecimal collateral; // 할당된 담보금
     
@@ -82,11 +85,20 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "TREND_FOLLOW_FLAG")
     int trendFollowFlag; // 1: trend follow, -1: trend reverse
 
+    @Column( name = "BOLLINGER_BAND_CHECKER")
+    int bollingerBandChecker; //볼린저 밴드로 매매전략 수립
+
     @Column( name = "ADX_CHECKER")
     int adxChecker; //ADX로 매매전략 수립
 
     @Column( name = "MACD_HISTOGRAM_CHECKER")
     int macdHistogramChecker; //MACD 히스토그램으로 매매전략 수립
+
+    @Column( name = "STOCH_CHECKER")
+    int stochChecker; //스토캐스틱 오실레이터 매매전략 수립
+
+    @Column( name = "STOCHRSI_CHECKER")
+    int stochRsiChecker; //스토캐스틱 RSI 매매전략 수립
 
     @Column( name = "RSI_CHECKER")
     int rsiChecker; //RSI로 매매전략 수립
