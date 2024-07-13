@@ -70,6 +70,7 @@ public class TradingDTO {
                 .stochChecker(stochChecker)
                 .stochRsiChecker(stochRsiChecker)
                 .rsiChecker(rsiChecker)
+                .movingAverageChecker(movingAverageChecker)
                 .build();
     }
 }

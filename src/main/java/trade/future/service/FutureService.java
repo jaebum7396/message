@@ -324,7 +324,10 @@ public class FutureService {
                     newTradingEntity.setLeverage(leverage);
                     newTradingEntity.setStockSelectionCount(stockSelectionCount);
                     newTradingEntity.setMaxPositionCount(maxPositionCount);
+                    newTradingEntity.setCandleCount(tradingEntity.getCandleCount());
                     newTradingEntity.setCollateral(finalAvailableBalance);
+                    newTradingEntity.setCollateralRate(tradingEntity.getCollateralRate());
+                    newTradingEntity.setTrendFollowFlag(tradingEntity.getTrendFollowFlag());
                     newTradingEntity.setUserCd(userCd);
                     //매매전략
                     newTradingEntity.setBollingerBandChecker(tradingEntity.getBollingerBandChecker());
@@ -333,6 +336,7 @@ public class FutureService {
                     newTradingEntity.setStochChecker(tradingEntity.getStochChecker());
                     newTradingEntity.setStochRsiChecker(tradingEntity.getStochRsiChecker());
                     newTradingEntity.setRsiChecker(tradingEntity.getRsiChecker());
+                    newTradingEntity.setMovingAverageChecker(tradingEntity.getMovingAverageChecker());
 
                     /*TradingEntity tradingEntity = TradingEntity.builder()
                             .symbol(symbol)
@@ -464,27 +468,27 @@ public class FutureService {
                             makeCloseOrder(eventEntity, positionEvent, remark);
                         }
                     } else {
-                        if(technicalIndicatorReportEntity.getAdxDirectionSignal() != 0
-                        ||technicalIndicatorReportEntity.getStochSignal() !=0
-                        ||technicalIndicatorReportEntity.getMacdReversalSignal() !=0){
-                            String adxDirectionSignal = technicalIndicatorReportEntity.getAdxDirectionSignal() != 0 ? (technicalIndicatorReportEntity.getAdxDirectionSignal() == 1 ? "LONG" : "SHORT") : "";
-                            String stochKSignal = technicalIndicatorReportEntity.getStochSignal() != 0 ? (technicalIndicatorReportEntity.getStochSignal() == 1 ? "LONG" : "SHORT") : "";
-                            String macdReversalSignal = technicalIndicatorReportEntity.getMacdReversalSignal() != 0 ? (technicalIndicatorReportEntity.getMacdReversalSignal() == 1 ? "LONG" : "SHORT") : "";
+                        if(technicalIndicatorReportEntity.getWeakSignal() != 0
+                        ||technicalIndicatorReportEntity.getMidSignal() !=0
+                        ||technicalIndicatorReportEntity.getStrongSignal() !=0){
+                            String weakSignal   = technicalIndicatorReportEntity.getWeakSignal() != 0 ? (technicalIndicatorReportEntity.getWeakSignal() == 1 ? "LONG" : "SHORT") : "";
+                            String midSignal    = technicalIndicatorReportEntity.getMidSignal() != 0 ? (technicalIndicatorReportEntity.getMidSignal() == 1 ? "LONG" : "SHORT") : "";
+                            String strongSignal = technicalIndicatorReportEntity.getStrongSignal() != 0 ? (technicalIndicatorReportEntity.getStrongSignal() == 1 ? "LONG" : "SHORT") : "";
                             PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
                             if(closePosition.getPositionStatus().equals("OPEN")){
                                 String positionSide = closePosition.getPositionSide();
                                 boolean isClose = false;
-                                if (!adxDirectionSignal.isEmpty() && !adxDirectionSignal.equals(positionSide)){
+                                if (!weakSignal.isEmpty() && !weakSignal.equals(positionSide)){
                                     isClose = true;
                                 }
-                                if (!stochKSignal.isEmpty() && !stochKSignal.equals(positionSide)){
+                                if (!midSignal.isEmpty() && !midSignal.equals(positionSide)){
                                     isClose = true;
                                 }
-                                if (!macdReversalSignal.isEmpty() && !macdReversalSignal.equals(positionSide)){
+                                if (!strongSignal.isEmpty() && !strongSignal.equals(positionSide)){
                                     isClose = true;
                                 }
                                 if(isClose){
-                                    String remark = "ADX(" + adxDirectionSignal + ") STOCH(" + stochKSignal + ") MACD(" + macdReversalSignal + ")";
+                                    String remark = "weakSignal(" + weakSignal + ") midSignal(" + midSignal + ") strongSignal(" + strongSignal + ")";
                                     makeCloseOrder(eventEntity, positionEvent, remark);
                                 }
                             }
@@ -529,13 +533,16 @@ public class FutureService {
                 }
             } else {
                 if (technicalIndicatorReportEntity.getStrongSignal() != 0
-                    //||technicalIndicatorReportEntity.getMidSignal() != 0
+                    ||technicalIndicatorReportEntity.getMidSignal() != 0
                     //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
                 ){
                     int adxDirectionSignal = technicalIndicatorReportEntity.getAdxDirectionSignal();
                     int bollingerBandSignal = technicalIndicatorReportEntity.getBollingerBandSignal();
                     int macdReversalSignal = technicalIndicatorReportEntity.getMacdReversalSignal();
+                    int rsiSignal = technicalIndicatorReportEntity.getRsiSignal();
                     int stochSignal = technicalIndicatorReportEntity.getStochSignal();
+                    int stochasticRsiSignal = technicalIndicatorReportEntity.getStochRsiSignal();
+                    int movingAverageSignal = technicalIndicatorReportEntity.getMovingAverageSignal();
 
                     String remark = "";
                     if(bollingerBandSignal != 0){
@@ -547,8 +554,17 @@ public class FutureService {
                     if(macdReversalSignal != 0){
                         remark += "MACD("+(macdReversalSignal == 1 ? "LONG" : "SHORT") + ") ";
                     }
+                    if(rsiSignal != 0){
+                        remark += "RSI("+(rsiSignal == 1 ? "LONG" : "SHORT") + ") ";
+                    }
                     if(stochSignal != 0){
                         remark += "STOCH("+(stochSignal == 1 ? "LONG" : "SHORT") + ") ";
+                    }
+                    if(stochasticRsiSignal != 0){
+                        remark += "STOCHRSI("+(stochasticRsiSignal == 1 ? "LONG" : "SHORT") + ") ";
+                    }
+                    if(movingAverageSignal != 0){
+                        remark += "MA("+(movingAverageSignal == 1 ? "LONG" : "SHORT") + ") ";
                     }
 
                     String direction = technicalIndicatorReportEntity.getStrongSignal() != 0
