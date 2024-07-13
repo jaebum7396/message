@@ -390,18 +390,18 @@ public class TechnicalIndicatorCalculator {
         if (RSI_증가 == 이전_RSI_증가) {
             //System.out.println("추세유지");
         } else {
-            //if (currentRsi < 0) {
-            if(!이전_RSI_증가 && RSI_증가){
-                specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[RSI "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 시그널]"+CONSOLE_COLORS.RESET+"RSI감소 >>> RSI증가 :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap +") "+CONSOLE_COLORS.RESET;
-                rsiSignal = 1;
+            if (currentRsi < 20) {
+                if(!이전_RSI_증가 && RSI_증가){
+                    specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[RSI "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 시그널]"+CONSOLE_COLORS.RESET+"RSI감소 >>> RSI증가 :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap +") "+CONSOLE_COLORS.RESET;
+                    rsiSignal = 1;
+                }
             }
-            //}
-            //if (currentRsi > 0) {
-            if(이전_RSI_증가 && !RSI_증가){
-                specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[RSI "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 시그널]"+CONSOLE_COLORS.RESET+"RSI증가 >>> RSI감소 :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap +") "+CONSOLE_COLORS.RESET;
-                rsiSignal = -1;
+            if (currentRsi > 70) {
+                if(이전_RSI_증가 && !RSI_증가){
+                    specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[RSI "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 시그널]"+CONSOLE_COLORS.RESET+"RSI증가 >>> RSI감소 :" + previousRsi + " >>> " + currentRsi + "(" + previousRsiGap + "/" + rsiGap +") "+CONSOLE_COLORS.RESET;
+                    rsiSignal = -1;
+                }
             }
-            //}
         }
         resultMap.put("currentRsi", currentRsi);
         resultMap.put("rsiSignal", rsiSignal);
@@ -493,10 +493,10 @@ public class TechnicalIndicatorCalculator {
         if (isStochRSIGapPositive == isPreviousStochRSIGapPositive) {
         // 추세 유지
         } else {
-            if (stochRsiGap > 0 && currentStochRSI < 0.2) {
+            if (stochRsiGap > 0 && previousStochRSI == 0) {
                 specialRemark += CONSOLE_COLORS.BRIGHT_BLUE+"[StochasticRSI시그널]"+"Stochastic RSI 감소 >>> Stochastic RSI 증가 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRsiGap + ") "+CONSOLE_COLORS.RESET;
                 stochRsiSignal = 1;
-            } else if (stochRsiGap < 0 && currentStochRSI > 0.8) {
+            } else if (stochRsiGap < 0 && previousStochRSI == 1) {
                 specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[StochasticRSI시그널]"+"Stochastic RSI 증가 >>> Stochastic RSI 감소 : " + previousStochRSI + " >>> " + currentStochRSI + "(" + previousStochRSIGap + "/" + stochRsiGap + ") "+CONSOLE_COLORS.RESET;
                 stochRsiSignal = -1;
             }

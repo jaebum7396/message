@@ -49,6 +49,8 @@ public class TradingDTO {
     int stochRsiChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int rsiChecker;
+    @ApiModelProperty(value = "1" , example = "1")
+    int movingAverageChecker;
 
     public TradingEntity toEntity() {
         return TradingEntity.builder()

@@ -29,6 +29,8 @@ import org.ta4j.core.indicators.helpers.LowPriceIndicator;
 import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.Num;
+import org.ta4j.core.rules.CrossedDownIndicatorRule;
+import org.ta4j.core.rules.CrossedUpIndicatorRule;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.TradingException;
@@ -237,7 +239,6 @@ public class FutureService {
         int stockSelectionCount = tradingEntity.getStockSelectionCount();
         int maxPositionCount = tradingEntity.getMaxPositionCount();
         String userCd = tradingEntity.getUserCd();
-
 
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
@@ -973,27 +974,70 @@ public class FutureService {
             }
 
             String symbol = String.valueOf(item.get("symbol"));
+            TradingEntity tempTradingEntity = tradingEntity.clone();
+            tempTradingEntity.setSymbol(symbol);
             List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
-
             if (tradingEntityList.isEmpty()) {
-                getKlines(tradingEntity);
-                TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tradingEntity);
-                if (
+                Map<String, Object> klineMap = getKlines(tempTradingEntity);
+                Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
+                TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempTradingEntity);
+                if (expectationProfitOpt.isPresent()){
+                    BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
+                    if (
+                            true
+                            &&expectationProfit.compareTo(BigDecimal.ZERO) > 0
+                    ) {
+                        System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
+                        overlappingData.add(item);
+                        reports.add(tempReport);
+                        count++;
+                    }
+                }
+
+                /*if (
                         true
-                        /*&& ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
-                        (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.강한추세.getGrade() && tempReport.getAdxGap()>0)*/
+                        *//*&& ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
+                        (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.강한추세.getGrade() && tempReport.getAdxGap()>0)*//*
                         //&& (tempReport.getClosePrice().compareTo(tempReport.getUbb())>0 || tempReport.getClosePrice().compareTo(tempReport.getLbb())<0)
                 ) {
                     overlappingData.add(item);
                     reports.add(tempReport);
                     count++;
-                }
+                }*/
             }
         }
+
+        for(Map<String, Object> item : overlappingData){
+            System.out.println("관심종목 : " + item);
+        }
+
+        //System.out.println("overlappingData : " + overlappingData);
 
         resultMap.put("reports", reports);
         resultMap.put("overlappingData", overlappingData);
         return resultMap;
+    }
+
+    public BigDecimal calculateProfit(TradingEntity tradingEntity){
+        BigDecimal 차익 = BigDecimal.ZERO;
+        //계약수량=계약금액×레버리지÷진입가격
+        BigDecimal 계약수량 =tradingEntity.getCollateral()
+                .multiply(new BigDecimal(tradingEntity.getLeverage()))
+                .divide(tradingEntity.getOpenPrice(), 10, RoundingMode.UP);
+        //총수수료=2×거래수수료×계약수량×진입가격
+        BigDecimal 총수수료 = 계약수량.multiply(new BigDecimal("0.0004"))
+                .multiply(tradingEntity.getOpenPrice())
+                .multiply(new BigDecimal("2"));
+        if (tradingEntity.getPositionSide().equals("LONG")) {
+            //롱차익=[(청산가격−진입가격)×계약수량]−총수수료
+            차익 = (tradingEntity.getClosePrice().subtract(tradingEntity.getOpenPrice()))
+                    .multiply(계약수량).subtract(총수수료);
+        } else {
+            //숏차익=[(진입가격−청산가격)×계약수량]−총수수료
+            차익 = (tradingEntity.getOpenPrice().subtract(tradingEntity.getClosePrice()))
+                    .multiply(계약수량).subtract(총수수료);
+        }
+        return 차익;
     }
 
     public Map<String, Object> getStockSelection(int limit) throws Exception {
@@ -1043,6 +1087,12 @@ public class FutureService {
         List<Map<String, Object>> topLimitItems = sortedBy.stream()
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("busd"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("usdc"))
+                //제외 종목
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("btc"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("eth"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("sol"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
                 .limit(limit)
                 .collect(Collectors.toList());
         topLimitItems.forEach(item -> {
@@ -1191,6 +1241,24 @@ public class FutureService {
 
     public Map<String, Object> getKlines(TradingEntity tradingEntity) {
 
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        //printPrettyJson(accountInfo);
+
+        System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+        System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+        System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+        System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
+
+        BigDecimal maxPositionAmount = totalWalletBalance
+                .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
+                .multiply(tradingEntity.getCollateralRate()).setScale(0, RoundingMode.DOWN);
+
+        tradingEntity.setCollateral(maxPositionAmount);
+
         String tradingCd = tradingEntity.getTradingCd();
         String symbol = tradingEntity.getSymbol();
         String interval = tradingEntity.getCandleInterval();
@@ -1198,15 +1266,15 @@ public class FutureService {
         int limit = candleCount;
         long startTime = System.currentTimeMillis(); // 시작 시간 기록
         log.info("getKline >>>>>");
+
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-
-        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
 
         paramMap.put("symbol", symbol);
         paramMap.put("interval", interval);
         paramMap.put("limit", limit);
 
+        client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
         String resultStr = client.market().klines(paramMap);
 
         //System.out.println("resultStr : "+ resultStr);
@@ -1219,6 +1287,7 @@ public class FutureService {
         seriesMap.put(tradingCd + "_" + interval, series);
 
         ArrayList<TechnicalIndicatorReportEntity> technicalIndicatorReportEntityArr = new ArrayList<>();
+        BigDecimal expectationProfit = BigDecimal.ZERO;
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
             KlineEntity klineEntity = parseKlineEntity(klineArray);
@@ -1234,12 +1303,66 @@ public class FutureService {
             series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
 
             if(i!=0){
-                technicalIndicatorReportEntityArr.add(technicalIndicatorCalculate(tradingEntity));
+                TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tradingEntity);
+                technicalIndicatorReportEntityArr.add(tempReport);
+
+                if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                    if((tempReport.getStrongSignal() < 0
+                        || tempReport.getMidSignal() < 0
+                        || tempReport.getWeakSignal() < 0)
+                        && tradingEntity.getPositionSide().equals("LONG")){
+                        tradingEntity.setPositionStatus("CLOSE");
+                        tradingEntity.setClosePrice(tempReport.getClosePrice());
+
+                        BigDecimal currentProfit = calculateProfit(tradingEntity);
+                        System.out.println("현재 수익("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
+                        expectationProfit = expectationProfit.add(currentProfit);
+
+                        if (currentProfit.compareTo(BigDecimal.ZERO) < 0) {
+                            tradingEntity.setLoseTradeCount(tradingEntity.getLoseTradeCount() + 1);
+                        }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
+                            tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
+                        }
+                    } else if ((tempReport.getStrongSignal() > 0
+                            || tempReport.getMidSignal() > 0
+                            ||tempReport.getWeakSignal() > 0)
+                            && tradingEntity.getPositionSide().equals("SHORT")){
+                        tradingEntity.setPositionStatus("CLOSE");
+                        tradingEntity.setClosePrice(tempReport.getClosePrice());
+
+                        BigDecimal currentProfit = calculateProfit(tradingEntity);
+                        System.out.println("현재 수익("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
+                        expectationProfit = expectationProfit.add(currentProfit);
+
+                        if (currentProfit.compareTo(BigDecimal.ZERO) < 0) {
+                            tradingEntity.setLoseTradeCount(tradingEntity.getLoseTradeCount() + 1);
+                        }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
+                            tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
+                        }
+                    }
+                } else if(tradingEntity.getPositionStatus() == null || tradingEntity.getPositionStatus().equals("CLOSE")){
+                    if (tempReport.getStrongSignal() != 0 || tempReport.getMidSignal() != 0) {
+                        if (tempReport.getStrongSignal() < 0 || tempReport.getMidSignal() < 0) {
+                            tradingEntity.setPositionSide("SHORT");
+                            tradingEntity.setPositionStatus("OPEN");
+                            tradingEntity.setOpenPrice(tempReport.getClosePrice());
+                        } else {
+                            tradingEntity.setPositionSide("LONG");
+                            tradingEntity.setPositionStatus("OPEN");
+                            tradingEntity.setOpenPrice(tempReport.getClosePrice());
+                        }
+                        tradingEntity.setTotalTradeCount(tradingEntity.getTotalTradeCount() + 1);
+                    }
+                }
             }
         }
+        System.out.println("최종예상 수익("+tradingEntity.getSymbol()+") : " + expectationProfit);
+        System.out.println("최종예상 승률("+tradingEntity.getSymbol()+") : " + (tradingEntity.getWinTradeCount()+"/" +tradingEntity.getLoseTradeCount()));
         klines.put(symbol, klineEntities);
+        resultMap.put("tempTradingEntity", tradingEntity);
         resultMap.put("result", klineEntities);
         resultMap.put("technicalIndicatorReportEntityArr", technicalIndicatorReportEntityArr);
+        resultMap.put("expectationProfit", expectationProfit);
 
         long endTime = System.currentTimeMillis(); // 종료 시간 기록
         long elapsedTime = endTime - startTime; // 실행 시간 계산
@@ -1328,14 +1451,61 @@ public class FutureService {
         String interval = tradingEntity.getCandleInterval();
 
         //매매전략 변수 설정 -- tradingEntity에서 필요한 값 추출
+
+        ArrayList<HashMap<String,Object>> technicalIndicatorCheckers = new ArrayList<>();
         int adxChecker = tradingEntity.getAdxChecker();
         int macdHistogramChecker = tradingEntity.getMacdHistogramChecker();
         int stochChecker = tradingEntity.getStochChecker();
         int stochRsiChecker = tradingEntity.getStochRsiChecker();
         int rsiChecker = tradingEntity.getRsiChecker();
         int bollingerBandChecker = tradingEntity.getBollingerBandChecker();
+        int movingAverageChecker = tradingEntity.getMovingAverageChecker();
 
-        int[] technicalIndicatorCheckers = {adxChecker, macdHistogramChecker, stochChecker, stochRsiChecker, rsiChecker, bollingerBandChecker};
+        if (adxChecker == 1) {
+            HashMap<String, Object> adxCheckerMap = new HashMap<>();
+            adxCheckerMap.put("key", "adxChecker");
+            adxCheckerMap.put("value", adxChecker);
+            technicalIndicatorCheckers.add(adxCheckerMap);
+        }
+        if (macdHistogramChecker == 1) {
+            HashMap<String, Object> macdHistogramCheckerMap = new HashMap<>();
+            macdHistogramCheckerMap.put("key", "macdHistogramChecker");
+            macdHistogramCheckerMap.put("value", macdHistogramChecker);
+            technicalIndicatorCheckers.add(macdHistogramCheckerMap);
+        }
+        if (stochChecker == 1) {
+            HashMap<String, Object> stochCheckerMap = new HashMap<>();
+            stochCheckerMap.put("key", "stochChecker");
+            stochCheckerMap.put("value", stochChecker);
+            technicalIndicatorCheckers.add(stochCheckerMap);
+        }
+        if (stochRsiChecker == 1) {
+            HashMap<String, Object> stochRsiCheckerMap = new HashMap<>();
+            stochRsiCheckerMap.put("key", "stochRsiChecker");
+            stochRsiCheckerMap.put("value", stochRsiChecker);
+            technicalIndicatorCheckers.add(stochRsiCheckerMap);
+        }
+        if (rsiChecker == 1) {
+            HashMap<String, Object> rsiCheckerMap = new HashMap<>();
+            rsiCheckerMap.put("key", "rsiChecker");
+            rsiCheckerMap.put("value", rsiChecker);
+            technicalIndicatorCheckers.add(rsiCheckerMap);
+        }
+        if (bollingerBandChecker == 1) {
+            HashMap<String, Object> bollingerBandCheckerMap = new HashMap<>();
+            bollingerBandCheckerMap.put("key", "bollingerBandChecker");
+            bollingerBandCheckerMap.put("value", bollingerBandChecker);
+            technicalIndicatorCheckers.add(bollingerBandCheckerMap);
+        }
+        if (movingAverageChecker == 1) {
+            HashMap<String, Object> movingAverageCheckerMap = new HashMap<>();
+            movingAverageCheckerMap.put("key", "movingAverageChecker");
+            movingAverageCheckerMap.put("value", movingAverageChecker);
+            technicalIndicatorCheckers.add(movingAverageCheckerMap);
+        }
+
+
+        //int[] technicalIndicatorCheckers = {adxChecker, macdHistogramChecker, stochChecker, stochRsiChecker, rsiChecker, bollingerBandChecker};
 
 
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval); //{tradingCd}_{interval} 로 특정한다
@@ -1353,6 +1523,11 @@ public class FutureService {
         HighPriceIndicator  highPrice   = new HighPriceIndicator(series); //고가
         LowPriceIndicator   lowPrice    = new LowPriceIndicator(series); //저가
 
+        String krTimeAndPriceExpressiont = "["+formattedEndTime+CONSOLE_COLORS.CYAN+"/"+symbol+"/"+closePrice.getValue(series.getEndIndex())+"] ";
+        String currentLogPrefix = krTimeAndPriceExpressiont;
+        String commonRemark  = currentLogPrefix;
+        String specialRemark = currentLogPrefix;
+
         //******************************** 이동평균선 관련 산식을 정의한다 **********************************
         int shortMovingPeriod = 3;   //단기이동평균 기간
         int middleMovingPeriod = 5;  //중기이동평균 기간
@@ -1360,6 +1535,28 @@ public class FutureService {
 
         SMAIndicator sma = new SMAIndicator(closePrice, shortMovingPeriod); //단기 이동평균선
         EMAIndicator ema = new EMAIndicator(closePrice, longMovingPeriod);  //장기 이동평균선
+        CrossedUpIndicatorRule crossUp = new CrossedUpIndicatorRule(sma, ema); //단기 이평선이 장기 이평선을 상향 돌파
+        CrossedDownIndicatorRule crossDown = new CrossedDownIndicatorRule(sma, ema); //단기 이평선이 장기 이평선을 하향 돌파
+
+        // 이동평균선 교차 신호 설정
+        int movingAverageSignal = 0;
+        int endIndex = series.getEndIndex();
+
+        if (endIndex >= 1) {
+            Num previousShortSma = sma.getValue(endIndex - 1);
+            Num previousLongEma = ema.getValue(endIndex - 1);
+            Num currentShortSma = sma.getValue(endIndex);
+            Num currentLongEma = ema.getValue(endIndex);
+
+            if (currentShortSma.isGreaterThan(currentLongEma) && previousShortSma.isLessThanOrEqual(previousLongEma)) {
+                movingAverageSignal = 1; // 매수 신호
+                specialRemark += CONSOLE_COLORS.BRIGHT_GREEN+"[이동평균선 상향돌파]"+CONSOLE_COLORS.RESET;
+            } else if (currentShortSma.isLessThan(currentLongEma) && previousShortSma.isGreaterThanOrEqual(previousLongEma)) {
+                movingAverageSignal = -1; // 매도 신호
+                specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[이동평균선 하향돌파]"+CONSOLE_COLORS.RESET;
+            }
+        }
+
         //**************************************** 이동평균선 끝 ******************************************
 
         // Calculate RSI
@@ -1375,11 +1572,6 @@ public class FutureService {
         //di
         double plusDi  = technicalIndicatorCalculator.calculatePlusDI(series, longMovingPeriod, series.getEndIndex());
         double minusDi = technicalIndicatorCalculator.calculateMinusDI(series, longMovingPeriod, series.getEndIndex());
-
-        String krTimeAndPriceExpressiont = "["+formattedEndTime+CONSOLE_COLORS.CYAN+"/"+symbol+"/"+closePrice.getValue(series.getEndIndex())+"] ";
-        String currentLogPrefix = krTimeAndPriceExpressiont;
-        String commonRemark  = currentLogPrefix;
-        String specialRemark = currentLogPrefix;
 
         //************************************ 여기서부터 볼린저밴드 관련 산식을 정의한다 ************************************
         int bollingerBandSignal = 0;
@@ -1491,6 +1683,7 @@ public class FutureService {
             System.out.println(specialRemark);
         }
 
+        int weakSignal = 0;
         int midSignal = 0;
         int strongSignal = 0;
         int totalSignal = 0;
@@ -1498,18 +1691,18 @@ public class FutureService {
         //{adxChecker, macdHistogramChecker, stochChecker, stochRsiChecker, rsiChecker, bollingerBandChecker}; -- TODO 동적으로 관리하던 해야될듯...
 
         double maxSignal = 0;
-        for (int i = 0; i < technicalIndicatorCheckers.length; i++) {
-            if (i == 5) {
-                maxSignal += technicalIndicatorCheckers[i] * 2; //볼린저밴드일 경우 가중치
+        for (HashMap<String, Object> technicalIndicatorCheckerMap : technicalIndicatorCheckers) {
+            if (technicalIndicatorCheckerMap.get("key").equals("bollingerBandChecker")) {
+                maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value"))*2; //볼린저밴드일 경우 가중치
             } else {
-                maxSignal += technicalIndicatorCheckers[i];
+                maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value"));
             }
         }
         String signalLog = " ";
         if(adxChecker == 1){
-            totalSignal += adxSignal;
-            if (adxSignal != 0){
-                signalLog += "ADX SIGNAL("+ adxSignal+") ";
+            totalSignal += adxDirectionSignal;
+            if (adxDirectionSignal != 0){
+                signalLog += "ADX DIRECTION SIGNAL("+ adxDirectionSignal+") ";
             }
         }
         if(macdHistogramChecker == 1){
@@ -1542,13 +1735,44 @@ public class FutureService {
                 signalLog += "BOLLINGERBAND SIGNAL("+ bollingerBandSignal+") ";
             }
         }
-
-        //시그널 계산
-        if (maxSignal/2 < totalSignal){
-            midSignal = 1;
+        if(movingAverageChecker == 1){
+            totalSignal += movingAverageSignal;
+            if (movingAverageSignal != 0){
+                signalLog += "MA SIGNAL("+ movingAverageSignal+") ";
+            }
         }
-        if (maxSignal/2 + 1 < totalSignal){
-            strongSignal = 1;
+
+        int totalSignalAbs = Math.abs(totalSignal);
+        double signalStandard = maxSignal/2;
+        //시그널 계산
+        //System.out.println("시그널계산식 : maxSignal/2 < totalSignalAbs : "+(maxSignal/2 +" "+totalSignalAbs));
+        if(1 == totalSignalAbs
+            //&& totalSignalAbs < signalStandard
+        ){
+            if(totalSignal < 0){
+                weakSignal = -1;
+            }else{
+                weakSignal = 1;
+            }
+        }else if(1 < totalSignalAbs && totalSignalAbs < signalStandard) {
+            if (totalSignal < 0) {
+                midSignal = -1;
+            } else {
+                midSignal = 1;
+            }
+        } else if (signalStandard <= totalSignalAbs){
+            if (totalSignal < 0){
+                strongSignal = -1;
+                //strongSignal = 1;
+            }else{
+                strongSignal = 1;
+                //strongSignal = -1;
+            }
+        }
+
+        if(weakSignal !=0){
+            System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
+            System.out.println(CONSOLE_COLORS.BRIGHT_BLACK+"약한 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ weakSignal+" "+ signalLog + CONSOLE_COLORS.RESET);
         }
         if(midSignal !=0){
             System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
@@ -1570,6 +1794,7 @@ public class FutureService {
                 .sma(CommonUtils.truncate(sma.getValue(series.getEndIndex()), tickSize))
                 .ema(CommonUtils.truncate(ema.getValue(series.getEndIndex()), tickSize))
                 .directionMa(directionMA)
+                .movingAverageSignal(movingAverageSignal) //!!! 시그널
                 //DI관련
                 .plusDi(plusDi)
                 .minusDi(minusDi)
@@ -1588,20 +1813,21 @@ public class FutureService {
                 .adxSignal(adxSignal) //!!! 시그널
                 .adxDirectionSignal(adxDirectionSignal) //!!! 시그널
                 //macd관련
-                .macd(BigDecimal.valueOf(currentMacd).setScale(10, RoundingMode.DOWN))
+                .macd(doulbleToBigDecimal(currentMacd).setScale(10, RoundingMode.DOWN))
                 .macdReversalSignal(macdReversalSignal)
                 .macdCrossSignal(macdCrossSignal)
                 //rsi관련
                 .rsi(BigDecimal.valueOf(currentRsi))
                 .rsiSignal(rsiSignal)
                 //stoch관련
-                .stochK(BigDecimal.valueOf(stochK))
-                .stochD(BigDecimal.valueOf(stochD))
+                .stochK(doulbleToBigDecimal(stochK))
+                .stochD(doulbleToBigDecimal(stochD))
                 .stochSignal(stochSignal)
                 //stochRsi관련
                 .stochRsi(doulbleToBigDecimal(stochRsi))
                 .stochRsiSignal(stochRsiSignal)
                 //매매신호
+                .weakSignal(weakSignal)
                 .midSignal(midSignal)
                 .strongSignal(strongSignal)
                 .build();

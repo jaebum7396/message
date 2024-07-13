@@ -135,6 +135,12 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "STOCH_RSI_SIGNAL")
     private int stochRsiSignal;
 
+    @Column( name = "MOVING_AVERAGE_SIGNAL")
+    private int movingAverageSignal;
+
+    @Column(name = "WEAK_SIGNAL")
+    private int weakSignal;
+
     @Column(name = "MID_SIGNAL")
     private int midSignal;
 

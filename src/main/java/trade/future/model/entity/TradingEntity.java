@@ -103,6 +103,15 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "RSI_CHECKER")
     int rsiChecker; //RSI로 매매전략 수립
 
+    @Column( name = "MOVING_AVERAGE_CHECKER")
+    int movingAverageChecker; //이동평균선으로 매매전략 수립
+
+    int totalTradeCount; // 총 거래 횟수
+    int winTradeCount; // 이긴 횟수
+    int loseTradeCount; // 진 횟수
+    BigDecimal expectationProfit; // 승률
+
+
     public TradingDTO toDTO() {
         return TradingDTO.builder()
                 .interval(this.candleInterval)
@@ -113,10 +122,16 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
                 .adxChecker(this.adxChecker)
                 .macdHistogramChecker(this.macdHistogramChecker)
                 .rsiChecker(this.rsiChecker)
+                .stochChecker(this.stochChecker)
+                .stochRsiChecker(this.stochRsiChecker)
+                .bollingerBandChecker(this.bollingerBandChecker)
+                .symbol(this.symbol)
+                .targetSymbol(this.targetSymbol)
                 .collateralRate(this.collateralRate)
                 .build();
     }
 
+    // 복사 생성자
     // 복사 생성자
     public TradingEntity(TradingEntity original) {
         this.tradingCd = original.tradingCd;
@@ -135,12 +150,17 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
         this.candleInterval = original.candleInterval;
         this.stockSelectionCount = original.stockSelectionCount;
         this.maxPositionCount = original.maxPositionCount;
+        this.candleCount = original.candleCount;
         this.collateral = original.collateral != null ? new BigDecimal(original.collateral.toString()) : null;
         this.collateralRate = original.collateralRate != null ? new BigDecimal(original.collateralRate.toString()) : null;
         this.trendFollowFlag = original.trendFollowFlag;
+        this.bollingerBandChecker = original.bollingerBandChecker;
         this.adxChecker = original.adxChecker;
         this.macdHistogramChecker = original.macdHistogramChecker;
+        this.stochChecker = original.stochChecker;
+        this.stochRsiChecker = original.stochRsiChecker;
         this.rsiChecker = original.rsiChecker;
+        this.movingAverageChecker = original.movingAverageChecker;
     }
 
     @Override
