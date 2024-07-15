@@ -611,6 +611,7 @@ public class FutureService {
             if(new BigDecimal(String.valueOf(symbolObj.get("positionAmt"))).compareTo(new BigDecimal("0")) != 0){
                 LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
                 String symbol = String.valueOf(symbolObj.get("symbol"));
+                TRADING_ENTITYS.remove(symbol);
                 paramMap.put("symbol", symbol);
                 paramMap.put("positionSide", symbolObj.get("positionSide"));
                 paramMap.put("side", symbolObj.get("positionSide").equals("LONG") ? "SELL" : "BUY");
@@ -1764,7 +1765,7 @@ public class FutureService {
         double maxSignal = 0;
         for (HashMap<String, Object> technicalIndicatorCheckerMap : technicalIndicatorCheckers) {
             if (technicalIndicatorCheckerMap.get("key").equals("bollingerBandChecker")) {
-                maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value")); //볼린저밴드일 경우 가중치
+                maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value"))*2; //볼린저밴드일 경우 가중치
             } else {
                 maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value"));
             }
@@ -1801,7 +1802,7 @@ public class FutureService {
             }
         }
         if(bollingerBandChecker == 1){
-            totalSignal += bollingerBandSignal;
+            totalSignal += bollingerBandSignal*2;
             if (bollingerBandSignal != 0){
                 signalLog += "BOLLINGERBAND SIGNAL("+ bollingerBandSignal+") ";
             }

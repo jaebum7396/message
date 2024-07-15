@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.Comment;
 import org.hibernate.annotations.GenericGenerator;
 import trade.common.model.BaseEntity;
 import trade.future.model.dto.TradingDTO;
@@ -29,9 +30,11 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     private String tradingCd; // ID 필드 추가 (데이터베이스 식별자)
 
     @Column( name = "USER_CD")
+    @Comment("유저 식별자")
     private String userCd; // 유저 식별자
 
     @Column( name = "TRADING_TYPE")
+    @Comment("트레이딩 타입(실제, 백테스트)")
     private String tradingType; // 트레이딩 타입(실제, 백테스트)
 
     @Column( name = "TRADING_STATUS")
