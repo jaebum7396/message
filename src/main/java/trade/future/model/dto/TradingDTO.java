@@ -39,13 +39,13 @@ public class TradingDTO {
     //strategyChecker
     @ApiModelProperty(value = "1" , example = "1")
     int bollingerBandChecker;
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int adxChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int macdHistogramChecker;
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int stochChecker;
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int stochRsiChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int rsiChecker;
