@@ -1588,7 +1588,7 @@ public class FutureService {
         String formattedEndTime = formatter.format(kstEndTime);
 
         //tickSize
-        BigDecimal tickSize = getStepSize(symbol.toUpperCase()); //해당 심볼의 틱사이즈(해당 페어의 최소로 보여지는 금액단위를 말한다)
+        BigDecimal tickSize = getTickSize(symbol.toUpperCase()); //해당 심볼의 틱사이즈(해당 페어의 최소로 보여지는 금액단위를 말한다)
 
         // Define indicators
         OpenPriceIndicator  openPrice   = new OpenPriceIndicator(series); //시가

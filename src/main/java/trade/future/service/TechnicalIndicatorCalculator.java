@@ -523,6 +523,7 @@ public class TechnicalIndicatorCalculator {
 
     public static BigDecimal calculateROI(BigDecimal openPrice, BigDecimal closePrice, int leverage, String positionSide) {
         BigDecimal roi;
+        System.out.println("openPrice : " + openPrice);
         if ("LONG".equalsIgnoreCase(positionSide)) {
             roi = closePrice.subtract(openPrice)
                     .divide(openPrice, 10, RoundingMode.HALF_UP)
