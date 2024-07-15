@@ -455,6 +455,7 @@ public class FutureService {
                 BigDecimal currentROI;
                 BigDecimal currentPnl;
                 if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                    tradingEntity.setClosePrice(doulbleToBigDecimal(klineObj.getDouble("c")));
                     currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity);
                     currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity);
                 } else {
