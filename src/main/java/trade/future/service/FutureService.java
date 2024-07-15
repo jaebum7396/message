@@ -439,12 +439,8 @@ public class FutureService {
             List<TradingEntity> tradingEntitys = new ArrayList<>();
             try{
                 tradingEntitys = getTradingEntity(symbol);
-                if(tradingEntitys.size() == 0){
-                    throw new RuntimeException("트레이딩이 존재하지 않습니다.");
-                }else if (tradingEntitys.size() > 1){
-                    throw new RuntimeException("트레이딩이 중복되어 존재합니다.");
-                }else{
-
+                if(tradingEntitys.size() != 1){
+                    throw new RuntimeException("트레이딩이 존재하지 않거나 중복되어있습니다.");
                 }
             } catch (Exception e){
                 nextFlag = false;
@@ -458,7 +454,7 @@ public class FutureService {
                 TradingEntity tradingEntity = tradingEntitys.get(0);
                 BigDecimal currentROI;
                 BigDecimal currentPnl;
-                if(tradingEntity.getPositionStatus().equals("OPEN")){
+                if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
                     currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity);
                     currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity);
                 } else {
