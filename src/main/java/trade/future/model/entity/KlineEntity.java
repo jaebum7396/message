@@ -72,7 +72,7 @@ public class KlineEntity extends BaseEntity implements Serializable {
     @Column( name = "LOW_PRICE", precision = 19, scale = 8)
     private BigDecimal lowPrice; // 저가 (Low)
 
-    @Column( name = "VOLUME")
+    @Column( name = "VOLUME", precision = 19, scale = 8)
     private BigDecimal volume; // 거래량 (Volume)
 
     @Column( name = "TRADE_COUNT")

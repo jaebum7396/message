@@ -36,22 +36,22 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "END_TIME")
     private LocalDateTime endTime; // Kline 종료 시간
 
-    @Column( name = "OPEN_PRICE")
+    @Column( name = "OPEN_PRICE", precision = 19, scale = 8)
     private BigDecimal openPrice;
 
-    @Column( name = "CLOSE_PRICE")
+    @Column( name = "CLOSE_PRICE", precision = 19, scale = 8)
     private BigDecimal closePrice;
 
-    @Column( name = "HIGH_PRICE")
+    @Column( name = "HIGH_PRICE", precision = 19, scale = 8)
     private BigDecimal highPrice;
 
-    @Column( name = "LOW_PRICE")
+    @Column( name = "LOW_PRICE", precision = 19, scale = 8)
     private BigDecimal lowPrice;
 
-    @Column( name = "SMA")
+    @Column( name = "SMA", precision = 19, scale = 8)
     private BigDecimal sma;
 
-    @Column( name = "EMA")
+    @Column( name = "EMA", precision = 19, scale = 8)
     private BigDecimal ema;
 
     @Column( name = "DIRECTION_MA")
@@ -66,13 +66,13 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "DIRECTION_DI")
     private String directionDi;
 
-    @Column( name = "UBB")
+    @Column( name = "UBB", precision = 19, scale = 8)
     private BigDecimal ubb; // Upper Bollinger Band
 
-    @Column( name = "MBB")
+    @Column( name = "MBB", precision = 19, scale = 8)
     private BigDecimal mbb; // Middle Bollinger Band
 
-    @Column( name = "LBB")
+    @Column( name = "LBB", precision = 19, scale = 8)
     private BigDecimal lbb; // Lower Bollinger Band
 
     @Column( name = "BOLLINGER_BAND_SIGNAL")
@@ -99,7 +99,7 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "ADX_DIRECTION_SIGNAL")
     private int adxDirectionSignal;
 
-    @Column( name = "MACD")
+    @Column( name = "MACD", precision = 19, scale = 8)
     private BigDecimal macd; // Moving Average Convergence Divergence
 
     @Column( name = "MACD_PRELIMINARY_SIGNAL")
@@ -114,22 +114,22 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MACD_REVERSAL_SIGNAL")
     private int macdReversalSignal;
 
-    @Column( name = "RSI")
+    @Column( name = "RSI", precision = 19, scale = 8)
     private BigDecimal rsi; // Relative Strength Index
 
     @Column( name = "RSI_SIGNAL")
     private int rsiSignal;
 
-    @Column( name = "STOCH_D")
+    @Column( name = "STOCH_D", precision = 19, scale = 8)
     private BigDecimal stochD;
 
-    @Column( name = "STOCH_K")
+    @Column( name = "STOCH_K", precision = 19, scale = 8)
     private BigDecimal stochK;
 
     @Column( name = "STOCH_SIGNAL")
     private int stochSignal;
 
-    @Column( name = "STOCH_RSI")
+    @Column( name = "STOCH_RSI", precision = 19, scale = 8)
     private BigDecimal stochRsi;
 
     @Column( name = "STOCH_RSI_SIGNAL")
