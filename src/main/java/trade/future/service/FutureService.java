@@ -412,8 +412,6 @@ public class FutureService {
                 .userCd(userCd)
                 .build();
 
-
-
         return resultMap;
     }
 
@@ -648,6 +646,12 @@ public class FutureService {
             leverageParamMap.put("leverage", tradingEntity.getLeverage());
             leverageChange(leverageParamMap);
 
+            //마진타입 변경(교차)
+            LinkedHashMap<String,Object> marginTypeParamMap = new LinkedHashMap<>();
+            marginTypeParamMap.put("symbol", tradingEntity.getSymbol());
+            marginTypeParamMap.put("marginType", "CROSSED");
+            marginTypeChange(marginTypeParamMap);
+
             //주문 제출
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "OPEN"));
             //tradingRepository.save(tradingEntity);
@@ -737,6 +741,18 @@ public class FutureService {
         try{
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
             String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
+            resultMap.put("result", leverageChangeResult);
+        } catch (Exception e) {
+            throw e;
+        }
+        return resultMap;
+    }
+
+    public Map<String, Object> marginTypeChange(LinkedHashMap<String, Object> marginTypeParam) throws Exception {
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        try{
+            UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+            String leverageChangeResult = client.account().changeMarginType(marginTypeParam);
             resultMap.put("result", leverageChangeResult);
         } catch (Exception e) {
             throw e;
