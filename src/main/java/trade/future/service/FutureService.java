@@ -455,8 +455,17 @@ public class FutureService {
             }
             //
             if (nextFlag) {
-                BigDecimal currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntitys.get(0));
-                BigDecimal currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntitys.get(0));
+                TradingEntity tradingEntity = tradingEntitys.get(0);
+                BigDecimal currentROI;
+                BigDecimal currentPnl;
+                if(tradingEntity.getPositionStatus().equals("OPEN")){
+                    currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity);
+                    currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity);
+                } else {
+                    currentROI = new BigDecimal("0");
+                    currentPnl = new BigDecimal("0");
+                }
+
                 /*System.out.println("ROI : " + currentROI);
                 System.out.println("PnL : " + currentPnl);*/
                 if(isFinal){
