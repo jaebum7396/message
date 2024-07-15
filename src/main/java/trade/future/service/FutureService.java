@@ -656,7 +656,11 @@ public class FutureService {
             LinkedHashMap<String,Object> marginTypeParamMap = new LinkedHashMap<>();
             marginTypeParamMap.put("symbol", tradingEntity.getSymbol());
             marginTypeParamMap.put("marginType", "CROSSED");
-            marginTypeChange(marginTypeParamMap);
+            try{
+                marginTypeChange(marginTypeParamMap);
+            }catch (Exception e){
+                e.printStackTrace();
+            }
 
             //주문 제출
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "OPEN"));
