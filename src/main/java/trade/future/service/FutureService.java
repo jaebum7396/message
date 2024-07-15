@@ -454,14 +454,14 @@ public class FutureService {
                 TradingEntity tradingEntity = tradingEntitys.get(0);
                 BigDecimal currentROI;
                 BigDecimal currentPnl;
-                if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                /*if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
                     tradingEntity.setClosePrice(doulbleToBigDecimal(klineObj.getDouble("c")));
                     currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity);
                     currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity);
                 } else {
                     currentROI = new BigDecimal("0");
                     currentPnl = new BigDecimal("0");
-                }
+                }*/
 
                 /*System.out.println("ROI : " + currentROI);
                 System.out.println("PnL : " + currentPnl);*/
@@ -481,10 +481,7 @@ public class FutureService {
                                 makeCloseOrder(eventEntity, positionEvent, remark);
                             }
                         } else {
-                            if (currentROI.compareTo(new BigDecimal("-20")) < 0){
-                                String remark = "강제 손절";
-                                makeCloseOrder(eventEntity, positionEvent, remark);
-                            }else if(technicalIndicatorReportEntity.getWeakSignal() != 0
+                            if(technicalIndicatorReportEntity.getWeakSignal() != 0
                                     ||technicalIndicatorReportEntity.getMidSignal() !=0
                                     ||technicalIndicatorReportEntity.getStrongSignal() !=0){
                                 String weakSignal   = technicalIndicatorReportEntity.getWeakSignal() != 0 ? (technicalIndicatorReportEntity.getWeakSignal() == 1 ? "LONG" : "SHORT") : "";
@@ -509,6 +506,10 @@ public class FutureService {
                                     }
                                 }
                             }
+                            /*else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
+                                String remark = "강제 손절";
+                                makeCloseOrder(eventEntity, positionEvent, remark);
+                            }*/
                         }
                     },() -> {
 
@@ -1621,10 +1622,10 @@ public class FutureService {
             Num currentLongEma = ema.getValue(endIndex);
 
             if (currentShortSma.isGreaterThan(currentLongEma) && previousShortSma.isLessThanOrEqual(previousLongEma)) {
-                movingAverageSignal = 1; // 매수 신호
+                movingAverageSignal = -1; // 매수 신호
                 specialRemark += CONSOLE_COLORS.BRIGHT_GREEN+"[이동평균선 상향돌파]"+CONSOLE_COLORS.RESET;
             } else if (currentShortSma.isLessThan(currentLongEma) && previousShortSma.isGreaterThanOrEqual(previousLongEma)) {
-                movingAverageSignal = -1; // 매도 신호
+                movingAverageSignal = 1; // 매도 신호
                 specialRemark += CONSOLE_COLORS.BRIGHT_RED+"[이동평균선 하향돌파]"+CONSOLE_COLORS.RESET;
             }
         }
