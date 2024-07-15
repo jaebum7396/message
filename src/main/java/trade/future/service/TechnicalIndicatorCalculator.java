@@ -14,9 +14,12 @@ import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
 import org.ta4j.core.indicators.helpers.VolumeIndicator;
 import org.ta4j.core.num.Num;
+import trade.future.model.entity.TradingEntity;
 import trade.future.model.enums.ADX_GRADE;
 import trade.future.model.enums.CONSOLE_COLORS;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 
 @Slf4j
@@ -508,4 +511,60 @@ public class TechnicalIndicatorCalculator {
         resultMap.put("specialRemark", specialRemark);
         return resultMap;
     }
+
+    public static BigDecimal calculateROI(TradingEntity tradingEntity) {
+        BigDecimal openPrice = tradingEntity.getOpenPrice();
+        BigDecimal closePrice = tradingEntity.getClosePrice();
+        int leverage = tradingEntity.getLeverage();
+        String positionSide = tradingEntity.getPositionSide();
+
+        return calculateROI(openPrice, closePrice, leverage, positionSide);
+    }
+
+    public static BigDecimal calculateROI(BigDecimal openPrice, BigDecimal closePrice, int leverage, String positionSide) {
+        BigDecimal roi;
+        if ("LONG".equalsIgnoreCase(positionSide)) {
+            roi = closePrice.subtract(openPrice)
+                    .divide(openPrice, 10, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(leverage))
+                    .multiply(BigDecimal.valueOf(100));
+        } else if ("SHORT".equalsIgnoreCase(positionSide)) {
+            roi = openPrice.subtract(closePrice)
+                    .divide(openPrice, 10, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(leverage))
+                    .multiply(BigDecimal.valueOf(100));
+        } else {
+            throw new IllegalArgumentException("Invalid position side. Must be 'LONG' or 'SHORT'");
+        }
+        return roi.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public static BigDecimal calculatePnL(TradingEntity tradingEntity) {
+        BigDecimal openPrice = tradingEntity.getOpenPrice();
+        BigDecimal closePrice = tradingEntity.getClosePrice();
+        BigDecimal collateral = tradingEntity.getCollateral();
+        int leverage = tradingEntity.getLeverage();
+        String positionSide = tradingEntity.getPositionSide();
+
+        return calculatePnL(openPrice, closePrice, collateral, leverage, positionSide);
+    }
+
+    public static BigDecimal calculatePnL(BigDecimal openPrice, BigDecimal closePrice, BigDecimal collateral, int leverage, String positionSide) {
+        BigDecimal pnl;
+        if ("LONG".equalsIgnoreCase(positionSide)) {
+            pnl = closePrice.subtract(openPrice)
+                    .divide(openPrice, 10, RoundingMode.HALF_UP)
+                    .multiply(collateral)
+                    .multiply(BigDecimal.valueOf(leverage));
+        } else if ("SHORT".equalsIgnoreCase(positionSide)) {
+            pnl = openPrice.subtract(closePrice)
+                    .divide(openPrice, 10, RoundingMode.HALF_UP)
+                    .multiply(collateral)
+                    .multiply(BigDecimal.valueOf(leverage));
+        } else {
+            throw new IllegalArgumentException("Invalid position side. Must be 'LONG' or 'SHORT'");
+        }
+        return pnl.setScale(2, RoundingMode.HALF_UP);
+    }
+
 }
