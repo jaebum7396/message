@@ -43,6 +43,8 @@ public class TradingDTO {
     int adxChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int macdHistogramChecker;
+    @ApiModelProperty(value = "1" , example = "1")
+    int macdCrossChecker;
     @ApiModelProperty(value = "-1" , example = "-1")
     int stochChecker;
     @ApiModelProperty(value = "-1" , example = "-1")
@@ -67,6 +69,7 @@ public class TradingDTO {
                 .bollingerBandChecker(bollingerBandChecker)
                 .adxChecker(adxChecker)
                 .macdHistogramChecker(macdHistogramChecker)
+                .macdCrossChecker(macdCrossChecker)
                 .stochChecker(stochChecker)
                 .stochRsiChecker(stochRsiChecker)
                 .rsiChecker(rsiChecker)

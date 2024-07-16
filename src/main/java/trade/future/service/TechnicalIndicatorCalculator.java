@@ -329,11 +329,11 @@ public class TechnicalIndicatorCalculator {
         if (MACD_히스토그램_증가 == 이전_MACD_히스토그램_증가) {
             //System.out.println("추세유지");
         } else {
-            if(!이전_MACD_히스토그램_증가 && MACD_히스토그램_증가){
+            if(!이전_MACD_히스토그램_증가 && MACD_히스토그램_증가 && previousMacdHistogram < 0){ // 이전 히스토그램이 음수였다가 양수로 전환되는 시그널
                 specialRemark += CONSOLE_COLORS.PURPLE+"[MACD "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 시그널]"+CONSOLE_COLORS.RESET+"MACD히스토그램감소 >>> MACD히스토그램증가 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap +") "+CONSOLE_COLORS.RESET;
                 macdReversalSignal = 1;
             }
-            if(이전_MACD_히스토그램_증가 && !MACD_히스토그램_증가){
+            if(이전_MACD_히스토그램_증가 && !MACD_히스토그램_증가 && previousMacdHistogram > 0){ // 이전 히스토그램이 양수였다가 음수로 전환되는 시그널
                 specialRemark += CONSOLE_COLORS.PURPLE+"[MACD "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 시그널]"+CONSOLE_COLORS.RESET+"MACD히스토그램증가 >>> MACD히스토그램감소 :" + previousMacdHistogram + " >>> " + currentMacdHistogram + "(" + previousMacdHistogramGap + "/" + macdHistogramGap +") "+CONSOLE_COLORS.RESET;
                 macdReversalSignal = -1;
             }
@@ -353,10 +353,10 @@ public class TechnicalIndicatorCalculator {
             macdPreliminarySignal = 1;
         }
         int macdCrossSignal = 0 ; // 골든 크로스일시 1, 데드 크로스일시 -1
-        if(isGoldenCross(series, 6, 12, 5)){
+        if(isGoldenCross(series, 6, 12, 5) && macd.getValue(series.getEndIndex()).isLessThan(series.zero())){
             macdCrossSignal = 1;
         }
-        if(isDeadCross(series, 6, 12, 5)){
+        if(isDeadCross(series, 6, 12, 5) && macd.getValue(series.getEndIndex()).isGreaterThan(series.zero())){
             macdCrossSignal = -1;
         }
 
@@ -457,10 +457,10 @@ public class TechnicalIndicatorCalculator {
         commonRemark += CONSOLE_COLORS.BRIGHT_CYAN+ "Stochastic K/D(" + currentStochK + "/" + currentStochD + "[" + kDExpression + "]) "+CONSOLE_COLORS.RESET;
 
         int stochSignal = 0;
-        if (isKAboveD && wasKBelowD) {
+        if (isKAboveD && wasKBelowD && currentStochK < 30 && isUptrend) {
             specialRemark += CONSOLE_COLORS.BRIGHT_CYAN+"[Stochastic "+CONSOLE_COLORS.BRIGHT_GREEN+"LONG 진입 시그널]"+CONSOLE_COLORS.RESET+" Stochastic K/D 상향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
             stochSignal = 1;
-        } else if (isKBelowD && wasKAboveD) {
+        } else if (isKBelowD && wasKAboveD && currentStochK > 70 && isDowntrend) {
             specialRemark += CONSOLE_COLORS.BRIGHT_CYAN+"[Stochastic "+CONSOLE_COLORS.BRIGHT_RED+"SHORT 진입 시그널]"+CONSOLE_COLORS.RESET+" Stochastic K/D 하향 돌파 : " + previousStochK + "/" + previousStochD + " >>> " + currentStochK + "/" + currentStochD + " "+CONSOLE_COLORS.RESET;
             stochSignal = -1;
         }

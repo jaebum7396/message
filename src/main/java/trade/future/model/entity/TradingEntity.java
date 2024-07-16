@@ -109,6 +109,9 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "MACD_HISTOGRAM_CHECKER")
     int macdHistogramChecker; //MACD 히스토그램으로 매매전략 수립
 
+    @Column( name = "MACD_CROSS_CHECKER")
+    int macdCrossChecker; //MACD 크로스로 매매전략 수립
+
     @Column( name = "STOCH_CHECKER")
     int stochChecker; //스토캐스틱 오실레이터 매매전략 수립
 

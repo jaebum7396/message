@@ -582,6 +582,7 @@ public class FutureService {
                     int adxDirectionSignal = technicalIndicatorReportEntity.getAdxDirectionSignal();
                     int bollingerBandSignal = technicalIndicatorReportEntity.getBollingerBandSignal();
                     int macdReversalSignal = technicalIndicatorReportEntity.getMacdReversalSignal();
+                    int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
                     int rsiSignal = technicalIndicatorReportEntity.getRsiSignal();
                     int stochSignal = technicalIndicatorReportEntity.getStochSignal();
                     int stochasticRsiSignal = technicalIndicatorReportEntity.getStochRsiSignal();
@@ -596,6 +597,9 @@ public class FutureService {
                     }
                     if(macdReversalSignal != 0){
                         remark += "MACD("+(macdReversalSignal == 1 ? "LONG" : "SHORT") + ") ";
+                    }
+                    if(macdCrossSignal != 0){
+                        remark += "MACD("+(macdCrossSignal == 1 ? "LONG" : "SHORT") + ") ";
                     }
                     if(rsiSignal != 0){
                         remark += "RSI("+(rsiSignal == 1 ? "LONG" : "SHORT") + ") ";
@@ -1623,6 +1627,7 @@ public class FutureService {
         ArrayList<HashMap<String,Object>> technicalIndicatorCheckers = new ArrayList<>();
         int adxChecker = tradingEntity.getAdxChecker();
         int macdHistogramChecker = tradingEntity.getMacdHistogramChecker();
+        int macdCrossChecker = tradingEntity.getMacdCrossChecker();
         int stochChecker = tradingEntity.getStochChecker();
         int stochRsiChecker = tradingEntity.getStochRsiChecker();
         int rsiChecker = tradingEntity.getRsiChecker();
@@ -1877,6 +1882,12 @@ public class FutureService {
                 signalLog += "MACD SIGNAL("+ macdReversalSignal+") ";
             }
         }
+        if(macdCrossChecker == 1){
+            totalSignal += macdCrossSignal;
+            if (macdCrossSignal != 0){
+                signalLog += "MACD CROSS SIGNAL("+ macdCrossSignal+") ";
+            }
+        }
         if(stochChecker == 1){
             totalSignal += stochSignal;
             if (stochSignal != 0){
@@ -1938,7 +1949,7 @@ public class FutureService {
             }else{
                 weakSignal = 1;
             }
-        }else if(1 < totalSignalAbs
+        }else if(2 < totalSignalAbs
                 && totalSignalAbs < signalStandard
                 && !signalHide) {
             if (totalSignal < 0) {
