@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.Comment;
 import org.hibernate.annotations.GenericGenerator;
 import trade.common.model.BaseEntity;
 import trade.future.model.dto.TradingDTO;
@@ -29,9 +30,11 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     private String tradingCd; // ID 필드 추가 (데이터베이스 식별자)
 
     @Column( name = "USER_CD")
+    @Comment("유저 식별자")
     private String userCd; // 유저 식별자
 
     @Column( name = "TRADING_TYPE")
+    @Comment("트레이딩 타입(실제, 백테스트)")
     private String tradingType; // 트레이딩 타입(실제, 백테스트)
 
     @Column( name = "TRADING_STATUS")
@@ -64,13 +67,13 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "POSITION_SIDE")
     private String positionSide; // 포지션 사이드
 
-    @Column( name = "OPEN_PRICE")
+    @Column( name = "OPEN_PRICE", precision = 19, scale = 8)
     private BigDecimal openPrice; // 진입가격
 
-    @Column( name = "CLOSE_PRICE")
+    @Column( name = "CLOSE_PRICE", precision = 19, scale = 8)
     private BigDecimal closePrice;  // 청산가격
 
-    @Column ( name = "PROFIT")
+    @Column ( name = "PROFIT", precision = 19, scale = 8)
     private BigDecimal profit; // 수익률
 
     @Column( name = "STREAM_ID")
@@ -88,10 +91,10 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "CANDLE_COUNT")
     int candleCount;
 
-    @Column( name = "COLLATERAL")
+    @Column( name = "COLLATERAL", precision = 19, scale = 8)
     BigDecimal collateral; // 할당된 담보금
     
-    @Column( name = "COLLATERAL_RATE")
+    @Column( name = "COLLATERAL_RATE", precision = 19, scale = 8)
     BigDecimal collateralRate; // 할당된 담보금 비율
 
     @Column( name = "TREND_FOLLOW_FLAG")
