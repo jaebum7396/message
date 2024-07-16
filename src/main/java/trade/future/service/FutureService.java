@@ -482,6 +482,8 @@ public class FutureService {
 
                 boolean resultFlag = trendMap.get("resultFlag").equals(true);
 
+                log.info("!!!!!!!!!!!!!!!!!트렌드 검증!!!!!!!!!!!!!!!!!!"+resultFlag+" 4h/"+trend4h+" 1h/"+trend1h+" 15m/"+trend15m);
+
                 if(resultFlag){ // 트렌드 검증 -- 큰 트렌드들이 모두 일치할때.
                     System.out.println("event : " + event);
                     // klineEvent를 데이터베이스에 저장
