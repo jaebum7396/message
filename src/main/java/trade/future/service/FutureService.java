@@ -480,12 +480,12 @@ public class FutureService {
                 tradingEntity.setTrend1h(trend1h);
                 tradingEntity.setTrend15m(trend15m);
 
-                boolean resultFlag = trendMap.get("resultFlag").equals("true");
+                boolean resultFlag = trendMap.get("resultFlag").equals(true);
 
                 if(resultFlag){ // 트렌드 검증 -- 큰 트렌드들이 모두 일치할때.
                     System.out.println("event : " + event);
                     // klineEvent를 데이터베이스에 저장
-                    EventEntity eventEntity = saveKlineEvent(event, tradingEntitys.get(0));
+                    EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
 
                     TechnicalIndicatorReportEntity technicalIndicatorReportEntity = eventEntity.getKlineEntity().getTechnicalIndicatorReportEntity();
                     Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
@@ -551,6 +551,8 @@ public class FutureService {
 
         // 기술지표 계산
         TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity);
+        // 트렌드
+        tradingEntity.setTrend(technicalIndicatorReportEntity.getDirectionDi());
         technicalIndicatorReportEntity.setKlineEntity(klineEvent.getKlineEntity());
         klineEvent.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
 
@@ -571,7 +573,6 @@ public class FutureService {
                     throw new TradingException(tradingEntity);
                 }
             } else {
-
                 if (technicalIndicatorReportEntity.getStrongSignal() != 0
                     ||technicalIndicatorReportEntity.getMidSignal() != 0
                     //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
@@ -610,10 +611,14 @@ public class FutureService {
                     String direction = technicalIndicatorReportEntity.getStrongSignal() != 0
                             ? (technicalIndicatorReportEntity.getStrongSignal() == 1 ? "LONG" : "SHORT") :
                             (technicalIndicatorReportEntity.getMidSignal() == 1 ? "LONG" : "SHORT") ;
-                    try {
-                        makeOpenOrder(klineEvent, direction, remark);
-                    } catch (Exception e) {
-                        e.printStackTrace();
+
+                    String bigTrend = tradingEntity.getTrend4h();
+                    if(bigTrend.equals(direction)){ // 큰 트렌드와 일치할때 매매 진입
+                        try {
+                            makeOpenOrder(klineEvent, direction, remark);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
             }
@@ -1060,13 +1065,18 @@ public class FutureService {
 
             List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
             if (tradingEntityList.isEmpty()) { //오픈된 트레이딩이 없다면
-                String trend4h = "";
-                String trend1h = "";
-                String trend15m = "";
 
-                trendValidate(tempTradingEntity);
+                HashMap<String, Object> trendMap = trendValidate(tempTradingEntity);
+                String trend4h = String.valueOf(trendMap.get("trend4h"));
+                String trend1h = String.valueOf(trendMap.get("trend1h"));
+                String trend15m = String.valueOf(trendMap.get("trend15m"));
+                tradingEntity.setTrend4h(trend4h);
+                tradingEntity.setTrend1h(trend1h);
+                tradingEntity.setTrend15m(trend15m);
 
-                if (trendValidate(tempTradingEntity)) {
+                boolean resultFlag = trendMap.get("resultFlag").equals(true);
+
+                if (resultFlag) {
                     tempTradingEntity.setTrend4h(trend4h);
                     tempTradingEntity.setTrend1h(trend1h);
                     tempTradingEntity.setTrend15m(trend15m);
@@ -1080,7 +1090,7 @@ public class FutureService {
                         BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                         if (
                                 true
-                                &&expectationProfit.compareTo(BigDecimal.ZERO) > 0
+                                &&expectationProfit.compareTo(BigDecimal.ONE) > 0
                                 && (winTradeCount.compareTo(loseTradeCount) >= 0)
                         ) {
                             System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
@@ -1147,7 +1157,7 @@ public class FutureService {
         returnMap.put("trend4h", trend4h);
         returnMap.put("trend1h", trend1h);
         returnMap.put("trend15m", trend15m);
-        returnMap.put("result", resultFlag);
+        returnMap.put("resultFlag", resultFlag);
 
         return returnMap;
     }
