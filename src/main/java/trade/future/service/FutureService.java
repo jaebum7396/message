@@ -1096,8 +1096,8 @@ public class FutureService {
                         BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                         if (
                                 true
-                                &&expectationProfit.compareTo(BigDecimal.ZERO) > 0
-                                && (winTradeCount.compareTo(loseTradeCount) >= 0)
+                                &&expectationProfit.compareTo(BigDecimal.ONE) > 0
+                                && (winTradeCount.compareTo(loseTradeCount) > 0)
                         ) {
                             System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
                             overlappingData.add(item);
@@ -1949,7 +1949,7 @@ public class FutureService {
             }else{
                 weakSignal = 1;
             }
-        }else if(2 < totalSignalAbs
+        }else if(1 < totalSignalAbs
                 && totalSignalAbs < signalStandard
                 && !signalHide) {
             if (totalSignal < 0) {
