@@ -46,6 +46,18 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "TARGET_SYMBOL")
     private String targetSymbol; // 타게팅된 심볼
 
+    @Column( name = "TREND")
+    private String trend; // 5분 트렌드
+
+    @Column( name = "TREND_15m")
+    private String trend15m; // 15분 트렌드
+
+    @Column( name = "TREND_1h")
+    private String trend1h; // 1시간 트렌드
+
+    @Column( name = "TREND_4h")
+    private String trend4h; // 4시간 트렌드
+
     @Column( name = "LEVERAGE")
     int leverage; // 레버리지
 

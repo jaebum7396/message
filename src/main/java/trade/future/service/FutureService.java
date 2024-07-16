@@ -658,7 +658,7 @@ public class FutureService {
             marginTypeParamMap.put("marginType", "CROSSED");
             try{
                 marginTypeChange(marginTypeParamMap);
-            }catch (Exception e){
+            } catch (Exception e){
                 e.printStackTrace();
             }
 
@@ -1028,39 +1028,70 @@ public class FutureService {
             }
 
             String symbol = String.valueOf(item.get("symbol"));
+
+            //트레이딩 데이터 수집의 주가 되는 객체
             TradingEntity tempTradingEntity = tradingEntity.clone();
             tempTradingEntity.setSymbol(symbol);
+
+            //트레이딩 데이터 4h
+            TradingEntity tempTradingEntity4h = tempTradingEntity.clone();
+            tempTradingEntity4h.setCandleInterval("4h");
+            tempTradingEntity4h.setCandleCount(10);
+            //트레이딩 데이터 1h
+            TradingEntity tempTradingEntity1h = tempTradingEntity.clone();
+            tempTradingEntity1h.setCandleInterval("1h");
+            tempTradingEntity1h.setCandleCount(10);
+            //트레이딩 데이터 15m
+            TradingEntity tempTradingEntity15m = tempTradingEntity.clone();
+            tempTradingEntity15m.setCandleInterval("15m");
+            tempTradingEntity15m.setCandleCount(10);
+
             List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
-            if (tradingEntityList.isEmpty()) {
-                Map<String, Object> klineMap = getKlines(tempTradingEntity);
-                Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
-                TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempTradingEntity);
-                if (expectationProfitOpt.isPresent()){
-                    BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
-                    BigDecimal winTradeCount = new BigDecimal(String.valueOf(klineMap.get("winTradeCount")));
-                    BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
-                    if (
-                            true
-                            &&expectationProfit.compareTo(BigDecimal.ZERO) > 0
-                            && (winTradeCount.compareTo(loseTradeCount) >= 0)
-                    ) {
-                        System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
-                        overlappingData.add(item);
-                        reports.add(tempReport);
-                        count++;
+            if (tradingEntityList.isEmpty()) { //오픈된 트레이딩이 없다면
+                String trend4h = "";
+                String trend1h = "";
+                String trend15m = "";
+
+                // 4시간봉 데이터 수집
+                Map<String, Object> kline4hMap =getKlines(tempTradingEntity4h);
+                trend4h = String.valueOf(kline4hMap.get("currentTrendDi"));
+                //String.valueOf(kline4hMap.get("currentTrendMa"));
+
+                // 1시간봉 데이터 수집
+                Map<String, Object> kline1hMap = getKlines(tempTradingEntity1h);
+                trend1h = String.valueOf(kline1hMap.get("currentTrendDi"));
+                //String.valueOf(kline1hMap.get("currentTrendMa"));
+
+                // 15분봉 데이터 수집
+                Map<String, Object> kline15mMap = getKlines(tempTradingEntity15m);
+                trend15m = String.valueOf(kline15mMap.get("currentTrendDi"));
+                //String.valueOf(kline15mMap.get("currentTrendMa"));
+                System.out.println("symbol trend : " + symbol + " / trend4h(" + trend4h + ") trend1h (" + trend1h + " ) / trend15m (" + trend15m+")");
+
+                if (trend4h.equals(trend1h) && trend1h.equals(trend15m)) {
+                    tempTradingEntity.setTrend4h(trend4h);
+                    tempTradingEntity.setTrend1h(trend1h);
+                    tempTradingEntity.setTrend15m(trend15m);
+
+                    Map<String, Object> klineMap = getKlines(tempTradingEntity); // 모두 한방향일때 주가 되는 캔들데이터를 수집한다.
+                    Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
+                    TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempTradingEntity);
+                    if (expectationProfitOpt.isPresent()){
+                        BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
+                        BigDecimal winTradeCount = new BigDecimal(String.valueOf(klineMap.get("winTradeCount")));
+                        BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
+                        if (
+                                true
+                                &&expectationProfit.compareTo(BigDecimal.ZERO) > 0
+                                && (winTradeCount.compareTo(loseTradeCount) >= 0)
+                        ) {
+                            System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
+                            overlappingData.add(item);
+                            reports.add(tempReport);
+                            count++;
+                        }
                     }
                 }
-
-                /*if (
-                        true
-                        *//*&& ADX_CHECKER && tempReport.getCurrentAdxGrade().equals(ADX_GRADE.횡보)||
-                        (tempReport.getCurrentAdxGrade().getGrade() > ADX_GRADE.강한추세.getGrade() && tempReport.getAdxGap()>0)*//*
-                        //&& (tempReport.getClosePrice().compareTo(tempReport.getUbb())>0 || tempReport.getClosePrice().compareTo(tempReport.getLbb())<0)
-                ) {
-                    overlappingData.add(item);
-                    reports.add(tempReport);
-                    count++;
-                }*/
             }
         }
 
@@ -1340,10 +1371,11 @@ public class FutureService {
         JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
         List<KlineEntity> klineEntities = new ArrayList<>();
         BaseBarSeries series = new BaseBarSeries();
-        series.setMaximumBarCount(WINDOW_SIZE);
+        series.setMaximumBarCount(limit);
         seriesMap.put(tradingCd + "_" + interval, series);
 
         ArrayList<TechnicalIndicatorReportEntity> technicalIndicatorReportEntityArr = new ArrayList<>();
+
         BigDecimal expectationProfit = BigDecimal.ZERO;
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
@@ -1368,15 +1400,7 @@ public class FutureService {
                     BigDecimal currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity.getOpenPrice(), tempReport.getClosePrice(), tradingEntity.getCollateral(), tradingEntity.getLeverage(), tradingEntity.getPositionSide());
                     System.out.println("ROI : " + currentROI);
                     System.out.println("PnL : " + currentPnl);
-                    if (currentROI.compareTo(new BigDecimal("-20")) < 0){
-                        tradingEntity.setPositionStatus("CLOSE");
-                        tradingEntity.setClosePrice(tempReport.getClosePrice());
-
-                        BigDecimal currentProfit = calculateProfit(tradingEntity);
-                        System.out.println("강제 손절("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
-                        expectationProfit = expectationProfit.add(currentProfit);
-
-                    } else if((tempReport.getStrongSignal() < 0
+                    if((tempReport.getStrongSignal() < 0
                         || tempReport.getMidSignal() < 0
                         || tempReport.getWeakSignal() < 0)
                         && tradingEntity.getPositionSide().equals("LONG")){
@@ -1423,6 +1447,15 @@ public class FutureService {
                         tradingEntity.setTotalTradeCount(tradingEntity.getTotalTradeCount() + 1);
                     }
                 }
+                /*else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
+                    tradingEntity.setPositionStatus("CLOSE");
+                    tradingEntity.setClosePrice(tempReport.getClosePrice());
+
+                    BigDecimal currentProfit = calculateProfit(tradingEntity);
+                    System.out.println("강제 손절("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
+                    expectationProfit = expectationProfit.add(currentProfit);
+
+                }*/
             }
         }
         System.out.println("최종예상 수익("+tradingEntity.getSymbol()+") : " + expectationProfit);
@@ -1432,8 +1465,10 @@ public class FutureService {
         resultMap.put("result", klineEntities);
         resultMap.put("technicalIndicatorReportEntityArr", technicalIndicatorReportEntityArr);
         resultMap.put("expectationProfit", expectationProfit);
-        resultMap.put("winTradeCount", tradingEntity.getWinTradeCount());
+        resultMap.put("winTradeCount" , tradingEntity.getWinTradeCount());
         resultMap.put("loseTradeCount", tradingEntity.getLoseTradeCount());
+        resultMap.put("currentTrendDi", technicalIndicatorReportEntityArr.get(technicalIndicatorReportEntityArr.size()-1).getDirectionDi());
+        resultMap.put("currentTrendMa", technicalIndicatorReportEntityArr.get(technicalIndicatorReportEntityArr.size()-1).getDirectionMa());
 
         long endTime = System.currentTimeMillis(); // 종료 시간 기록
         long elapsedTime = endTime - startTime; // 실행 시간 계산
@@ -1515,11 +1550,14 @@ public class FutureService {
     }
 
     private TechnicalIndicatorReportEntity technicalIndicatorCalculate(TradingEntity tradingEntity) {
-
         // 변수 설정 -- tradingEntity에서 필요한 값 추출
         String tradingCd = tradingEntity.getTradingCd();
         String symbol = tradingEntity.getSymbol();
         String interval = tradingEntity.getCandleInterval();
+
+        String trend4h = tradingEntity.getTrend4h();
+        String trend1h = tradingEntity.getTrend1h();
+        String trend15m = tradingEntity.getTrend15m();
 
         //매매전략 변수 설정 -- tradingEntity에서 필요한 값 추출
 
@@ -1575,9 +1613,7 @@ public class FutureService {
             technicalIndicatorCheckers.add(movingAverageCheckerMap);
         }
 
-
         //int[] technicalIndicatorCheckers = {adxChecker, macdHistogramChecker, stochChecker, stochRsiChecker, rsiChecker, bollingerBandChecker};
-
 
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval); //{tradingCd}_{interval} 로 특정한다
         // 포맷 적용하여 문자열로 변환
@@ -1813,10 +1849,22 @@ public class FutureService {
             }
         }
 
+        boolean signalHide = true;
+        // 모든 트렌드가 일치하고 시그널 또한 같은 방향일때만 시그널을 노출한다.
+        if(trend4h !=null && trend1h !=null && trend15m !=null){
+            if(trend15m.equals("LONG") && trend1h.equals("LONG") && trend4h.equals("LONG") && totalSignal > 0
+                    ||trend15m.equals("SHORT") && trend1h.equals("SHORT") && trend4h.equals("SHORT") && totalSignal < 0){
+                //totalSignal = 0;
+                signalHide = false;
+            }
+        }
+
         int totalSignalAbs = Math.abs(totalSignal);
         double signalStandard = maxSignal/2;
-        //시그널 계산
+        // 시그널 계산
         //System.out.println("시그널계산식 : maxSignal/2 < totalSignalAbs : "+(maxSignal/2 +" "+totalSignalAbs));
+
+        // 약한 시그널은 언제나 감지한다.
         if(1 == totalSignalAbs
             //&& totalSignalAbs < signalStandard
         ){
@@ -1825,13 +1873,16 @@ public class FutureService {
             }else{
                 weakSignal = 1;
             }
-        }else if(1 < totalSignalAbs && totalSignalAbs < signalStandard) {
+        }else if(1 < totalSignalAbs
+                && totalSignalAbs < signalStandard
+                && signalHide) {
             if (totalSignal < 0) {
                 midSignal = -1;
             } else {
                 midSignal = 1;
             }
-        } else if (signalStandard <= totalSignalAbs){
+        } else if (signalStandard <= totalSignalAbs
+                && signalHide){
             if (totalSignal < 0){
                 strongSignal = -1;
                 //strongSignal = 1;
