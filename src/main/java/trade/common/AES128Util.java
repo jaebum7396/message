@@ -1,6 +1,6 @@
 package trade.common;
 
-import org.apache.tomcat.util.codec.binary.Base64;
+import org.apache.commons.codec.binary.Base64;
 import org.springframework.context.annotation.Configuration;
 
 import javax.crypto.Cipher;
