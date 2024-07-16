@@ -122,6 +122,13 @@ public class FutureService {
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
         getKlines(tradingEntity);
+        HashMap<String, Object> trendMap = trendValidate(tradingEntity);
+        String trend4h = String.valueOf(trendMap.get("trend4h"));
+        String trend1h = String.valueOf(trendMap.get("trend1h"));
+        String trend15m = String.valueOf(trendMap.get("trend15m"));
+        tradingEntity.setTrend4h(trend4h);
+        tradingEntity.setTrend1h(trend1h);
+        tradingEntity.setTrend15m(trend15m);
         //getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), "5m", 50);
         /*if (streamId.equals("1")){
             throw new RuntimeException("강제예외 발생");
@@ -426,46 +433,56 @@ public class FutureService {
     }
 
     private void klineProcess(String event){
-            JSONObject eventObj = new JSONObject(event);
-            JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
-            JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
-            boolean isFinal = klineObj.getBoolean("x");
+        JSONObject eventObj = new JSONObject(event);
+        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
+        boolean isFinal = klineObj.getBoolean("x");
 
-            String seriesNm = String.valueOf(eventObj.get("stream"));
-            String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
-            String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
+        String seriesNm = String.valueOf(eventObj.get("stream"));
+        String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
+        String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
 
-            boolean nextFlag = true;
-            List<TradingEntity> tradingEntitys = new ArrayList<>();
-            try{
-                tradingEntitys = getTradingEntity(symbol);
-                if(tradingEntitys.size() != 1){
-                    throw new RuntimeException("트레이딩이 존재하지 않거나 중복되어있습니다.");
-                }
-            } catch (Exception e){
-                nextFlag = false;
-                e.printStackTrace();
-                for(TradingEntity tradingEntity:tradingEntitys){
-                    restartTrading(tradingEntity);
-                }
+        boolean nextFlag = true;
+        List<TradingEntity> tradingEntitys = new ArrayList<>();
+        try{
+            tradingEntitys = getTradingEntity(symbol);
+            if(tradingEntitys.size() != 1){
+                throw new RuntimeException("트레이딩이 존재하지 않거나 중복되어있습니다.");
             }
-            //
-            if (nextFlag) {
-                TradingEntity tradingEntity = tradingEntitys.get(0);
-                BigDecimal currentROI;
-                BigDecimal currentPnl;
-                /*if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
-                    tradingEntity.setClosePrice(doulbleToBigDecimal(klineObj.getDouble("c")));
-                    currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity);
-                    currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity);
-                } else {
-                    currentROI = new BigDecimal("0");
-                    currentPnl = new BigDecimal("0");
-                }*/
+        } catch (Exception e){
+            nextFlag = false;
+            e.printStackTrace();
+            for(TradingEntity tradingEntity:tradingEntitys){
+                restartTrading(tradingEntity);
+            }
+        }
+        //
+        if (nextFlag) {
+            TradingEntity tradingEntity = tradingEntitys.get(0);
+            BigDecimal currentROI;
+            BigDecimal currentPnl;
+            /*if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                tradingEntity.setClosePrice(doulbleToBigDecimal(klineObj.getDouble("c")));
+                currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity);
+                currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity);
+            } else {
+                currentROI = new BigDecimal("0");
+                currentPnl = new BigDecimal("0");
+            }*/
+            /*System.out.println("ROI : " + currentROI);
+            System.out.println("PnL : " + currentPnl);*/
+            if(isFinal){
+                HashMap<String, Object> trendMap = trendValidate(tradingEntity);
+                String trend4h = String.valueOf(trendMap.get("trend4h"));
+                String trend1h = String.valueOf(trendMap.get("trend1h"));
+                String trend15m = String.valueOf(trendMap.get("trend15m"));
+                tradingEntity.setTrend4h(trend4h);
+                tradingEntity.setTrend1h(trend1h);
+                tradingEntity.setTrend15m(trend15m);
 
-                /*System.out.println("ROI : " + currentROI);
-                System.out.println("PnL : " + currentPnl);*/
-                if(isFinal){
+                boolean resultFlag = trendMap.get("resultFlag").equals("true");
+
+                if(resultFlag){ // 트렌드 검증 -- 큰 트렌드들이 모두 일치할때.
                     System.out.println("event : " + event);
                     // klineEvent를 데이터베이스에 저장
                     EventEntity eventEntity = saveKlineEvent(event, tradingEntitys.get(0));
@@ -506,16 +523,21 @@ public class FutureService {
                                     }
                                 }
                             }
-                            /*else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
-                                String remark = "강제 손절";
-                                makeCloseOrder(eventEntity, positionEvent, remark);
-                            }*/
+                        /*else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
+                            String remark = "강제 손절";
+                            makeCloseOrder(eventEntity, positionEvent, remark);
+                        }*/
                         }
                     },() -> {
 
                     });
+                }else{
+                    restartTrading(tradingEntity);
+                    System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+                    log.info("스트림 종료");
                 }
             }
+        }
     }
 
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
@@ -549,6 +571,7 @@ public class FutureService {
                     throw new TradingException(tradingEntity);
                 }
             } else {
+
                 if (technicalIndicatorReportEntity.getStrongSignal() != 0
                     ||technicalIndicatorReportEntity.getMidSignal() != 0
                     //&& (technicalIndicatorReportEntity.getAdxGap() > 1 || technicalIndicatorReportEntity.getAdxGap() < -1)
@@ -1035,42 +1058,15 @@ public class FutureService {
             TradingEntity tempTradingEntity = tradingEntity.clone();
             tempTradingEntity.setSymbol(symbol);
 
-            //트레이딩 데이터 4h
-            TradingEntity tempTradingEntity4h = tempTradingEntity.clone();
-            tempTradingEntity4h.setCandleInterval("4h");
-            tempTradingEntity4h.setCandleCount(10);
-            //트레이딩 데이터 1h
-            TradingEntity tempTradingEntity1h = tempTradingEntity.clone();
-            tempTradingEntity1h.setCandleInterval("1h");
-            tempTradingEntity1h.setCandleCount(10);
-            //트레이딩 데이터 15m
-            TradingEntity tempTradingEntity15m = tempTradingEntity.clone();
-            tempTradingEntity15m.setCandleInterval("15m");
-            tempTradingEntity15m.setCandleCount(10);
-
             List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
             if (tradingEntityList.isEmpty()) { //오픈된 트레이딩이 없다면
                 String trend4h = "";
                 String trend1h = "";
                 String trend15m = "";
 
-                // 4시간봉 데이터 수집
-                Map<String, Object> kline4hMap =getKlines(tempTradingEntity4h);
-                trend4h = String.valueOf(kline4hMap.get("currentTrendDi"));
-                //String.valueOf(kline4hMap.get("currentTrendMa"));
+                trendValidate(tempTradingEntity);
 
-                // 1시간봉 데이터 수집
-                Map<String, Object> kline1hMap = getKlines(tempTradingEntity1h);
-                trend1h = String.valueOf(kline1hMap.get("currentTrendDi"));
-                //String.valueOf(kline1hMap.get("currentTrendMa"));
-
-                // 15분봉 데이터 수집
-                Map<String, Object> kline15mMap = getKlines(tempTradingEntity15m);
-                trend15m = String.valueOf(kline15mMap.get("currentTrendDi"));
-                //String.valueOf(kline15mMap.get("currentTrendMa"));
-                System.out.println("symbol trend : " + symbol + " / trend4h(" + trend4h + ") trend1h (" + trend1h + " ) / trend15m (" + trend15m+")");
-
-                if (trend4h.equals(trend1h) && trend1h.equals(trend15m)) {
+                if (trendValidate(tempTradingEntity)) {
                     tempTradingEntity.setTrend4h(trend4h);
                     tempTradingEntity.setTrend1h(trend1h);
                     tempTradingEntity.setTrend15m(trend15m);
@@ -1106,6 +1102,54 @@ public class FutureService {
         resultMap.put("reports", reports);
         resultMap.put("overlappingData", overlappingData);
         return resultMap;
+    }
+
+    public HashMap<String,Object> trendValidate(TradingEntity tradingEntity){
+        HashMap<String, Object> returnMap = new HashMap<>();
+        //트레이딩 데이터 4h
+        TradingEntity tempTradingEntity4h = tradingEntity.clone();
+        tempTradingEntity4h.setCandleInterval("4h");
+        tempTradingEntity4h.setCandleCount(10);
+        //트레이딩 데이터 1h
+        TradingEntity tempTradingEntity1h = tradingEntity.clone();
+        tempTradingEntity1h.setCandleInterval("1h");
+        tempTradingEntity1h.setCandleCount(10);
+        //트레이딩 데이터 15m
+        TradingEntity tempTradingEntity15m = tradingEntity.clone();
+        tempTradingEntity15m.setCandleInterval("15m");
+        tempTradingEntity15m.setCandleCount(10);
+
+        String trend4h = "";
+        String trend1h = "";
+        String trend15m = "";
+
+        // 4시간봉 데이터 수집
+        Map<String, Object> kline4hMap =getKlines(tempTradingEntity4h);
+        trend4h = String.valueOf(kline4hMap.get("currentTrendDi"));
+        //String.valueOf(kline4hMap.get("currentTrendMa"));
+
+        // 1시간봉 데이터 수집
+        Map<String, Object> kline1hMap = getKlines(tempTradingEntity1h);
+        trend1h = String.valueOf(kline1hMap.get("currentTrendDi"));
+        //String.valueOf(kline1hMap.get("currentTrendMa"));
+
+        // 15분봉 데이터 수집
+        Map<String, Object> kline15mMap = getKlines(tempTradingEntity15m);
+        trend15m = String.valueOf(kline15mMap.get("currentTrendDi"));
+        //String.valueOf(kline15mMap.get("currentTrendMa"));
+
+        System.out.println("symbol trend : " + tradingEntity.getSymbol() + " / trend4h(" + trend4h + ") trend1h (" + trend1h + " ) / trend15m (" + trend15m+")");
+
+        boolean resultFlag = true
+                //&& trend1h.equals(trend15m)
+                && trend4h.equals(trend1h) && trend1h.equals(trend15m);
+
+        returnMap.put("trend4h", trend4h);
+        returnMap.put("trend1h", trend1h);
+        returnMap.put("trend15m", trend15m);
+        returnMap.put("result", resultFlag);
+
+        return returnMap;
     }
 
     public BigDecimal calculateProfit(TradingEntity tradingEntity){
