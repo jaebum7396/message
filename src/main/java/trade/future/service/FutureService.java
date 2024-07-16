@@ -482,7 +482,7 @@ public class FutureService {
 
                 boolean resultFlag = trendMap.get("resultFlag").equals(true);
 
-                log.info("!!!!!!!!!!!!!!!!!트렌드 검증!!!!!!!!!!!!!!!!!!"+resultFlag+" 4h/"+trend4h+" 1h/"+trend1h+" 15m/"+trend15m);
+                //log.info("!!!!!!!!!!!!!!!!!트렌드 검증!!!!!!!!!!!!!!!!!!"+resultFlag+" 4h/"+trend4h+" 1h/"+trend1h+" 15m/"+trend15m);
 
                 if(resultFlag){ // 트렌드 검증 -- 큰 트렌드들이 모두 일치할때.
                     System.out.println("event : " + event);
@@ -614,7 +614,7 @@ public class FutureService {
                             ? (technicalIndicatorReportEntity.getStrongSignal() == 1 ? "LONG" : "SHORT") :
                             (technicalIndicatorReportEntity.getMidSignal() == 1 ? "LONG" : "SHORT") ;
 
-                    String bigTrend = tradingEntity.getTrend4h();
+                    String bigTrend = tradingEntity.getTrend15m();
                     if(bigTrend.equals(direction)){ // 큰 트렌드와 일치할때 매매 진입
                         try {
                             makeOpenOrder(klineEvent, direction, remark);
@@ -1092,7 +1092,7 @@ public class FutureService {
                         BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                         if (
                                 true
-                                &&expectationProfit.compareTo(BigDecimal.ONE) > 0
+                                &&expectationProfit.compareTo(BigDecimal.ZERO) > 0
                                 && (winTradeCount.compareTo(loseTradeCount) >= 0)
                         ) {
                             System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
@@ -1153,8 +1153,9 @@ public class FutureService {
         System.out.println("symbol trend : " + tradingEntity.getSymbol() + " / trend4h(" + trend4h + ") trend1h (" + trend1h + " ) / trend15m (" + trend15m+")");
 
         boolean resultFlag = true
+                //&& trend4h.equals(trend1h)
                 //&& trend1h.equals(trend15m)
-                && trend4h.equals(trend1h) && trend1h.equals(trend15m);
+                ;
 
         returnMap.put("trend4h", trend4h);
         returnMap.put("trend1h", trend1h);
@@ -1910,8 +1911,14 @@ public class FutureService {
         boolean signalHide = true;
         // 모든 트렌드가 일치하고 시그널 또한 같은 방향일때만 시그널을 노출한다.
         if(trend4h !=null && trend1h !=null && trend15m !=null){
-            if(trend15m.equals("LONG") && trend1h.equals("LONG") && trend4h.equals("LONG") && totalSignal > 0
-                    ||trend15m.equals("SHORT") && trend1h.equals("SHORT") && trend4h.equals("SHORT") && totalSignal < 0){
+            if(trend15m.equals("LONG")
+                //&& trend1h.equals("LONG")
+                //&& trend4h.equals("LONG")
+                && totalSignal > 0
+                ||trend15m.equals("SHORT")
+                //&& trend1h.equals("SHORT")
+                //&& trend4h.equals("SHORT")
+                && totalSignal < 0){
                 //totalSignal = 0;
                 signalHide = false;
             }
@@ -1933,14 +1940,14 @@ public class FutureService {
             }
         }else if(1 < totalSignalAbs
                 && totalSignalAbs < signalStandard
-                && signalHide) {
+                && !signalHide) {
             if (totalSignal < 0) {
                 midSignal = -1;
             } else {
                 midSignal = 1;
             }
         } else if (signalStandard <= totalSignalAbs
-                && signalHide){
+                && !signalHide){
             if (totalSignal < 0){
                 strongSignal = -1;
                 //strongSignal = 1;
