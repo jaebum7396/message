@@ -739,7 +739,7 @@ public class FutureService {
             closePosition.setPositionStatus("CLOSE");
             closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
-            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_RED+"*********************[청산 - 청산사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
+            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_RED+"*********************[청산/"+closePosition.getRealizatioPnl()+" - 청산사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
             //throw new TradingException(tradingEntity);
