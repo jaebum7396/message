@@ -82,6 +82,7 @@ public class PositionEntity extends BaseEntity implements Serializable {
     @Column( name = "PROFIT", precision = 19, scale = 8)
     private BigDecimal profit; // 수익입니다. 포지션의 수익을 나타냅니다.
 
+
     @Column( name = "BID_NOTIONAL", precision = 19, scale = 8)
     private BigDecimal bidNotional; // 매도 명목 가치입니다. 매도 주문의 명목 가치를 나타냅니다.
 
@@ -100,6 +101,9 @@ public class PositionEntity extends BaseEntity implements Serializable {
 
     @Column( name = "GOAL_PRICE_PERCENT", precision = 19, scale = 8)
     private int goalPricePercent;
+
+    @Column( name = "ROI", precision = 19, scale = 8)
+    private BigDecimal roi; // 실현손익비율
 
     @Column( name = "REALIZATION_PNL", precision = 19, scale = 8)
     private BigDecimal realizatioPnl; // 실현손익
@@ -135,6 +139,7 @@ public class PositionEntity extends BaseEntity implements Serializable {
                 ", closePrice=" + closePrice +
                 ", positionAmt=" + positionAmt +
                 ", profit=" + profit +
+                ", roi=" + roi +
                 ", bidNotional=" + bidNotional +
                 ", positionStatus='" + positionStatus + '\'' +
                 ", goalPriceCheck=" + goalPriceCheck +

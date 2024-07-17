@@ -459,18 +459,6 @@ public class FutureService {
         //
         if (nextFlag) {
             TradingEntity tradingEntity = tradingEntitys.get(0);
-            BigDecimal currentROI;
-            BigDecimal currentPnl;
-            /*if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
-                tradingEntity.setClosePrice(doulbleToBigDecimal(klineObj.getDouble("c")));
-                currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity);
-                currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity);
-            } else {
-                currentROI = new BigDecimal("0");
-                currentPnl = new BigDecimal("0");
-            }*/
-            /*System.out.println("ROI : " + currentROI);
-            System.out.println("PnL : " + currentPnl);*/
             if(isFinal){
                 HashMap<String, Object> trendMap = trendValidate(tradingEntity);
                 String trend4h = String.valueOf(trendMap.get("trend4h"));
@@ -484,7 +472,7 @@ public class FutureService {
 
                 //log.info("!!!!!!!!!!!!!!!!!트렌드 검증!!!!!!!!!!!!!!!!!!"+resultFlag+" 4h/"+trend4h+" 1h/"+trend1h+" 15m/"+trend15m);
 
-                if(resultFlag){ // 트렌드 검증 -- 큰 트렌드들이 모두 일치할때.
+                //if(resultFlag){ // 트렌드 검증 -- 큰 트렌드들이 모두 일치할때.
                     System.out.println("event : " + event);
                     // klineEvent를 데이터베이스에 저장
                     EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
@@ -493,20 +481,51 @@ public class FutureService {
                     Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                     openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
                         TechnicalIndicatorReportEntity positionReport = positionEvent.getKlineEntity().getTechnicalIndicatorReportEntity();
+                        PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+
+                        BigDecimal currentROI;
+                        BigDecimal currentPnl;
+                        if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                            currentROI = TechnicalIndicatorCalculator.calculateROI(closePosition.getEntryPrice(), technicalIndicatorReportEntity.getClosePrice(), tradingEntity.getLeverage(), closePosition.getPositionSide());
+                            currentPnl = TechnicalIndicatorCalculator.calculatePnL(closePosition.getEntryPrice(), technicalIndicatorReportEntity.getClosePrice(), tradingEntity.getCollateral(), tradingEntity.getLeverage(), closePosition.getPositionSide());
+                        } else {
+                            currentROI = new BigDecimal("0");
+                            currentPnl = new BigDecimal("0");
+                        }
+                        closePosition.setRoi(currentROI);
+                        closePosition.setProfit(currentPnl);
+                        System.out.println("ROI : " + currentROI);
+                        System.out.println("PNL : " + currentPnl);
+
+                        // 테스트 모드 청산
                         if(DEV_FLAG){
                             String remark = "테스트 청산";
-                            PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-                            if(closePosition.getPositionStatus().equals("OPEN")){
-                                makeCloseOrder(eventEntity, positionEvent, remark);
-                            }
-                        } else {
+                            closePosition.setRealizatioPnl(currentPnl);
+                            positionEvent.getKlineEntity().setPositionEntity(closePosition);
+                            makeCloseOrder(eventEntity, positionEvent, remark);
+                        }
+                        // 진입 당시의 트렌드와 현재 트렌드가 다르다면 청산
+                        else if (!tradingEntity.getTrend15m().equals(closePosition.getPositionSide())){
+                            String remark = "트렌드 역전 청산";
+                            closePosition.setRealizatioPnl(currentPnl);
+                            positionEvent.getKlineEntity().setPositionEntity(closePosition);
+                            makeCloseOrder(eventEntity, positionEvent, remark);
+                        }
+                        // 포지션의 수익률이 -20% 이하라면 청산
+                        else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
+                            String remark = "수익률 하한선 돌파 청산";
+                            closePosition.setRealizatioPnl(currentPnl);
+                            positionEvent.getKlineEntity().setPositionEntity(closePosition);
+                            makeCloseOrder(eventEntity, positionEvent, remark);
+                        }
+                        // 이하는 시그널에 따른 청산
+                        else {
                             if(technicalIndicatorReportEntity.getWeakSignal() != 0
-                                    ||technicalIndicatorReportEntity.getMidSignal() !=0
-                                    ||technicalIndicatorReportEntity.getStrongSignal() !=0){
+                                ||technicalIndicatorReportEntity.getMidSignal() !=0
+                                ||technicalIndicatorReportEntity.getStrongSignal() !=0){
                                 String weakSignal   = technicalIndicatorReportEntity.getWeakSignal() != 0 ? (technicalIndicatorReportEntity.getWeakSignal() == 1 ? "LONG" : "SHORT") : "";
                                 String midSignal    = technicalIndicatorReportEntity.getMidSignal() != 0 ? (technicalIndicatorReportEntity.getMidSignal() == 1 ? "LONG" : "SHORT") : "";
                                 String strongSignal = technicalIndicatorReportEntity.getStrongSignal() != 0 ? (technicalIndicatorReportEntity.getStrongSignal() == 1 ? "LONG" : "SHORT") : "";
-                                PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
                                 if(closePosition.getPositionStatus().equals("OPEN")){
                                     String positionSide = closePosition.getPositionSide();
                                     boolean isClose = false;
@@ -520,24 +539,22 @@ public class FutureService {
                                         isClose = true;
                                     }
                                     if(isClose){
+                                        closePosition.setRealizatioPnl(currentPnl);
+                                        positionEvent.getKlineEntity().setPositionEntity(closePosition);
                                         String remark = "weakSignal(" + weakSignal + ") midSignal(" + midSignal + ") strongSignal(" + strongSignal + ")";
                                         makeCloseOrder(eventEntity, positionEvent, remark);
                                     }
                                 }
                             }
-                        /*else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
-                            String remark = "강제 손절";
-                            makeCloseOrder(eventEntity, positionEvent, remark);
-                        }*/
                         }
                     },() -> {
 
                     });
-                }else{
+                /*}else{
                     restartTrading(tradingEntity);
                     System.out.println("closeTradingEntity >>>>> " + tradingEntity);
                     log.info("스트림 종료");
-                }
+                }*/
             }
         }
     }
@@ -700,6 +717,7 @@ public class FutureService {
 
             //주문 제출
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "OPEN"));
+            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_GREEN+"*********************[진입 - 진입사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
             //tradingRepository.save(tradingEntity);
         } catch (Exception e) {
             e.printStackTrace();
@@ -721,7 +739,7 @@ public class FutureService {
             closePosition.setPositionStatus("CLOSE");
             closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
-
+            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_RED+"*********************[청산 - 청산사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
             //throw new TradingException(tradingEntity);
