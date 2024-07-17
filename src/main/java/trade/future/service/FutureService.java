@@ -505,12 +505,12 @@ public class FutureService {
                             makeCloseOrder(eventEntity, positionEvent, remark);
                         }
                         // 진입 당시의 트렌드와 현재 트렌드가 다르다면 청산
-                        else if (!tradingEntity.getTrend15m().equals(closePosition.getPositionSide())){
+                        /*else if (!tradingEntity.getTrend15m().equals(closePosition.getPositionSide())){
                             String remark = "트렌드 역전 청산";
                             closePosition.setRealizatioPnl(currentPnl);
                             positionEvent.getKlineEntity().setPositionEntity(closePosition);
                             makeCloseOrder(eventEntity, positionEvent, remark);
-                        }
+                        }*/
                         // 포지션의 수익률이 -20% 이하라면 청산
                         else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
                             String remark = "수익률 하한선 돌파 청산";
