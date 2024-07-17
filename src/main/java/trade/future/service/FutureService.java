@@ -1513,6 +1513,14 @@ public class FutureService {
                         }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
                             tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
                         }
+                    } else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
+                        tradingEntity.setPositionStatus("CLOSE");
+                        tradingEntity.setClosePrice(tempReport.getClosePrice());
+
+                        BigDecimal currentProfit = calculateProfit(tradingEntity);
+                        System.out.println("강제 손절("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
+                        expectationProfit = expectationProfit.add(currentProfit);
+
                     }
                 } else if(tradingEntity.getPositionStatus() == null || tradingEntity.getPositionStatus().equals("CLOSE")){
                     if (tempReport.getStrongSignal() != 0 || tempReport.getMidSignal() != 0) {
@@ -1528,15 +1536,6 @@ public class FutureService {
                         tradingEntity.setTotalTradeCount(tradingEntity.getTotalTradeCount() + 1);
                     }
                 }
-                /*else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
-                    tradingEntity.setPositionStatus("CLOSE");
-                    tradingEntity.setClosePrice(tempReport.getClosePrice());
-
-                    BigDecimal currentProfit = calculateProfit(tradingEntity);
-                    System.out.println("강제 손절("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
-                    expectationProfit = expectationProfit.add(currentProfit);
-
-                }*/
             }
         }
         System.out.println("최종예상 수익("+tradingEntity.getSymbol()+") : " + expectationProfit);
