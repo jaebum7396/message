@@ -1738,7 +1738,7 @@ public class FutureService {
         String directionMA = technicalIndicatorCalculator.determineTrend(series, sma);
 
         // DI 기준으로 방향을 가져온다.
-        String directionDI = technicalIndicatorCalculator.getDirection(series, longMovingPeriod, series.getEndIndex());
+        String directionDI = technicalIndicatorCalculator.getDirection(series, shortMovingPeriod, series.getEndIndex());
 
         //di
         double plusDi  = technicalIndicatorCalculator.calculatePlusDI(series, longMovingPeriod, series.getEndIndex());
