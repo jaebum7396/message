@@ -523,10 +523,12 @@ public class FutureService {
                             //MACD 히스토그램이 역전됐을 경우
                             if (technicalIndicatorReportEntity.getMacdHistogramGap()>0&&closePosition.getPositionSide().equals("SHORT")
                                 ||technicalIndicatorReportEntity.getMacdHistogramGap()<0&&closePosition.getPositionSide().equals("LONG")){
-                                String remark = closePosition.getPositionSide()+"청산 MACD HISTOGRAM 역전 시그널";
-                                closePosition.setRealizatioPnl(currentPnl);
-                                positionEvent.getKlineEntity().setPositionEntity(closePosition);
-                                makeCloseOrder(eventEntity, positionEvent, remark);
+                                if (!closePosition.getKlineEntity().getKLineCd().equals(technicalIndicatorReportEntity.getKlineEntity().getKLineCd())){
+                                    String remark = closePosition.getPositionSide()+"청산 MACD HISTOGRAM 역전 시그널";
+                                    closePosition.setRealizatioPnl(currentPnl);
+                                    positionEvent.getKlineEntity().setPositionEntity(closePosition);
+                                    makeCloseOrder(eventEntity, positionEvent, remark);
+                                }
                             }else if(technicalIndicatorReportEntity.getWeakSignal() != 0 //기타 시그널
                                 ||technicalIndicatorReportEntity.getMidSignal() !=0
                                 ||technicalIndicatorReportEntity.getStrongSignal() !=0){
@@ -2019,13 +2021,11 @@ public class FutureService {
             if((trend15m.equals("LONG")
                 //&& trend1h.equals("LONG")
                 //&& trend4h.equals("LONG")
-                && totalSignal > 0
-                && macdReversalSignal == 1)
+                && totalSignal > 0)
                 ||(trend15m.equals("SHORT")
                 //&& trend1h.equals("SHORT")
                 //&& trend4h.equals("SHORT")
-                && totalSignal < 0
-                && macdReversalSignal == -1)){
+                && totalSignal < 0)){
                 //totalSignal = 0;
                 signalHide = false;
             }
