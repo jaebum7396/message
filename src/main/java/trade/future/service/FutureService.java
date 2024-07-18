@@ -1573,6 +1573,18 @@ public class FutureService {
                         }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
                             tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
                         }
+                    } else if (tempReport.getMacdHistogramGap() < 0 && tradingEntity.getPositionSide().equals("LONG")
+                            || tempReport.getMacdHistogramGap() > 0 && tradingEntity.getPositionSide().equals("SHORT")){
+                        tradingEntity.setPositionStatus("CLOSE");
+                        tradingEntity.setClosePrice(tempReport.getClosePrice());
+
+                        BigDecimal currentProfit = calculateProfit(tradingEntity);
+                        System.out.println("MACD 갭 청산("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
+                        if (currentProfit.compareTo(BigDecimal.ZERO) < 0) {
+                            tradingEntity.setLoseTradeCount(tradingEntity.getLoseTradeCount() + 1);
+                        }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
+                            tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
+                        }
                     }
                 } else if(tradingEntity.getPositionStatus() == null || tradingEntity.getPositionStatus().equals("CLOSE")){
                     if (tempReport.getStrongSignal() != 0 || tempReport.getMidSignal() != 0) {
