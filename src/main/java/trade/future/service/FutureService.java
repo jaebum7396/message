@@ -562,7 +562,7 @@ public class FutureService {
                                             remark += "MACD("+(macdReversalSignal == 1 ? "LONG" : "SHORT") + ") ";
                                         }
                                         if(macdCrossSignal != 0){
-                                            remark += "MACD("+(macdCrossSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                            remark += "MACD CROSS("+(macdCrossSignal == 1 ? "LONG" : "SHORT") + ") ";
                                         }
                                         if(rsiSignal != 0){
                                             remark += "RSI("+(rsiSignal == 1 ? "LONG" : "SHORT") + ") ";
@@ -650,7 +650,7 @@ public class FutureService {
                         remark += "MACD("+(macdReversalSignal == 1 ? "LONG" : "SHORT") + ") ";
                     }
                     if(macdCrossSignal != 0){
-                        remark += "MACD("+(macdCrossSignal == 1 ? "LONG" : "SHORT") + ") ";
+                        remark += "MACD CROSS("+(macdCrossSignal == 1 ? "LONG" : "SHORT") + ") ";
                     }
                     if(rsiSignal != 0){
                         remark += "RSI("+(rsiSignal == 1 ? "LONG" : "SHORT") + ") ";
@@ -1553,8 +1553,11 @@ public class FutureService {
 
                         BigDecimal currentProfit = calculateProfit(tradingEntity);
                         System.out.println("강제 손절("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
-                        expectationProfit = expectationProfit.add(currentProfit);
-
+                        if (currentProfit.compareTo(BigDecimal.ZERO) < 0) {
+                            tradingEntity.setLoseTradeCount(tradingEntity.getLoseTradeCount() + 1);
+                        }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
+                            tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
+                        }
                     }
                 } else if(tradingEntity.getPositionStatus() == null || tradingEntity.getPositionStatus().equals("CLOSE")){
                     if (tempReport.getStrongSignal() != 0 || tempReport.getMidSignal() != 0) {
@@ -1789,7 +1792,7 @@ public class FutureService {
         String directionMA = technicalIndicatorCalculator.determineTrend(series, sma);
 
         // DI 기준으로 방향을 가져온다.
-        String directionDI = technicalIndicatorCalculator.getDirection(series, longMovingPeriod, series.getEndIndex());
+        String directionDI = technicalIndicatorCalculator.getDirection(series, shortMovingPeriod, series.getEndIndex());
 
         //di
         double plusDi  = technicalIndicatorCalculator.calculatePlusDI(series, longMovingPeriod, series.getEndIndex());
@@ -2006,15 +2009,18 @@ public class FutureService {
                 weakSignal = 1;
             }
         }else if(1 < totalSignalAbs
-                && totalSignalAbs < signalStandard
-                && !signalHide) {
+            && totalSignalAbs < signalStandard
+            && !signalHide
+        ) {
             if (totalSignal < 0) {
                 midSignal = -1;
             } else {
                 midSignal = 1;
             }
-        } else if (signalStandard <= totalSignalAbs
-                && !signalHide){
+        } else if (
+            signalStandard <= totalSignalAbs
+            && !signalHide
+        ){
             if (totalSignal < 0){
                 strongSignal = -1;
                 //strongSignal = 1;
