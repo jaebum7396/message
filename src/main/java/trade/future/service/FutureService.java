@@ -670,7 +670,15 @@ public class FutureService {
                             (technicalIndicatorReportEntity.getMidSignal() == 1 ? "LONG" : "SHORT") ;
 
                     String bigTrend = tradingEntity.getTrend15m();
-                    if(bigTrend.equals(direction)){ // 큰 트렌드와 일치할때 매매 진입
+                    if(tradingEntity.getTrendFollowFlag() ==1){
+                        if(bigTrend.equals(direction)){ // 큰 트렌드와 일치할때 매매 진입
+                            try {
+                                makeOpenOrder(klineEvent, direction, remark);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    } else {
                         try {
                             makeOpenOrder(klineEvent, direction, remark);
                         } catch (Exception e) {
@@ -1679,6 +1687,9 @@ public class FutureService {
         //매매전략 변수 설정 -- tradingEntity에서 필요한 값 추출
 
         ArrayList<HashMap<String,Object>> technicalIndicatorCheckers = new ArrayList<>();
+
+        int trendFollowFlag = tradingEntity.getTrendFollowFlag();
+
         int adxChecker = tradingEntity.getAdxChecker();
         int macdHistogramChecker = tradingEntity.getMacdHistogramChecker();
         int macdCrossChecker = tradingEntity.getMacdCrossChecker();
@@ -1976,7 +1987,12 @@ public class FutureService {
             }
         }
 
-        boolean signalHide = true;
+        boolean signalHide = false;
+        if(trendFollowFlag == 1){
+            signalHide = true;
+        }else{
+            signalHide = false;
+        }
         // 모든 트렌드가 일치하고 시그널 또한 같은 방향일때만 시그널을 노출한다.
         if(trend4h !=null && trend1h !=null && trend15m !=null){
             if((trend15m.equals("LONG")
