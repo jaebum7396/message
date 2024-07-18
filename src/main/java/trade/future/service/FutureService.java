@@ -1881,8 +1881,11 @@ public class FutureService {
         double maxSignal = 0;
         for (HashMap<String, Object> technicalIndicatorCheckerMap : technicalIndicatorCheckers) {
             if (technicalIndicatorCheckerMap.get("key").equals("bollingerBandChecker")) {
-                maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value"))*2; //볼린저밴드일 경우 가중치
-            } else {
+                maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value")); //볼린저밴드일 경우 가중치
+            } else if(technicalIndicatorCheckerMap.get("key").equals("macdHistogramChecker")){
+                maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value"))*0; //macd 경우 가중치
+            }
+            else {
                 maxSignal += Math.abs((Integer) technicalIndicatorCheckerMap.get("value"));
             }
         }
@@ -1894,7 +1897,7 @@ public class FutureService {
             }
         }
         if(macdHistogramChecker == 1){
-            totalSignal += macdReversalSignal;
+            //totalSignal += macdReversalSignal;
             if (macdReversalSignal != 0){
                 signalLog += "MACD SIGNAL("+ macdReversalSignal+") ";
             }
@@ -1939,14 +1942,16 @@ public class FutureService {
         boolean signalHide = true;
         // 모든 트렌드가 일치하고 시그널 또한 같은 방향일때만 시그널을 노출한다.
         if(trend4h !=null && trend1h !=null && trend15m !=null){
-            if(trend15m.equals("LONG")
+            if((trend15m.equals("LONG")
                 //&& trend1h.equals("LONG")
                 //&& trend4h.equals("LONG")
                 && totalSignal > 0
-                ||trend15m.equals("SHORT")
+                && macdReversalSignal == 1)
+                ||(trend15m.equals("SHORT")
                 //&& trend1h.equals("SHORT")
                 //&& trend4h.equals("SHORT")
-                && totalSignal < 0){
+                && totalSignal < 0
+                && macdReversalSignal == -1)){
                 //totalSignal = 0;
                 signalHide = false;
             }
