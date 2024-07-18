@@ -541,7 +541,41 @@ public class FutureService {
                                     if(isClose){
                                         closePosition.setRealizatioPnl(currentPnl);
                                         positionEvent.getKlineEntity().setPositionEntity(closePosition);
-                                        String remark = "weakSignal(" + weakSignal + ") midSignal(" + midSignal + ") strongSignal(" + strongSignal + ")";
+
+                                        int adxDirectionSignal = technicalIndicatorReportEntity.getAdxDirectionSignal();
+                                        int bollingerBandSignal = technicalIndicatorReportEntity.getBollingerBandSignal();
+                                        int macdReversalSignal = technicalIndicatorReportEntity.getMacdReversalSignal();
+                                        int macdCrossSignal = technicalIndicatorReportEntity.getMacdCrossSignal();
+                                        int rsiSignal = technicalIndicatorReportEntity.getRsiSignal();
+                                        int stochSignal = technicalIndicatorReportEntity.getStochSignal();
+                                        int stochasticRsiSignal = technicalIndicatorReportEntity.getStochRsiSignal();
+                                        int movingAverageSignal = technicalIndicatorReportEntity.getMovingAverageSignal();
+
+                                        String remark = "";
+                                        if(bollingerBandSignal != 0){
+                                            remark += "BOLLINGER("+(bollingerBandSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
+                                        if(adxDirectionSignal != 0){
+                                            remark += "ADX("+(adxDirectionSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
+                                        if(macdReversalSignal != 0){
+                                            remark += "MACD("+(macdReversalSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
+                                        if(macdCrossSignal != 0){
+                                            remark += "MACD("+(macdCrossSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
+                                        if(rsiSignal != 0){
+                                            remark += "RSI("+(rsiSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
+                                        if(stochSignal != 0){
+                                            remark += "STOCH("+(stochSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
+                                        if(stochasticRsiSignal != 0){
+                                            remark += "STOCHRSI("+(stochasticRsiSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
+                                        if(movingAverageSignal != 0){
+                                            remark += "MA("+(movingAverageSignal == 1 ? "LONG" : "SHORT") + ") ";
+                                        }
                                         makeCloseOrder(eventEntity, positionEvent, remark);
                                     }
                                 }
