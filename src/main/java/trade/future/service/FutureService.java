@@ -520,7 +520,14 @@ public class FutureService {
                         }
                         // 이하는 시그널에 따른 청산
                         else {
-                            if(technicalIndicatorReportEntity.getWeakSignal() != 0
+                            //MACD 히스토그램이 역전됐을 경우
+                            if (technicalIndicatorReportEntity.getMacdHistogramGap()>0&&closePosition.getPositionSide().equals("SHORT")
+                                ||technicalIndicatorReportEntity.getMacdHistogramGap()<0&&closePosition.getPositionSide().equals("LONG")){
+                                String remark = closePosition.getPositionSide()+"청산 MACD HISTOGRAM 역전 시그널";
+                                closePosition.setRealizatioPnl(currentPnl);
+                                positionEvent.getKlineEntity().setPositionEntity(closePosition);
+                                makeCloseOrder(eventEntity, positionEvent, remark);
+                            }else if(technicalIndicatorReportEntity.getWeakSignal() != 0 //기타 시그널
                                 ||technicalIndicatorReportEntity.getMidSignal() !=0
                                 ||technicalIndicatorReportEntity.getStrongSignal() !=0){
                                 String weakSignal   = technicalIndicatorReportEntity.getWeakSignal() != 0 ? (technicalIndicatorReportEntity.getWeakSignal() == 1 ? "LONG" : "SHORT") : "";
@@ -1859,9 +1866,11 @@ public class FutureService {
         int macdCrossSignal = 0;
         int macdReversalSignal = 0;
         double currentMacd = 0;
+        double macdHistogramGap = 0;
 
         HashMap<String,Object> macdStrategy = technicalIndicatorCalculator.macdStrategy(series, closePrice);
         currentMacd = (double) macdStrategy.get("currentMacd");
+        macdHistogramGap = (double) macdStrategy.get("macdHistogramGap");
 
         if (macdHistogramChecker == 1){
             macdCrossSignal = (int) macdStrategy.get("macdCrossSignal");
@@ -2092,6 +2101,7 @@ public class FutureService {
                 .macd(doulbleToBigDecimal(currentMacd).setScale(10, RoundingMode.DOWN))
                 .macdReversalSignal(macdReversalSignal)
                 .macdCrossSignal(macdCrossSignal)
+                .macdHistogramGap(macdHistogramGap)
                 //rsi관련
                 .rsi(BigDecimal.valueOf(currentRsi))
                 .rsiSignal(rsiSignal)

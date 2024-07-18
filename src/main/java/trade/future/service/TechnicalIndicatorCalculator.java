@@ -362,6 +362,7 @@ public class TechnicalIndicatorCalculator {
 
         resultMap.put("currentMacd", macd.getValue(series.getEndIndex()).doubleValue());
         resultMap.put("currentMacdHistogram", currentMacdHistogram);
+        resultMap.put("macdHistogramGap", macdHistogramGap);
         resultMap.put("macdCrossSignal", macdCrossSignal);
         resultMap.put("macdReversalSignal", macdReversalSignal);
         resultMap.put("commonRemark", commonRemark);

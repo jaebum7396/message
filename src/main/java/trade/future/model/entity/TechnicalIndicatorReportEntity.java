@@ -138,6 +138,9 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column( name = "MOVING_AVERAGE_SIGNAL")
     private int movingAverageSignal;
 
+    @Column( name = "MACD_HISTOGRAM_GAP")
+    private double macdHistogramGap;
+
     @Column(name = "WEAK_SIGNAL")
     private int weakSignal;
 
