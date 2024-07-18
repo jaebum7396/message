@@ -521,14 +521,13 @@ public class FutureService {
                         // 이하는 시그널에 따른 청산
                         else {
                             //MACD 히스토그램이 역전됐을 경우
-                            if (technicalIndicatorReportEntity.getMacdHistogramGap()>0&&closePosition.getPositionSide().equals("SHORT")
-                                ||technicalIndicatorReportEntity.getMacdHistogramGap()<0&&closePosition.getPositionSide().equals("LONG")){
-                                if (!closePosition.getKlineEntity().getKLineCd().equals(technicalIndicatorReportEntity.getKlineEntity().getKLineCd())){
-                                    String remark = closePosition.getPositionSide()+"청산 MACD HISTOGRAM 역전 시그널";
-                                    closePosition.setRealizatioPnl(currentPnl);
-                                    positionEvent.getKlineEntity().setPositionEntity(closePosition);
-                                    makeCloseOrder(eventEntity, positionEvent, remark);
-                                }
+                            if ((technicalIndicatorReportEntity.getMacdHistogramGap()>0&&closePosition.getPositionSide().equals("SHORT")
+                                ||technicalIndicatorReportEntity.getMacdHistogramGap()<0&&closePosition.getPositionSide().equals("LONG"))
+                                &&!closePosition.getKlineEntity().getKLineCd().equals(technicalIndicatorReportEntity.getKlineEntity().getKLineCd())){
+                                String remark = closePosition.getPositionSide()+"청산 MACD HISTOGRAM 역전 시그널";
+                                closePosition.setRealizatioPnl(currentPnl);
+                                positionEvent.getKlineEntity().setPositionEntity(closePosition);
+                                makeCloseOrder(eventEntity, positionEvent, remark);
                             }else if(technicalIndicatorReportEntity.getWeakSignal() != 0 //기타 시그널
                                 ||technicalIndicatorReportEntity.getMidSignal() !=0
                                 ||technicalIndicatorReportEntity.getStrongSignal() !=0){
