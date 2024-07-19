@@ -456,7 +456,6 @@ public class FutureService {
                 restartTrading(tradingEntity);
             }
         }
-        //
         if (nextFlag) {
             TradingEntity tradingEntity = tradingEntitys.get(0);
             if(isFinal){
@@ -520,15 +519,7 @@ public class FutureService {
                         }
                         // 이하는 시그널에 따른 청산
                         else {
-                            //MACD 히스토그램이 역전됐을 경우
-                            if ((technicalIndicatorReportEntity.getMacdHistogramGap()>0&&closePosition.getPositionSide().equals("SHORT")
-                                ||technicalIndicatorReportEntity.getMacdHistogramGap()<0&&closePosition.getPositionSide().equals("LONG"))
-                                &&!closePosition.getKlineEntity().getKLineCd().equals(technicalIndicatorReportEntity.getKlineEntity().getKLineCd())){
-                                String remark = closePosition.getPositionSide()+"청산 MACD HISTOGRAM 역전 시그널";
-                                closePosition.setRealizatioPnl(currentPnl);
-                                positionEvent.getKlineEntity().setPositionEntity(closePosition);
-                                makeCloseOrder(eventEntity, positionEvent, remark);
-                            }else if(technicalIndicatorReportEntity.getWeakSignal() != 0 //기타 시그널
+                            if(technicalIndicatorReportEntity.getWeakSignal() != 0 //기타 시그널
                                 ||technicalIndicatorReportEntity.getMidSignal() !=0
                                 ||technicalIndicatorReportEntity.getStrongSignal() !=0){
                                 String weakSignal   = technicalIndicatorReportEntity.getWeakSignal() != 0 ? (technicalIndicatorReportEntity.getWeakSignal() == 1 ? "LONG" : "SHORT") : "";
@@ -588,6 +579,15 @@ public class FutureService {
                                     }
                                 }
                             }
+                            //MACD 히스토그램이 역전됐을 경우
+                            /*else if ((technicalIndicatorReportEntity.getMacdHistogramGap()>0&&closePosition.getPositionSide().equals("SHORT")
+                                ||technicalIndicatorReportEntity.getMacdHistogramGap()<0&&closePosition.getPositionSide().equals("LONG"))
+                                &&!closePosition.getKlineEntity().getKLineCd().equals(technicalIndicatorReportEntity.getKlineEntity().getKLineCd())){
+                                String remark = closePosition.getPositionSide()+"청산 MACD HISTOGRAM 역전 시그널";
+                                closePosition.setRealizatioPnl(currentPnl);
+                                positionEvent.getKlineEntity().setPositionEntity(closePosition);
+                                makeCloseOrder(eventEntity, positionEvent, remark);
+                            }*/
                         }
                     },() -> {
 
@@ -1574,19 +1574,20 @@ public class FutureService {
                         }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
                             tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
                         }
-                    } else if (tempReport.getMacdHistogramGap() < 0 && tradingEntity.getPositionSide().equals("LONG")
+                    }
+                    /*else if (tempReport.getMacdHistogramGap() < 0 && tradingEntity.getPositionSide().equals("LONG")
                             || tempReport.getMacdHistogramGap() > 0 && tradingEntity.getPositionSide().equals("SHORT")){
                         tradingEntity.setPositionStatus("CLOSE");
                         tradingEntity.setClosePrice(tempReport.getClosePrice());
 
                         BigDecimal currentProfit = calculateProfit(tradingEntity);
-                        System.out.println("MACD 갭 청산("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);
+                        System.out.println("청산 MACD HISTOGRAM 역전 시그널");
                         if (currentProfit.compareTo(BigDecimal.ZERO) < 0) {
                             tradingEntity.setLoseTradeCount(tradingEntity.getLoseTradeCount() + 1);
                         }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
                             tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
                         }
-                    }
+                    }*/
                 } else if(tradingEntity.getPositionStatus() == null || tradingEntity.getPositionStatus().equals("CLOSE")){
                     if (tempReport.getStrongSignal() != 0 || tempReport.getMidSignal() != 0) {
                         if (tempReport.getStrongSignal() < 0 || tempReport.getMidSignal() < 0) {
@@ -2067,17 +2068,18 @@ public class FutureService {
         }
 
         if(weakSignal !=0){
-            System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
+           // System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
             System.out.println(CONSOLE_COLORS.BRIGHT_BLACK+"약한 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ weakSignal+" "+ signalLog + CONSOLE_COLORS.RESET);
         }
         if(midSignal !=0){
-            System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
+            //System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
             System.out.println(CONSOLE_COLORS.BACKGROUND_WHITE+""+CONSOLE_COLORS.BRIGHT_BLACK+"중간 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ midSignal+" "+ signalLog + CONSOLE_COLORS.RESET);
         }
         if(strongSignal !=0){
-            System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
+            //System.out.println("시그널계산식 : maxSignal/2 < totalSignal : "+(maxSignal/2 +" "+totalSignal));
             System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_WHITE+""+CONSOLE_COLORS.BRIGHT_BLACK+"강력한 매매신호 : "+ "["+formattedEndTime+"/"+closePrice.getValue(series.getEndIndex())+"] " +"/"+ strongSignal+" "+signalLog + CONSOLE_COLORS.RESET);
         }
+
         TechnicalIndicatorReportEntity technicalIndicatorReport = TechnicalIndicatorReportEntity.builder()
                 //기본정보
                 .symbol(symbol)
