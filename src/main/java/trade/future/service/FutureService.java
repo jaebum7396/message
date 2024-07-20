@@ -511,8 +511,8 @@ public class FutureService {
                             positionEvent.getKlineEntity().setPositionEntity(closePosition);
                             makeCloseOrder(eventEntity, positionEvent, remark);
                         }*/
-                        // 포지션의 수익률이 -20% 이하라면 청산
-                        else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
+                        // 포지션의 수익률이 -10% 이하라면 청산
+                        else if (currentROI.compareTo(new BigDecimal("-10")) < 0){
                             String remark = "수익률 하한선 돌파 청산";
                             closePosition.setRealizatioPnl(currentPnl);
                             positionEvent.getKlineEntity().setPositionEntity(closePosition);
@@ -1563,7 +1563,7 @@ public class FutureService {
                         }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
                             tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
                         }
-                    } else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
+                    } else if (currentROI.compareTo(new BigDecimal("-10")) < 0){
                         tradingEntity.setPositionStatus("CLOSE");
                         tradingEntity.setClosePrice(tempReport.getClosePrice());
 
