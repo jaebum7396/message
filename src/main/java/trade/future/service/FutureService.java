@@ -849,6 +849,7 @@ public class FutureService {
                 } else {
                     stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                 }
+                stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
                 LinkedHashMap<String, Object> stopLossOrder = makeStopLossOrder(tradingEntity, stopLossPrice, quantity);
                 paramMap.put("stopLossOrder", stopLossOrder);
             } else {
