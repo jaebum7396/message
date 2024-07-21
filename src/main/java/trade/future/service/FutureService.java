@@ -520,6 +520,8 @@ public class FutureService {
                                 stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                             }
 
+                            stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
+
                             String remark = "수익률 하한선 돌파 청산";
                             closePosition.setClosePrice(stopLossPrice);
                             closePosition.setRealizatioPnl(tradingEntity.getCollateral().multiply(new BigDecimal("-0.1")));
@@ -1704,6 +1706,12 @@ public class FutureService {
         JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
         JSONObject lotSizeFilter = getFilterInfo(symbolInfo, "LOT_SIZE");
         return new BigDecimal(lotSizeFilter.getString("stepSize"));
+    }
+
+    private int getPricePrecision(String symbol) { //최소 주문가능 금액
+        JSONArray symbols = getSymbols(exchangeInfo);
+        JSONObject symbolInfo = getSymbolInfo(symbols, symbol);
+        return symbolInfo.getInt("pricePrecision");
     }
 
     private JSONObject getExchangeInfo() {
