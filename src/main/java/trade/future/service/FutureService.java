@@ -874,6 +874,7 @@ public class FutureService {
         String symbol = tradingEntity.getSymbol();
         String positionSide = tradingEntity.getPositionSide();
         stopLossParamMap.put("symbol", symbol);
+        stopLossParamMap.put("positionSide", positionSide);
         stopLossParamMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
         stopLossParamMap.put("type", "STOP_MARKET");
         stopLossParamMap.put("quantity", quantity);
@@ -1617,6 +1618,7 @@ public class FutureService {
                         } else {
                             stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                         }
+                        stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
                         tradingEntity.setClosePrice(stopLossPrice);
 
                         BigDecimal currentProfit = calculateProfit(tradingEntity);
