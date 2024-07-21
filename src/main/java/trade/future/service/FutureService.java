@@ -512,8 +512,17 @@ public class FutureService {
                         }*/
                         // 포지션의 수익률이 -10% 이하라면 청산
                         else if (currentROI.compareTo(new BigDecimal("-10")) < 0){
+                            // 레버리지를 반영하여 스탑로스 가격 계산
+                            BigDecimal stopLossPrice;
+                            if (tradingEntity.getPositionSide().equals("LONG")) {
+                                stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                            } else {
+                                stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                            }
+
                             String remark = "수익률 하한선 돌파 청산";
-                            closePosition.setRealizatioPnl(currentPnl);
+                            closePosition.setClosePrice(stopLossPrice);
+                            closePosition.setRealizatioPnl(tradingEntity.getCollateral().multiply(new BigDecimal("-0.1")));
                             positionEvent.getKlineEntity().setPositionEntity(closePosition);
                             makeCloseOrder(eventEntity, positionEvent, remark);
                         }
@@ -759,15 +768,25 @@ public class FutureService {
             LinkedHashMap<String,Object> marginTypeParamMap = new LinkedHashMap<>();
             marginTypeParamMap.put("symbol", tradingEntity.getSymbol());
             marginTypeParamMap.put("marginType", "CROSSED");
+
             try{
                 marginTypeChange(marginTypeParamMap);
             } catch (Exception e){
                 e.printStackTrace();
             }
 
-            //주문 제출
-            Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "OPEN"));
+            // 메인 주문과 스탑로스 주문 제출
+            LinkedHashMap<String, Object> orderParams = makeOrder(tradingEntity, "OPEN");
+            Map<String, Object> resultMap = orderSubmit(orderParams);
+
+            // 스탑로스 주문 제출
+            if (orderParams.containsKey("stopLossOrder")) {
+                LinkedHashMap<String, Object> stopLossOrderParams = (LinkedHashMap<String, Object>) orderParams.get("stopLossOrder");
+                orderSubmit(stopLossOrderParams);
+            }
+
             System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_GREEN+"*********************[진입 - 진입사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
+
             //tradingRepository.save(tradingEntity);
         } catch (Exception e) {
             e.printStackTrace();
@@ -802,12 +821,13 @@ public class FutureService {
         }
     }
 
-    public LinkedHashMap<String,Object> makeOrder(TradingEntity tradingEntity, String intent){
-        LinkedHashMap<String,Object> paramMap = new LinkedHashMap<>();
+    public LinkedHashMap<String, Object> makeOrder(TradingEntity tradingEntity, String intent) {
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
         String symbol = tradingEntity.getSymbol();
         String positionSide = tradingEntity.getPositionSide();
-        String side = ""; //BUY/SELL
+        String side = ""; // BUY/SELL
         paramMap.put("symbol", symbol);
+
         if (intent.equals("OPEN")) {
             BigDecimal openPrice = tradingEntity.getOpenPrice();
             side = positionSide.equals("LONG") ? "BUY" : "SELL";
@@ -819,9 +839,19 @@ public class FutureService {
                 BigDecimal stepSize = getStepSize(symbol);
                 quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
                 paramMap.put("quantity", quantity);
-            }else{
-                System.out.println("명목가치(" + notional+ ")가 최소주문가능금액보다 작습니다.");
-                //throw new TradingException(tradingEntity);
+
+                // 레버리지를 반영하여 스탑로스 가격 계산
+                BigDecimal stopLossPrice;
+                if (positionSide.equals("LONG")) {
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                } else {
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                }
+                LinkedHashMap<String, Object> stopLossOrder = makeStopLossOrder(tradingEntity, stopLossPrice, quantity);
+                paramMap.put("stopLossOrder", stopLossOrder);
+            } else {
+                System.out.println("명목가치(" + notional + ")가 최소주문가능금액보다 작습니다.");
+                // throw new TradingException(tradingEntity);
             }
         } else if (intent.equals("CLOSE")) {
             BigDecimal closePrice = tradingEntity.getClosePrice();
@@ -833,6 +863,19 @@ public class FutureService {
         }
         paramMap.put("type", "MARKET");
         return paramMap;
+    }
+
+
+    public LinkedHashMap<String, Object> makeStopLossOrder(TradingEntity tradingEntity, BigDecimal stopLossPrice, BigDecimal quantity) {
+        LinkedHashMap<String, Object> stopLossParamMap = new LinkedHashMap<>();
+        String symbol = tradingEntity.getSymbol();
+        String positionSide = tradingEntity.getPositionSide();
+        stopLossParamMap.put("symbol", symbol);
+        stopLossParamMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
+        stopLossParamMap.put("type", "STOP_MARKET");
+        stopLossParamMap.put("quantity", quantity);
+        stopLossParamMap.put("stopPrice", stopLossPrice);
+        return stopLossParamMap;
     }
 
     public Optional<JSONObject> getPosition(String symbol, String positionSide){
@@ -1565,7 +1608,13 @@ public class FutureService {
                         }
                     } else if (currentROI.compareTo(new BigDecimal("-10")) < 0){
                         tradingEntity.setPositionStatus("CLOSE");
-                        tradingEntity.setClosePrice(tempReport.getClosePrice());
+                        BigDecimal stopLossPrice = BigDecimal.ZERO;
+                        if (tradingEntity.getPositionSide().equals("LONG")) {
+                            stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                        } else {
+                            stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                        }
+                        tradingEntity.setClosePrice(stopLossPrice);
 
                         BigDecimal currentProfit = calculateProfit(tradingEntity);
                         System.out.println("강제 손절("+tradingEntity.getSymbol()+"/"+tradingEntity.getOpenPrice()+">>>"+tradingEntity.getClosePrice()+") : "  + currentProfit);

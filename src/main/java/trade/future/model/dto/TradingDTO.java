@@ -25,19 +25,19 @@ public class TradingDTO {
     String interval;
     @ApiModelProperty(value = "20", example = "20")
     int leverage;
-    @ApiModelProperty(value = "30", example = "30")
+    @ApiModelProperty(value = "50", example = "50")
     int stockSelectionCount; // 종목 몇개를 확인할 것인지
     @ApiModelProperty(value = "10", example = "10")
     int maxPositionCount; // 최대 포지션 수
-    @ApiModelProperty(value = "500", example = "500")
-    int candleCount; // 최대 포지션 수
+    @ApiModelProperty(value = "300", example = "300")
+    int candleCount; //
     @ApiModelProperty(value = "1" , example = "0.95")
     BigDecimal collateralRate; //매매에 사용할 담보금 비율
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int trendFollowFlag; // 1: trend follow, -1: trend reverse
 
     //strategyChecker
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int bollingerBandChecker;
     @ApiModelProperty(value = "-1" , example = "-1")
     int adxChecker;
@@ -47,7 +47,7 @@ public class TradingDTO {
     int macdCrossChecker;
     @ApiModelProperty(value = "-1" , example = "-1")
     int stochChecker;
-    @ApiModelProperty(value = "-1" , example = "-1")
+    @ApiModelProperty(value = "1" , example = "1")
     int stochRsiChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int rsiChecker;
