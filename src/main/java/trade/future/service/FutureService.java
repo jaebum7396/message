@@ -520,7 +520,7 @@ public class FutureService {
                                 stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                             }
 
-                            stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
+                            //stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
 
                             String remark = "수익률 하한선 돌파 청산";
                             closePosition.setClosePrice(stopLossPrice);
