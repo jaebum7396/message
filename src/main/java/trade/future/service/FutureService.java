@@ -601,7 +601,12 @@ public class FutureService {
                             }*/
                         }
                     },() -> {
-
+                        if(technicalIndicatorReportEntity.getCurrentAdxGrade().getGrade()<2){
+                            restartTrading(tradingEntity);
+                            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+                            log.info("스트림 종료");
+                            printTradingEntitys();
+                        }
                     });
                 /*}else{
                     restartTrading(tradingEntity);
@@ -1213,6 +1218,7 @@ public class FutureService {
                                 true
                                 &&expectationProfit.compareTo(BigDecimal.ONE) > 0
                                 && (winTradeCount.compareTo(loseTradeCount) > 0)
+                                && tempReport.getCurrentAdxGrade().getGrade()>1
                         ) {
                             System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
                             overlappingData.add(item);
@@ -2105,25 +2111,30 @@ public class FutureService {
             }else{
                 weakSignal = 1;
             }
-        }else if(1 < totalSignalAbs
-            && totalSignalAbs < signalStandard
-            && !signalHide
-        ) {
-            if (totalSignal < 0) {
-                midSignal = -1;
-            } else {
-                midSignal = 1;
-            }
-        } else if (
-            signalStandard <= totalSignalAbs
-            && !signalHide
+        }else if(
+            true
+            &&currentAdxGrade.getGrade()>ADX_GRADE.약한추세.getGrade()
         ){
-            if (totalSignal < 0){
-                strongSignal = -1;
-                //strongSignal = 1;
-            }else{
-                strongSignal = 1;
-                //strongSignal = -1;
+            if(1 < totalSignalAbs
+                    && totalSignalAbs < signalStandard
+                    && !signalHide
+            ){
+                if (totalSignal < 0) {
+                    midSignal = -1;
+                } else {
+                    midSignal = 1;
+                }
+            } else if (
+                    signalStandard <= totalSignalAbs
+                            && !signalHide
+            ){
+                if (totalSignal < 0){
+                    strongSignal = -1;
+                    //strongSignal = 1;
+                }else{
+                    strongSignal = 1;
+                    //strongSignal = -1;
+                }
             }
         }
 
