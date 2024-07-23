@@ -150,6 +150,9 @@ public class TechnicalIndicatorReportEntity extends BaseEntity implements Serial
     @Column(name = "STRONG_SIGNAL")
     private int strongSignal;
 
+    @Column(name = "MARKET_CONDITION")
+    private int marketCondition;
+
 
     @Override
     public String toString() {
