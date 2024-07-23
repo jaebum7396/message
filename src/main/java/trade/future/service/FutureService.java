@@ -607,12 +607,12 @@ public class FutureService {
                             log.info("스트림 종료");
                             printTradingEntitys();
                         }*/
-                        if(technicalIndicatorReportEntity.getMarketCondition()!=1){
+                        /*if(technicalIndicatorReportEntity.getMarketCondition()!=1){
                             restartTrading(tradingEntity);
                             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
                             log.info("스트림 종료");
                             printTradingEntitys();
-                        }
+                        }*/
                     });
                 /*}else{
                     restartTrading(tradingEntity);
@@ -1222,10 +1222,10 @@ public class FutureService {
                         BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                         if (
                                 true
-                                //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
-                                //&& (winTradeCount.compareTo(loseTradeCount) > 0)
+                                &&expectationProfit.compareTo(BigDecimal.ONE) > 0
+                                && (winTradeCount.compareTo(loseTradeCount) > 0)
                                 //&& tempReport.getCurrentAdxGrade().getGrade()>1
-                                && tempReport.getMarketCondition() == 1
+                                //&& tempReport.getMarketCondition() == 1
                         ) {
                             System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
                             overlappingData.add(item);
@@ -2180,13 +2180,13 @@ public class FutureService {
                 }
             }
         }
-        VolatilityAndTrendChecker volatilityAndTrendChecker = new VolatilityAndTrendChecker(series, 10, 1.5, 3,5);
+        /*VolatilityAndTrendChecker volatilityAndTrendChecker = new VolatilityAndTrendChecker(series, 10, 1.5, 3,5);
         int marketCondition = volatilityAndTrendChecker.checkMarketCondition(series.getEndIndex());
         //System.out.println("현재변동성 : " + marketCondition);
         if (marketCondition != 1){
             midSignal = 0;
             strongSignal = 0;
-        }
+        }*/
 
         //추세가 확정이고 강해지고 있을때, 반대 포지션은 잡지 않는다.
         /*if (adxGap > 0){
@@ -2291,7 +2291,7 @@ public class FutureService {
                 .weakSignal(weakSignal)
                 .midSignal(midSignal)
                 .strongSignal(strongSignal)
-                .marketCondition(marketCondition)
+                //.marketCondition(marketCondition)
                 .build();
         return technicalIndicatorReport;
     }
