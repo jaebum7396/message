@@ -1213,26 +1213,26 @@ public class FutureService {
                     tempTradingEntity.setTrend1h(trend1h);
                     tempTradingEntity.setTrend15m(trend15m);
 
-                    Map<String, Object> klineMap = getKlines(tempTradingEntity,true);
-                    Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
+                    //Map<String, Object> klineMap = getKlines(tempTradingEntity,true);
+                   // Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
                     TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempTradingEntity);
-                    if (expectationProfitOpt.isPresent()){
-                        BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
-                        BigDecimal winTradeCount = new BigDecimal(String.valueOf(klineMap.get("winTradeCount")));
-                        BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
+                    //if (expectationProfitOpt.isPresent()){
+                        //BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
+                        //BigDecimal winTradeCount = new BigDecimal(String.valueOf(klineMap.get("winTradeCount")));
+                        //BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                         if (
                                 true
-                                &&expectationProfit.compareTo(BigDecimal.ONE) > 0
-                                && (winTradeCount.compareTo(loseTradeCount) > 0)
+                               // &&expectationProfit.compareTo(BigDecimal.ONE) > 0
+                                //&& (winTradeCount.compareTo(loseTradeCount) > 0)
                                 //&& tempReport.getCurrentAdxGrade().getGrade()>1
                                 && tempReport.getMarketCondition() == 1
                         ) {
-                            System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
+                            //System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
                             overlappingData.add(item);
                             reports.add(tempReport);
                             count++;
                         }
-                    }
+                    //}
                 }
             }
         }
