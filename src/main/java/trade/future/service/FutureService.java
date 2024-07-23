@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
 import org.ta4j.core.backtest.BarSeriesManager;
+import org.ta4j.core.criteria.pnl.ProfitCriterion;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
@@ -27,10 +28,12 @@ import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
 import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
+import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.rules.CrossedUpIndicatorRule;
 import org.ta4j.core.rules.OverIndicatorRule;
+import org.ta4j.core.rules.UnderIndicatorRule;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.TradingException;
@@ -371,6 +374,274 @@ public class FutureService {
             }
         }
         return resultMap;
+    }
+
+    public Map<String,Object> backTest(HttpServletRequest request, TradingDTO tradingDTO){
+        Claims claims = getClaims(request);
+        String userCd = String.valueOf(claims.get("userCd"));
+        if (userCd == null || userCd.isEmpty()) {
+            throw new RuntimeException("사용자 정보가 없습니다.");
+        }
+        TradingEntity tradingEntity = tradingDTO.toEntity();
+        tradingEntity.setTradingCd(UUID.randomUUID().toString());
+        tradingEntity.setUserCd(userCd);
+        return backTest(tradingEntity);
+    }
+
+    public Map<String, Object> backTest(TradingEntity tradingEntity) {
+        //변수 설정
+        String interval = tradingEntity.getCandleInterval();
+        int maxPositionCount = tradingEntity.getMaxPositionCount();
+        int stockSelectionCount = tradingEntity.getStockSelectionCount();
+
+        Map<String, Object> resultMap = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+
+        String resultStr = umFuturesClientImpl.market().ticker24H(paramMap);
+        JSONArray resultArray = new JSONArray(resultStr);
+
+        // 거래량(QuoteVolume - 기준 화폐)을 기준으로 내림차순으로 정렬해서 가져옴
+        List<Map<String, Object>> sortedByQuoteVolume = getSort(resultArray, "quoteVolume", "DESC", stockSelectionCount);
+        //System.out.println("sortedByQuoteVolume : " + sortedByQuoteVolume);
+        List<Map<String, Object>> overlappingData = new ArrayList<>();
+        List<TechnicalIndicatorReportEntity> reports = new ArrayList<>();
+
+        int count = 0;
+        for (Map<String, Object> item : sortedByQuoteVolume) {
+            int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
+            if (availablePositionCount <= 0) {
+                break;
+            }
+            if (count >= availablePositionCount) {
+                break;
+            }
+
+            String symbol = String.valueOf(item.get("symbol"));
+
+            //트레이딩 데이터 수집의 주가 되는 객체
+            TradingEntity tempTradingEntity = tradingEntity.clone();
+            tempTradingEntity.setSymbol(symbol);
+
+            List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+            if (tradingEntityList.isEmpty()) { //오픈된 트레이딩이 없다면
+                Map<String, Object> klineMap = backTestExec(tempTradingEntity,false);
+                /*HashMap<String, Object> trendMap = trendValidate(tempTradingEntity);
+                String trend4h = String.valueOf(trendMap.get("trend4h"));
+                String trend1h = String.valueOf(trendMap.get("trend1h"));
+                String trend15m = String.valueOf(trendMap.get("trend15m"));
+                tradingEntity.setTrend4h(trend4h);
+                tradingEntity.setTrend1h(trend1h);
+                tradingEntity.setTrend15m(trend15m);
+
+                boolean resultFlag = trendMap.get("resultFlag").equals(true);
+
+                if (resultFlag) {
+                    tempTradingEntity.setTrend4h(trend4h);
+                    tempTradingEntity.setTrend1h(trend1h);
+                    tempTradingEntity.setTrend15m(trend15m);
+
+                    Map<String, Object> klineMap = backTestExec(tempTradingEntity,true);
+                    Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
+                    TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempTradingEntity);
+                    if (expectationProfitOpt.isPresent()){
+                        BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
+                        BigDecimal winTradeCount = new BigDecimal(String.valueOf(klineMap.get("winTradeCount")));
+                        BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
+                        if (
+                                true
+                                        &&expectationProfit.compareTo(BigDecimal.ONE) > 0
+                                        && (winTradeCount.compareTo(loseTradeCount) > 0)
+                            //&& tempReport.getCurrentAdxGrade().getGrade()>1
+                            //&& tempReport.getMarketCondition() == 1
+                        ) {
+                            System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
+                            overlappingData.add(item);
+                            reports.add(tempReport);
+                            count++;
+                        }
+                    }
+                }*/
+            }
+        }
+
+        for(Map<String, Object> item : overlappingData){
+            System.out.println("관심종목 : " + item);
+        }
+
+        //System.out.println("overlappingData : " + overlappingData);
+
+        resultMap.put("reports", reports);
+        resultMap.put("overlappingData", overlappingData);
+        return resultMap;
+    }
+
+    public Map<String, Object> backTestExec(TradingEntity tradingEntity, boolean logFlag) {
+
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        //printPrettyJson(accountInfo);
+
+        if(logFlag){
+            System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+            System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+            System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+            System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+        }
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
+
+        BigDecimal maxPositionAmount = totalWalletBalance
+                .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
+                .multiply(tradingEntity.getCollateralRate()).setScale(0, RoundingMode.DOWN);
+
+        tradingEntity.setCollateral(maxPositionAmount);
+
+        String tradingCd = tradingEntity.getTradingCd();
+        String symbol = tradingEntity.getSymbol();
+        String interval = tradingEntity.getCandleInterval();
+        int candleCount = tradingEntity.getCandleCount();
+        int limit = candleCount;
+        long startTime = System.currentTimeMillis(); // 시작 시간 기록
+
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+
+        paramMap.put("symbol", symbol);
+        paramMap.put("interval", interval);
+        paramMap.put("limit", limit);
+
+        client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
+        String resultStr = client.market().klines(paramMap);
+
+        //System.out.println("resultStr : "+ resultStr);
+        String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
+        System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
+        JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
+        List<KlineEntity> klineEntities = new ArrayList<>();
+        BaseBarSeries series = new BaseBarSeries();
+        series.setMaximumBarCount(limit);
+        seriesMap.put(tradingCd + "_" + interval, series);
+
+        ArrayList<TechnicalIndicatorReportEntity> technicalIndicatorReportEntityArr = new ArrayList<>();
+
+        BigDecimal expectationProfit = BigDecimal.ZERO;
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONArray klineArray = jsonArray.getJSONArray(i);
+            KlineEntity klineEntity = parseKlineEntity(klineArray);
+            //System.out.println(klineArray);
+            klineEntities.add(klineEntity);
+
+            Num open = series.numOf(klineEntity.getOpenPrice());
+            Num high = series.numOf(klineEntity.getHighPrice());
+            Num low = series.numOf(klineEntity.getLowPrice());
+            Num close = series.numOf(klineEntity.getClosePrice());
+            Num volume = series.numOf(klineEntity.getVolume());
+
+            series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
+        }
+        // 포맷 적용하여 문자열로 변환
+        ZonedDateTime utcEndTime = series.getBar(series.getEndIndex()).getEndTime(); //캔들이 !!!끝나는 시간!!!
+        ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul")); //한국시간 설정
+        String formattedEndTime = formatter.format(kstEndTime);
+
+        int shortMovingPeriod = 20;
+        int midPeriod = 30;
+        int longMovingPeriod = 50;
+
+        // 종가 설정
+        // Define indicators
+        OpenPriceIndicator  openPrice   = new OpenPriceIndicator(series); //시가
+        ClosePriceIndicator closePrice  = new ClosePriceIndicator(series); //종가
+        HighPriceIndicator  highPrice   = new HighPriceIndicator(series); //고가
+        LowPriceIndicator   lowPrice    = new LowPriceIndicator(series); //저가
+
+        String krTimeAndPriceExpression = "["+formattedEndTime+CONSOLE_COLORS.CYAN+"/"+symbol+"/"+closePrice.getValue(series.getEndIndex())+"] ";
+
+        log.info("SYMBOL : " + symbol);
+
+        SMAIndicator sma = new SMAIndicator(closePrice, shortMovingPeriod); //단기 이동평균선
+        EMAIndicator ema = new EMAIndicator(closePrice, longMovingPeriod);  //장기 이동평균선
+
+        // 볼린저 밴드 설정
+        int barCount = 20;
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, longMovingPeriod); //장기 이평선 기간 동안의 표준편차
+        BollingerBandsMiddleIndicator middleBBand    = new BollingerBandsMiddleIndicator(ema); //장기 이평선으로 중심선
+        BollingerBandsUpperIndicator upperBBand      = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand      = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+
+        // 이동평균선 설정
+        SMAIndicator shortSma = new SMAIndicator(closePrice, 20);
+        SMAIndicator longSma = new SMAIndicator(closePrice, 50);
+
+        // 볼린저 밴드 매수/매도 규칙
+        Rule bollingerBuyingRule = new CrossedDownIndicatorRule(closePrice, lowerBBand); // 가격이 하한선을 돌파할 때 매수
+        Rule bollingerSellingRule = new CrossedUpIndicatorRule(closePrice, upperBBand); // 가격이 상한선을 돌파할 때 매도
+
+        // 이동평균선 매수/매도 규칙
+        Rule smaBuyingRule = new OverIndicatorRule(shortSma, longSma); // 20MA > 50MA
+        Rule smaSellingRule = new UnderIndicatorRule(shortSma, longSma); // 20MA < 50MA
+
+        // 전략 조합
+        Rule combinedBuyingRule = bollingerBuyingRule.or(smaBuyingRule);
+        Rule combinedSellingRule = bollingerSellingRule.or(smaSellingRule);
+
+
+        // 전략 생성
+        Strategy combinedLongStrategy = new BaseStrategy(combinedBuyingRule, combinedSellingRule);
+        Strategy combinedShortStrategy = new BaseStrategy(combinedSellingRule, combinedBuyingRule);
+
+        // 백테스트 실행
+        BarSeriesManager seriesManager = new BarSeriesManager(series);
+        TradingRecord longTradingRecord = seriesManager.run(combinedLongStrategy);
+        TradingRecord shortTradingRecord = seriesManager.run(combinedShortStrategy);
+
+        // 초기 자산 및 레버리지 설정
+        Num initialBalance = DecimalNum.valueOf(maxPositionAmount); // 초기 자산 10000달러
+        double leverage = 20.0; // 2배 레버리지
+
+        // 결과 출력
+        System.out.println("");
+        System.out.println("LONG 백테스트 결과");
+        printBackTestResult(longTradingRecord, series, leverage);
+        System.out.println("");
+        System.out.println("SHORT 백테스트 결과");
+        printBackTestResult(shortTradingRecord, series, leverage);
+
+        // 포지션 거래 결과 분석
+        AnalysisCriterion profitCriterion = new ProfitCriterion();
+        Num longTotalProfit = profitCriterion.calculate(series, longTradingRecord);
+        Num longLeveragedProfit = longTotalProfit.multipliedBy(DecimalNum.valueOf(leverage));
+        Num longFinalBalance = initialBalance.plus(longLeveragedProfit);
+        
+        Num shortTotalProfit = profitCriterion.calculate(series, shortTradingRecord);
+        Num shortLeveragedProfit = shortTotalProfit.multipliedBy(DecimalNum.valueOf(leverage));
+        Num shortFinalBalance = initialBalance.plus(shortLeveragedProfit);
+        System.out.println("");
+        System.out.println("롱 매매횟수 : "+longTradingRecord.getPositionCount());
+        System.out.println("숏 매매횟수 : "+shortTradingRecord.getPositionCount());
+
+        
+        //System.out.println("최종 롱 수익(레버리지 적용): " + longLeveragedProfit);
+
+        return resultMap;
+    }
+
+    public void printBackTestResult(TradingRecord tradingRecord, BaseBarSeries series, double leverage) {
+        // 거래 기록 출력
+        List<Position> positions = tradingRecord.getPositions();
+        Num totalProfit = series.numOf(0);
+        for (Position position : positions) {
+            Trade entry = position.getEntry();
+            Trade exit = position.getExit();
+            System.out.println("");
+            System.out.println("  진입(" + series.getBar(entry.getIndex()).getEndTime()+")"+ " : " + entry.getNetPrice());
+            System.out.println("  청산(" + series.getBar(exit.getIndex()).getEndTime()+")"+ " : " + exit.getNetPrice());
+            System.out.println("  수익: " + position.getProfit());
+            totalProfit = totalProfit.plus(position.getProfit());
+        }
+        System.out.println("");
+        System.out.println("최종 수익: " + totalProfit);
     }
 
     public Map<String, Object> backTestTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {

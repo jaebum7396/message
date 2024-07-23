@@ -35,7 +35,7 @@ public class FutureController {
     @PostMapping(value = "/future/auto/backtest")
     @Operation(summary="백테스팅", description="백테스팅")
     public ResponseEntity backTestTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
-        return commonUtils.okResponsePackaging(futureService.backTestTradingOpen(request, tradingDTO));
+        return commonUtils.okResponsePackaging(futureService.backTest(request, tradingDTO));
     }
     @GetMapping(value = "/future/positions/close")
     @Operation(summary="모든 포지션을 종료합니다.", description="모든 포지션을 종료합니다.")
