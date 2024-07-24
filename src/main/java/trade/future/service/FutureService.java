@@ -23,6 +23,7 @@ import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
+import org.ta4j.core.indicators.bollinger.PercentBIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
@@ -540,10 +541,6 @@ public class FutureService {
 
             series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
         }
-        // 포맷 적용하여 문자열로 변환
-        ZonedDateTime utcEndTime = series.getBar(series.getEndIndex()).getEndTime(); //캔들이 !!!끝나는 시간!!!
-        ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul")); //한국시간 설정
-        String formattedEndTime = formatter.format(kstEndTime);
 
         int shortMovingPeriod = 20;
         int midPeriod = 30;
@@ -556,10 +553,9 @@ public class FutureService {
         HighPriceIndicator  highPrice   = new HighPriceIndicator(series); //고가
         LowPriceIndicator   lowPrice    = new LowPriceIndicator(series); //저가
 
-        String krTimeAndPriceExpression = "["+formattedEndTime+CONSOLE_COLORS.CYAN+"/"+symbol+"/"+closePrice.getValue(series.getEndIndex())+"] ";
-
         log.info("SYMBOL : " + symbol);
 
+        // 이동평균선 설정
         SMAIndicator sma = new SMAIndicator(closePrice, shortMovingPeriod); //단기 이동평균선
         EMAIndicator ema = new EMAIndicator(closePrice, longMovingPeriod);  //장기 이동평균선
 
@@ -570,26 +566,61 @@ public class FutureService {
         BollingerBandsUpperIndicator upperBBand      = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
         BollingerBandsLowerIndicator lowerBBand      = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
 
-        // 이동평균선 설정
-        SMAIndicator shortSma = new SMAIndicator(closePrice, 20);
-        SMAIndicator longSma = new SMAIndicator(closePrice, 50);
-
         // 볼린저 밴드 매수/매도 규칙
         Rule bollingerBuyingRule = new CrossedDownIndicatorRule(closePrice, lowerBBand); // 가격이 하한선을 돌파할 때 매수
         Rule bollingerSellingRule = new CrossedUpIndicatorRule(closePrice, upperBBand); // 가격이 상한선을 돌파할 때 매도
 
         // 이동평균선 매수/매도 규칙
-        Rule smaBuyingRule = new OverIndicatorRule(shortSma, longSma); // 20MA > 50MA
-        Rule smaSellingRule = new UnderIndicatorRule(shortSma, longSma); // 20MA < 50MA
+        Rule smaBuyingRule = new OverIndicatorRule(sma, ema); // 20MA > 50MA
+        Rule smaSellingRule = new UnderIndicatorRule(sma, ema); // 20MA < 50MA
+
+        // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
+        DecimalNum longStopLossPercentage = DecimalNum.valueOf(0.995); // -0.5%
+        Rule longStopLossRule = new Rule() {
+            @Override
+            public boolean isSatisfied(int index, TradingRecord tradingRecord) {
+                Position currentPosition = tradingRecord.getCurrentPosition();
+                if (currentPosition.isOpened()) {
+                    Trade entry = currentPosition.getEntry();
+                    Num entryPrice = entry.getNetPrice();
+                    Num currentPrice = closePrice.getValue(index);
+                    Num lossThreshold = entryPrice.multipliedBy(longStopLossPercentage);
+                    return currentPrice.isLessThan(lossThreshold);
+                }
+                return false;
+            }
+        };
+
+        DecimalNum shortStopLossPercentage = DecimalNum.valueOf(1.005); // -0.5%
+        Rule shortStopLossRule = new Rule() {
+            @Override
+            public boolean isSatisfied(int index, TradingRecord tradingRecord) {
+                Position currentPosition = tradingRecord.getCurrentPosition();
+                if (currentPosition.isOpened()) {
+                    Trade entry = currentPosition.getEntry();
+                    Num entryPrice = entry.getNetPrice();
+                    Num currentPrice = closePrice.getValue(index);
+                    Num lossThreshold = entryPrice.multipliedBy(shortStopLossPercentage);
+                    return currentPrice.isLessThan(lossThreshold);
+                }
+                return false;
+            }
+        };
 
         // 전략 조합
         Rule combinedBuyingRule = bollingerBuyingRule.or(smaBuyingRule);
         Rule combinedSellingRule = bollingerSellingRule.or(smaSellingRule);
 
+        Rule combinedLongStopRule = combinedSellingRule
+                //.or(longStopLossRule)
+                ;
+        Rule combinedShortStopRule = combinedBuyingRule
+                //.or(shortStopLossRule)
+                ;
 
         // 전략 생성
-        Strategy combinedLongStrategy = new BaseStrategy(combinedBuyingRule, combinedSellingRule);
-        Strategy combinedShortStrategy = new BaseStrategy(combinedSellingRule, combinedBuyingRule);
+        Strategy combinedLongStrategy = new BaseStrategy(combinedBuyingRule, combinedLongStopRule);
+        Strategy combinedShortStrategy = new BaseStrategy(combinedSellingRule, combinedShortStopRule);
 
         // 백테스트 실행
         BarSeriesManager seriesManager = new BarSeriesManager(series);
@@ -598,50 +629,69 @@ public class FutureService {
 
         // 초기 자산 및 레버리지 설정
         Num initialBalance = DecimalNum.valueOf(maxPositionAmount); // 초기 자산 10000달러
-        double leverage = 20.0; // 2배 레버리지
+        int leverage = 20; // 2배 레버리지
 
         // 결과 출력
         System.out.println("");
-        System.out.println("LONG 백테스트 결과");
-        printBackTestResult(longTradingRecord, series, leverage);
+        printBackTestResult(longTradingRecord, series, symbol, leverage, "LONG", maxPositionAmount);
         System.out.println("");
-        System.out.println("SHORT 백테스트 결과");
-        printBackTestResult(shortTradingRecord, series, leverage);
+        printBackTestResult(shortTradingRecord, series, symbol, leverage, "SHORT", maxPositionAmount);
 
         // 포지션 거래 결과 분석
-        AnalysisCriterion profitCriterion = new ProfitCriterion();
+        /*AnalysisCriterion profitCriterion = new ProfitCriterion();
         Num longTotalProfit = profitCriterion.calculate(series, longTradingRecord);
         Num longLeveragedProfit = longTotalProfit.multipliedBy(DecimalNum.valueOf(leverage));
         Num longFinalBalance = initialBalance.plus(longLeveragedProfit);
         
         Num shortTotalProfit = profitCriterion.calculate(series, shortTradingRecord);
         Num shortLeveragedProfit = shortTotalProfit.multipliedBy(DecimalNum.valueOf(leverage));
-        Num shortFinalBalance = initialBalance.plus(shortLeveragedProfit);
+        Num shortFinalBalance = initialBalance.plus(shortLeveragedProfit);*/
+
         System.out.println("");
         System.out.println("롱 매매횟수 : "+longTradingRecord.getPositionCount());
         System.out.println("숏 매매횟수 : "+shortTradingRecord.getPositionCount());
 
-        
         //System.out.println("최종 롱 수익(레버리지 적용): " + longLeveragedProfit);
 
         return resultMap;
     }
 
-    public void printBackTestResult(TradingRecord tradingRecord, BaseBarSeries series, double leverage) {
+    public void printBackTestResult(TradingRecord tradingRecord, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
         // 거래 기록 출력
         List<Position> positions = tradingRecord.getPositions();
-        Num totalProfit = series.numOf(0);
+        BigDecimal totalProfit = BigDecimal.ZERO;
+        List<Position> winPositions = new ArrayList<>();
+        List<Position> losePositions = new ArrayList<>();
+        System.out.println(symbol+"/"+positionSide+" 리포트");
         for (Position position : positions) {
             Trade entry = position.getEntry();
             Trade exit = position.getExit();
-            System.out.println("");
-            System.out.println("  진입(" + series.getBar(entry.getIndex()).getEndTime()+")"+ " : " + entry.getNetPrice());
-            System.out.println("  청산(" + series.getBar(exit.getIndex()).getEndTime()+")"+ " : " + exit.getNetPrice());
-            System.out.println("  수익: " + position.getProfit());
-            totalProfit = totalProfit.plus(position.getProfit());
+            BigDecimal PNL = TechnicalIndicatorCalculator.calculatePnL(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide, collateral);
+            BigDecimal ROI = TechnicalIndicatorCalculator.calculateROI(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide);
+            String entryExpression = "진입" + krTimeExpression(series.getBar(entry.getIndex())) +":"+entry.getNetPrice();
+            String exitExpression = "청산" + krTimeExpression(series.getBar(exit.getIndex())) +":"+exit.getNetPrice();
+            String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
+            String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
+            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression);
+            if(PNL.compareTo(BigDecimal.ZERO) > 0){
+                winPositions.add(position);
+            }else if(PNL.compareTo(BigDecimal.ZERO) < 0){
+                losePositions.add(position);
+            }
+            totalProfit = totalProfit.add(PNL);
         }
-        System.out.println("");
-        System.out.println("최종 수익: " + totalProfit);
+        System.out.println(" ");
+        System.out.println(symbol+"/"+positionSide+"(승패 : "+winPositions.size()+"/"+losePositions.size()+") : 최종 수익: " + totalProfit);
+    }
+
+
+    public String krTimeExpression(Bar bar){
+        // 포맷 적용하여 문자열로 변환
+        ZonedDateTime utcEndTime = bar.getEndTime(); //캔들이 !!!끝나는 시간!!!
+        ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul")); //한국시간 설정
+        String formattedEndTime = formatter.format(kstEndTime);
+        String krTimeExpression = "["+formattedEndTime+"]";
+        return krTimeExpression;
     }
 
     public Map<String, Object> backTestTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
@@ -757,7 +807,7 @@ public class FutureService {
                         BigDecimal currentPnl;
                         if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
                             currentROI = TechnicalIndicatorCalculator.calculateROI(closePosition.getEntryPrice(), technicalIndicatorReportEntity.getClosePrice(), tradingEntity.getLeverage(), closePosition.getPositionSide());
-                            currentPnl = TechnicalIndicatorCalculator.calculatePnL(closePosition.getEntryPrice(), technicalIndicatorReportEntity.getClosePrice(), tradingEntity.getCollateral(), tradingEntity.getLeverage(), closePosition.getPositionSide());
+                            currentPnl = TechnicalIndicatorCalculator.calculatePnL(closePosition.getEntryPrice(), technicalIndicatorReportEntity.getClosePrice(), tradingEntity.getLeverage(), closePosition.getPositionSide(), tradingEntity.getCollateral());
                         } else {
                             currentROI = new BigDecimal("0");
                             currentPnl = new BigDecimal("0");
@@ -1861,7 +1911,7 @@ public class FutureService {
 
                 if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
                     BigDecimal currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity.getOpenPrice(), tempReport.getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide());
-                    BigDecimal currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity.getOpenPrice(), tempReport.getClosePrice(), tradingEntity.getCollateral(), tradingEntity.getLeverage(), tradingEntity.getPositionSide());
+                    BigDecimal currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity.getOpenPrice(), tempReport.getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral());
                     if(logFlag){
                         System.out.println("ROI : " + currentROI);
                         System.out.println("PnL : " + currentPnl);

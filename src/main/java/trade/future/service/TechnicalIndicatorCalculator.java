@@ -524,7 +524,6 @@ public class TechnicalIndicatorCalculator {
 
     public static BigDecimal calculateROI(BigDecimal openPrice, BigDecimal closePrice, int leverage, String positionSide) {
         BigDecimal roi;
-        System.out.println("openPrice : " + openPrice);
         if ("LONG".equalsIgnoreCase(positionSide)) {
             roi = closePrice.subtract(openPrice)
                     .divide(openPrice, 10, RoundingMode.HALF_UP)
@@ -548,10 +547,10 @@ public class TechnicalIndicatorCalculator {
         int leverage = tradingEntity.getLeverage();
         String positionSide = tradingEntity.getPositionSide();
 
-        return calculatePnL(openPrice, closePrice, collateral, leverage, positionSide);
+        return calculatePnL(openPrice, closePrice, leverage, positionSide, collateral);
     }
 
-    public static BigDecimal calculatePnL(BigDecimal openPrice, BigDecimal closePrice, BigDecimal collateral, int leverage, String positionSide) {
+    public static BigDecimal calculatePnL(BigDecimal openPrice, BigDecimal closePrice, int leverage, String positionSide, BigDecimal collateral) {
         BigDecimal pnl;
         if ("LONG".equalsIgnoreCase(positionSide)) {
             pnl = closePrice.subtract(openPrice)
