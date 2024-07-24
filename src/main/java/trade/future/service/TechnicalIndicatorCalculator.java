@@ -353,10 +353,10 @@ public class TechnicalIndicatorCalculator {
             macdPreliminarySignal = 1;
         }
         int macdCrossSignal = 0 ; // 골든 크로스일시 1, 데드 크로스일시 -1
-        if(isGoldenCross(series, 6, 12, 5) && macd.getValue(series.getEndIndex()).isLessThan(series.zero())){
+        if(isGoldenCross(series, 6, 12, 5) && macd.getValue(series.getEndIndex()).isLessThan(series.numOf(0))){
             macdCrossSignal = 1;
         }
-        if(isDeadCross(series, 6, 12, 5) && macd.getValue(series.getEndIndex()).isGreaterThan(series.zero())){
+        if(isDeadCross(series, 6, 12, 5) && macd.getValue(series.getEndIndex()).isGreaterThan(series.numOf(0))){
             macdCrossSignal = -1;
         }
 

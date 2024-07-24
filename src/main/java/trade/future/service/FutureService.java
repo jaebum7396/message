@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
 import org.ta4j.core.backtest.BarSeriesManager;
-import org.ta4j.core.criteria.pnl.ProfitCriterion;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
@@ -31,10 +30,7 @@ import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
-import org.ta4j.core.rules.CrossedDownIndicatorRule;
-import org.ta4j.core.rules.CrossedUpIndicatorRule;
-import org.ta4j.core.rules.OverIndicatorRule;
-import org.ta4j.core.rules.UnderIndicatorRule;
+import org.ta4j.core.rules.*;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.TradingException;
@@ -566,58 +562,52 @@ public class FutureService {
         BollingerBandsUpperIndicator upperBBand      = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
         BollingerBandsLowerIndicator lowerBBand      = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
 
+        List<Rule> longEntryRules = new ArrayList<>();
+        List<Rule> longStopRules = new ArrayList<>();
+        List<Rule> shortEntryRules = new ArrayList<>();
+        List<Rule> shortStopRules = new ArrayList<>();
+
         // 볼린저 밴드 매수/매도 규칙
         Rule bollingerBuyingRule = new CrossedDownIndicatorRule(closePrice, lowerBBand); // 가격이 하한선을 돌파할 때 매수
+        longEntryRules.add(bollingerBuyingRule);
+        shortStopRules.add(bollingerBuyingRule);
+
         Rule bollingerSellingRule = new CrossedUpIndicatorRule(closePrice, upperBBand); // 가격이 상한선을 돌파할 때 매도
+        longStopRules.add(bollingerSellingRule);
+        shortEntryRules.add(bollingerSellingRule);
 
         // 이동평균선 매수/매도 규칙
         Rule smaBuyingRule = new OverIndicatorRule(sma, ema); // 20MA > 50MA
+        longEntryRules.add(smaBuyingRule);
+        shortStopRules.add(smaBuyingRule);
         Rule smaSellingRule = new UnderIndicatorRule(sma, ema); // 20MA < 50MA
+        longStopRules.add(smaSellingRule);
+        shortEntryRules.add(smaSellingRule);
 
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
-        DecimalNum longStopLossPercentage = DecimalNum.valueOf(0.995); // -0.5%
-        Rule longStopLossRule = new Rule() {
-            @Override
-            public boolean isSatisfied(int index, TradingRecord tradingRecord) {
-                Position currentPosition = tradingRecord.getCurrentPosition();
-                if (currentPosition.isOpened()) {
-                    Trade entry = currentPosition.getEntry();
-                    Num entryPrice = entry.getNetPrice();
-                    Num currentPrice = closePrice.getValue(index);
-                    Num lossThreshold = entryPrice.multipliedBy(longStopLossPercentage);
-                    return currentPrice.isLessThan(lossThreshold);
-                }
-                return false;
-            }
-        };
+        DecimalNum longStopLossPercentage = DecimalNum.valueOf(-1); // -0.5%
+        Rule longStopLossRule = new StopLossRule(closePrice, longStopLossPercentage);
+        longStopRules.add(longStopLossRule);
 
-        DecimalNum shortStopLossPercentage = DecimalNum.valueOf(1.005); // -0.5%
-        Rule shortStopLossRule = new Rule() {
-            @Override
-            public boolean isSatisfied(int index, TradingRecord tradingRecord) {
-                Position currentPosition = tradingRecord.getCurrentPosition();
-                if (currentPosition.isOpened()) {
-                    Trade entry = currentPosition.getEntry();
-                    Num entryPrice = entry.getNetPrice();
-                    Num currentPrice = closePrice.getValue(index);
-                    Num lossThreshold = entryPrice.multipliedBy(shortStopLossPercentage);
-                    return currentPrice.isLessThan(lossThreshold);
-                }
-                return false;
-            }
-        };
+        DecimalNum shortStopLossPercentage = DecimalNum.valueOf(1); // -0.5%
+        Rule shortStopLossRule = new StopLossRule(closePrice, shortStopLossPercentage);
+        shortStopRules.add(shortStopLossRule);
 
         // 전략 조합
         Rule combinedBuyingRule = bollingerBuyingRule.or(smaBuyingRule);
         Rule combinedSellingRule = bollingerSellingRule.or(smaSellingRule);
 
         Rule combinedLongStopRule = combinedSellingRule
-                //.or(longStopLossRule)
+                .or(longStopLossRule)
                 ;
         Rule combinedShortStopRule = combinedBuyingRule
-                //.or(shortStopLossRule)
+                .or(shortStopLossRule)
                 ;
 
+        System.out.println("longEntryRules : " + longEntryRules);
+        System.out.println("longStopRules : " + longStopRules);
+        System.out.println("shortEntryRules : " + shortEntryRules);
+        System.out.println("shortStopRules : " + shortStopRules);
         // 전략 생성
         Strategy combinedLongStrategy = new BaseStrategy(combinedBuyingRule, combinedLongStopRule);
         Strategy combinedShortStrategy = new BaseStrategy(combinedSellingRule, combinedShortStopRule);
@@ -633,9 +623,9 @@ public class FutureService {
 
         // 결과 출력
         System.out.println("");
-        printBackTestResult(longTradingRecord, series, symbol, leverage, "LONG", maxPositionAmount);
+        printBackTestResult(longTradingRecord, longEntryRules, longStopRules, series, symbol, leverage, "LONG", maxPositionAmount);
         System.out.println("");
-        printBackTestResult(shortTradingRecord, series, symbol, leverage, "SHORT", maxPositionAmount);
+        printBackTestResult(shortTradingRecord, shortEntryRules, shortStopRules, series, symbol, leverage, "SHORT", maxPositionAmount);
 
         // 포지션 거래 결과 분석
         /*AnalysisCriterion profitCriterion = new ProfitCriterion();
@@ -656,7 +646,7 @@ public class FutureService {
         return resultMap;
     }
 
-    public void printBackTestResult(TradingRecord tradingRecord, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
+    public void printBackTestResult(TradingRecord tradingRecord, List<Rule> entryRules, List<Rule> stopRules, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
         // 거래 기록 출력
         List<Position> positions = tradingRecord.getPositions();
         BigDecimal totalProfit = BigDecimal.ZERO;
@@ -672,7 +662,23 @@ public class FutureService {
             String exitExpression = "청산" + krTimeExpression(series.getBar(exit.getIndex())) +":"+exit.getNetPrice();
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
-            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression);
+            StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
+            StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
+            int i = 1;
+            for (Rule entryRule : entryRules) {
+                if (entryRule.isSatisfied(entry.getIndex(), tradingRecord)||entryRule.isSatisfied(exit.getIndex())) {
+                    entryRuleExpression.append(i).append(" ").append(entryRule.getClass().getSimpleName()).append(" ");
+                    i++;
+                }
+            }
+            int j = 1;
+            for (Rule stopRule : stopRules) {
+                if (stopRule.isSatisfied(exit.getIndex(),tradingRecord)) {
+                    stopRuleExpression.append(j).append(" ").append(stopRule.getClass().getSimpleName()).append(" ");
+                    j++;
+                }
+            }
+            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression+" / "+entryRuleExpression+" / "+stopRuleExpression);
             if(PNL.compareTo(BigDecimal.ZERO) > 0){
                 winPositions.add(position);
             }else if(PNL.compareTo(BigDecimal.ZERO) < 0){
