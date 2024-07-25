@@ -307,12 +307,15 @@ public class TechnicalIndicatorCalculator {
     public HashMap<String,Object> macdStrategy(BaseBarSeries series, ClosePriceIndicator closePrice){
         HashMap<String,Object> resultMap = new HashMap<>();
 
-        // Calculate MACD
-        MACDIndicator macd = new MACDIndicator(closePrice, 6, 12);
+        int shortMovingPeriod = 20;
+        int longMovingPeriod = 50;
 
-        double currentMacdHistogram     = calculateMACDHistogram(closePrice, 6, 12, series.getEndIndex());
-        double previousMacdHistogram    = calculateMACDHistogram(closePrice, 6, 12, series.getEndIndex()-1);
-        double prePreviousMacdHistogram = calculateMACDHistogram(closePrice, 6, 12, series.getEndIndex()-2);
+        // Calculate MACD
+        MACDIndicator macd = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
+
+        double currentMacdHistogram     = calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, series.getEndIndex());
+        double previousMacdHistogram    = calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, series.getEndIndex()-1);
+        double prePreviousMacdHistogram = calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, series.getEndIndex()-2);
 
         double macdHistogramGap = currentMacdHistogram - previousMacdHistogram;
         double previousMacdHistogramGap = previousMacdHistogram - prePreviousMacdHistogram;

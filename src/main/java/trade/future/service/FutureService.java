@@ -618,20 +618,24 @@ public class FutureService {
         };
 
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
-        DecimalNum longStopLossPercentage = DecimalNum.valueOf(-1); // -0.5%
-        Rule longStopLossRule = new StopLossRule(closePrice, longStopLossPercentage);
+        DecimalNum longStopLossPercentage = DecimalNum.valueOf(1); // -0.5%
+        Rule longStopLossRule = new StopLossRule(closePrice, longStopLossPercentage){
+        };
 
         DecimalNum shortStopLossPercentage = DecimalNum.valueOf(1); // -0.5%
-        Rule shortStopLossRule = new StopGainRule(closePrice, shortStopLossPercentage);
+        Rule shortStopLossRule = new StopLossRule(closePrice, shortStopLossPercentage){
+        };
         shortStopRules.add(shortStopLossRule);
 
+        Rule combinedLongEntryRule = null;
+
         // 전략 조합
-        Rule combinedLongEntryRule =
+        combinedLongEntryRule =
                 (
                     bollingerBuyingRule
                     //.or(macdHistogramPositive)
                 )
-                .and(rsiBuyingRule)
+                .or(rsiBuyingRule)
                 //.or(smaBuyingRule)
                 ;
         Rule combinedShortEntryRule =
@@ -639,21 +643,21 @@ public class FutureService {
                     bollingerSellingRule
                     //.or(macdHistogramNegative)
                 )
-                .and(rsiSellingRule)
+                .or(rsiSellingRule)
                 //.or(smaSellingRule)
                 ;
 
         Rule combinedLongStopRule =
-                bollingerSellingRule
+                longStopLossRule
+                .or(bollingerSellingRule)
                 //.or(macdHistogramNegative)
                 .or(rsiSellingRule)
-                //.or(longStopLossRule)
                 ;
         Rule combinedShortStopRule =
-                bollingerBuyingRule
+                shortStopLossRule
+                .or(bollingerBuyingRule)
                 //.or(macdHistogramPositive)
                 .or(rsiBuyingRule)
-                //.or(shortStopLossRule)
                 ;
 
         // 전략 생성
@@ -687,7 +691,7 @@ public class FutureService {
         // 백테스트 실행
         BarSeriesManager seriesManager = new BarSeriesManager(series);
         TradingRecord longTradingRecord = seriesManager.run(combinedLongStrategy);
-        TradingRecord shortTradingRecord = seriesManager.run(combinedShortStrategy);
+        TradingRecord shortTradingRecord = seriesManager.run(combinedShortStrategy, Trade.TradeType.SELL);
 
         // 초기 자산 및 레버리지 설정
         Num initialBalance = DecimalNum.valueOf(maxPositionAmount); // 초기 자산 10000달러
@@ -726,6 +730,7 @@ public class FutureService {
         List<Position> losePositions = new ArrayList<>();
         System.out.println(symbol+"/"+positionSide+" 리포트");
         for (Position position : positions) {
+            System.out.println(" "+position);
             Trade entry = position.getEntry();
             Trade exit = position.getExit();
             BigDecimal PNL = TechnicalIndicatorCalculator.calculatePnL(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide, collateral);
@@ -911,20 +916,20 @@ public class FutureService {
                             makeCloseOrder(eventEntity, positionEvent, remark);
                         }*/
                         // 포지션의 수익률이 -10% 이하라면 청산
-                        else if (currentROI.compareTo(new BigDecimal("-10")) < 0){
+                        else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
                             // 레버리지를 반영하여 스탑로스 가격 계산
                             BigDecimal stopLossPrice;
                             if (tradingEntity.getPositionSide().equals("LONG")) {
-                                stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                                stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                             } else {
-                                stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                                stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                             }
 
                             //stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
 
                             String remark = "수익률 하한선 돌파 청산";
                             closePosition.setClosePrice(stopLossPrice);
-                            closePosition.setRealizatioPnl(tradingEntity.getCollateral().multiply(new BigDecimal("-0.1")));
+                            closePosition.setRealizatioPnl(tradingEntity.getCollateral().multiply(new BigDecimal("-0.2")));
                             positionEvent.getKlineEntity().setPositionEntity(closePosition);
                             makeCloseOrder(eventEntity, positionEvent, remark);
                         }
@@ -1256,9 +1261,9 @@ public class FutureService {
                 // 레버리지를 반영하여 스탑로스 가격 계산
                 BigDecimal stopLossPrice;
                 if (positionSide.equals("LONG")) {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                 } else {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                 }
                 stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
                 LinkedHashMap<String, Object> stopLossOrder = makeStopLossOrder(tradingEntity, stopLossPrice, quantity);
@@ -1992,8 +1997,7 @@ public class FutureService {
                     BigDecimal currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity.getOpenPrice(), tempReport.getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide());
                     BigDecimal currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity.getOpenPrice(), tempReport.getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral());
                     if(logFlag){
-                        System.out.println("ROI : " + currentROI);
-                        System.out.println("PnL : " + currentPnl);
+                        System.out.println("ROI : " + currentROI+"/"+"PnL : " + currentPnl);
                     }
                     if((tempReport.getStrongSignal() < 0
                         || tempReport.getMidSignal() < 0
@@ -2031,13 +2035,13 @@ public class FutureService {
                         }else if (currentProfit.compareTo(BigDecimal.ZERO) > 0) {
                             tradingEntity.setWinTradeCount(tradingEntity.getWinTradeCount() + 1);
                         }
-                    } else if (currentROI.compareTo(new BigDecimal("-10")) < 0){
+                    } else if (currentROI.compareTo(new BigDecimal("-20")) < 0){
                         tradingEntity.setPositionStatus("CLOSE");
                         BigDecimal stopLossPrice = BigDecimal.ZERO;
                         if (tradingEntity.getPositionSide().equals("LONG")) {
-                            stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                            stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                         } else {
-                            stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                            stopLossPrice = tradingEntity.getOpenPrice().multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                         }
                         stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
                         tradingEntity.setClosePrice(stopLossPrice);
@@ -2304,7 +2308,7 @@ public class FutureService {
         //**************************************** 이동평균선 끝 ******************************************
 
         // Calculate RSI
-        int rsiPeriod = 5;   //RSI 기간
+        int rsiPeriod = middleMovingPeriod;   //RSI 기간
         RSIIndicator rsi = new RSIIndicator(closePrice, rsiPeriod);
 
         // 단기 이평선 기준으로 방향을 가져온다.
@@ -2556,10 +2560,10 @@ public class FutureService {
             }
         }else if(
             true
-            &&currentAdxGrade.getGrade()>ADX_GRADE.약한추세.getGrade()
+            //&&currentAdxGrade.getGrade()>ADX_GRADE.약한추세.getGrade()
         ){
             if(1 < totalSignalAbs
-                    && totalSignalAbs < signalStandard
+                    && totalSignalAbs <= signalStandard
                     && !signalHide
             ){
                 if (totalSignal < 0) {
@@ -2568,7 +2572,7 @@ public class FutureService {
                     midSignal = 1;
                 }
             } else if (
-                signalStandard <= totalSignalAbs
+                signalStandard < totalSignalAbs
                 && !signalHide
             ){
                 if (totalSignal < 0){
