@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
 import org.ta4j.core.backtest.BarSeriesManager;
 import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
@@ -567,50 +568,121 @@ public class FutureService {
         List<Rule> shortEntryRules = new ArrayList<>();
         List<Rule> shortStopRules = new ArrayList<>();
 
-        // 볼린저 밴드 매수/매도 규칙
-        Rule bollingerBuyingRule = new CrossedDownIndicatorRule(closePrice, lowerBBand); // 가격이 하한선을 돌파할 때 매수
-        longEntryRules.add(bollingerBuyingRule);
-        shortStopRules.add(bollingerBuyingRule);
-
-        Rule bollingerSellingRule = new CrossedUpIndicatorRule(closePrice, upperBBand); // 가격이 상한선을 돌파할 때 매도
-        longStopRules.add(bollingerSellingRule);
-        shortEntryRules.add(bollingerSellingRule);
-
         // 이동평균선 매수/매도 규칙
         Rule smaBuyingRule = new OverIndicatorRule(sma, ema); // 20MA > 50MA
-        longEntryRules.add(smaBuyingRule);
-        shortStopRules.add(smaBuyingRule);
         Rule smaSellingRule = new UnderIndicatorRule(sma, ema); // 20MA < 50MA
-        longStopRules.add(smaSellingRule);
-        shortEntryRules.add(smaSellingRule);
+
+        // 볼린저 밴드 매수/매도 규칙
+        Rule bollingerBuyingRule = new CrossedDownIndicatorRule(closePrice, lowerBBand); // 가격이 하한선을 돌파할 때 매수
+        Rule bollingerSellingRule = new CrossedUpIndicatorRule(closePrice, upperBBand); // 가격이 상한선을 돌파할 때 매도
+
+        // RSI 매수/매도 규칙
+        int rsiPeriod = 10;
+        RSIIndicator rsiIndicator = new RSIIndicator(closePrice, rsiPeriod);
+        Rule rsiBuyingRule = new CrossedDownIndicatorRule(rsiIndicator, DecimalNum.valueOf(20)); // RSI가 20 이하로 떨어질 때 매수
+        Rule rsiSellingRule = new CrossedUpIndicatorRule(rsiIndicator, DecimalNum.valueOf(70)); // RSI가 70 이상으로 올라갈 때 매도
+
+        MACDIndicator macd = new MACDIndicator(closePrice, 6, 12);
+
+        Rule macdHistogramPositive = new Rule(){
+            @Override
+            public boolean isSatisfied(int i, TradingRecord tradingRecord) {
+                double currentMacdHistogram     = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, i);
+                double previousMacdHistogram    = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, i-1);
+                double prePreviousMacdHistogram = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, i-2);
+
+                double macdHistogramGap = currentMacdHistogram - previousMacdHistogram;
+                double previousMacdHistogramGap = previousMacdHistogram - prePreviousMacdHistogram;
+
+                boolean MACD_히스토그램_증가 = macdHistogramGap > 0;
+                boolean 이전_MACD_히스토그램_증가 = previousMacdHistogramGap > 0;
+
+                return MACD_히스토그램_증가 && !이전_MACD_히스토그램_증가 && previousMacdHistogram < 0;
+            }
+        };
+        Rule macdHistogramNegative = new Rule() {
+            @Override
+            public boolean isSatisfied(int i, TradingRecord tradingRecord) {
+                double currentMacdHistogram     = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, i);
+                double previousMacdHistogram    = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, i - 1);
+                double prePreviousMacdHistogram = technicalIndicatorCalculator.calculateMACDHistogram(closePrice, shortMovingPeriod, longMovingPeriod, i - 2);
+
+                double macdHistogramGap = currentMacdHistogram - previousMacdHistogram;
+                double previousMacdHistogramGap = previousMacdHistogram - prePreviousMacdHistogram;
+
+                boolean MACD_히스토그램_증가 = macdHistogramGap > 0;
+                boolean 이전_MACD_히스토그램_증가 = previousMacdHistogramGap > 0;
+
+                return !MACD_히스토그램_증가 && 이전_MACD_히스토그램_증가 && previousMacdHistogram > 0;
+            }
+        };
 
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
         DecimalNum longStopLossPercentage = DecimalNum.valueOf(-1); // -0.5%
         Rule longStopLossRule = new StopLossRule(closePrice, longStopLossPercentage);
-        longStopRules.add(longStopLossRule);
 
         DecimalNum shortStopLossPercentage = DecimalNum.valueOf(1); // -0.5%
-        Rule shortStopLossRule = new StopLossRule(closePrice, shortStopLossPercentage);
+        Rule shortStopLossRule = new StopGainRule(closePrice, shortStopLossPercentage);
         shortStopRules.add(shortStopLossRule);
 
         // 전략 조합
-        Rule combinedBuyingRule = bollingerBuyingRule.or(smaBuyingRule);
-        Rule combinedSellingRule = bollingerSellingRule.or(smaSellingRule);
+        Rule combinedLongEntryRule =
+                (
+                    bollingerBuyingRule
+                    //.or(macdHistogramPositive)
+                )
+                .and(rsiBuyingRule)
+                //.or(smaBuyingRule)
+                ;
+        Rule combinedShortEntryRule =
+                (
+                    bollingerSellingRule
+                    //.or(macdHistogramNegative)
+                )
+                .and(rsiSellingRule)
+                //.or(smaSellingRule)
+                ;
 
-        Rule combinedLongStopRule = combinedSellingRule
-                .or(longStopLossRule)
+        Rule combinedLongStopRule =
+                bollingerSellingRule
+                //.or(macdHistogramNegative)
+                .or(rsiSellingRule)
+                //.or(longStopLossRule)
                 ;
-        Rule combinedShortStopRule = combinedBuyingRule
-                .or(shortStopLossRule)
+        Rule combinedShortStopRule =
+                bollingerBuyingRule
+                //.or(macdHistogramPositive)
+                .or(rsiBuyingRule)
+                //.or(shortStopLossRule)
                 ;
+
+        // 전략 생성
+        Strategy combinedLongStrategy = new BaseStrategy(combinedLongEntryRule, combinedLongStopRule);
+        Strategy combinedShortStrategy = new BaseStrategy(combinedShortEntryRule, combinedShortStopRule);
+
+
+        //롱 진입규칙
+        //longEntryRules.add(smaBuyingRule);         // 롱 진입규칙에 이동평균선 매수 규칙 추가
+        longEntryRules.add(bollingerBuyingRule);     // 롱 진입규칙에 볼린저 밴드 매수 규칙 추가
+
+        //롱 청산규칙
+        //longStopRules.add(smaSellingRule);         // 롱 청산규칙에 이동평균선 매도 규칙 추가
+        longStopRules.add(bollingerSellingRule);     // 롱 청산규칙에 볼린저 밴드 매도 규칙 추가
+        longStopRules.add(longStopLossRule);         // 롱 청산규칙에 손절 규칙 추가
+
+        //숏 진입규칙
+        //shortEntryRules.add(smaSellingRule);       // 숏 진입규칙에 이동평균선 매도 규칙 추가
+        shortEntryRules.add(bollingerSellingRule);   // 숏 진입규칙에 볼린저 밴드 매도 규칙 추가
+
+        //숏 청산규칙
+        //shortStopRules.add(smaBuyingRule);         // 숏 청산규칙에 이동평균선 매수 규칙 추가
+        shortStopRules.add(bollingerBuyingRule);     // 숏 청산규칙에 볼린저 밴드 매수 규칙 추가
+        shortStopRules.add(shortStopLossRule);       // 숏 청산규칙에 손절 규칙 추가
 
         System.out.println("longEntryRules : " + longEntryRules);
         System.out.println("longStopRules : " + longStopRules);
         System.out.println("shortEntryRules : " + shortEntryRules);
         System.out.println("shortStopRules : " + shortStopRules);
-        // 전략 생성
-        Strategy combinedLongStrategy = new BaseStrategy(combinedBuyingRule, combinedLongStopRule);
-        Strategy combinedShortStrategy = new BaseStrategy(combinedSellingRule, combinedShortStopRule);
 
         // 백테스트 실행
         BarSeriesManager seriesManager = new BarSeriesManager(series);
@@ -658,26 +730,27 @@ public class FutureService {
             Trade exit = position.getExit();
             BigDecimal PNL = TechnicalIndicatorCalculator.calculatePnL(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide, collateral);
             BigDecimal ROI = TechnicalIndicatorCalculator.calculateROI(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide);
-            String entryExpression = "진입" + krTimeExpression(series.getBar(entry.getIndex())) +":"+entry.getNetPrice();
-            String exitExpression = "청산" + krTimeExpression(series.getBar(exit.getIndex())) +":"+exit.getNetPrice();
+            String entryExpression = "진입["+entry.getIndex()+"]"+ krTimeExpression(series.getBar(entry.getIndex())) +":"+entry.getNetPrice();
+            String exitExpression = "청산["+exit.getIndex()+"]"+ krTimeExpression(series.getBar(exit.getIndex())) +":"+exit.getNetPrice();
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
             int i = 1;
             for (Rule entryRule : entryRules) {
-                if (entryRule.isSatisfied(entry.getIndex(), tradingRecord)||entryRule.isSatisfied(exit.getIndex())) {
+                if (entryRule.isSatisfied(entry.getIndex(), tradingRecord)||entryRule.isSatisfied(entry.getIndex())) {
                     entryRuleExpression.append(i).append(" ").append(entryRule.getClass().getSimpleName()).append(" ");
                     i++;
                 }
             }
             int j = 1;
             for (Rule stopRule : stopRules) {
-                if (stopRule.isSatisfied(exit.getIndex(),tradingRecord)) {
+                if (stopRule.isSatisfied(exit.getIndex(),tradingRecord)||stopRule.isSatisfied(exit.getIndex())) {
                     stopRuleExpression.append(j).append(" ").append(stopRule.getClass().getSimpleName()).append(" ");
                     j++;
                 }
             }
+            //System.out.println(" "+entry+" / "+exit);
             System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression+" / "+entryRuleExpression+" / "+stopRuleExpression);
             if(PNL.compareTo(BigDecimal.ZERO) > 0){
                 winPositions.add(position);
