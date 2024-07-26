@@ -91,6 +91,15 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "CANDLE_COUNT")
     int candleCount;
 
+    @Column( name = "SHORT_MOVING_PERIOD")
+    int shortMovingPeriod;
+
+    @Column( name = "MID_MOVING_PERIOD")
+    int midMovingPeriod;
+
+    @Column( name = "LONG_MOVING_PERIOD")
+    int longMovingPeriod;
+
     @Column( name = "COLLATERAL", precision = 19, scale = 8)
     BigDecimal collateral; // 할당된 담보금
     
@@ -123,6 +132,9 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
 
     @Column( name = "MOVING_AVERAGE_CHECKER")
     int movingAverageChecker; //이동평균선으로 매매전략 수립
+
+    @Column( name = "STOP_LOSS_CHECKER")
+    int stopLossChecker; // 손절 매매전략 수립
 
     int totalTradeCount; // 총 거래 횟수
     int winTradeCount; // 이긴 횟수

@@ -31,6 +31,14 @@ public class TradingDTO {
     int maxPositionCount; // 최대 포지션 수
     @ApiModelProperty(value = "300", example = "300")
     int candleCount; //
+
+    @ApiModelProperty(value = "5", example = "5")
+    int shortMovingPeriod; //
+    @ApiModelProperty(value = "20", example = "20")
+    int midMovingPeriod; //
+    @ApiModelProperty(value = "50", example = "50")
+    int longMovingPeriod; //
+
     @ApiModelProperty(value = "1" , example = "0.95")
     BigDecimal collateralRate; //매매에 사용할 담보금 비율
     @ApiModelProperty(value = "-1" , example = "-1")
@@ -54,6 +62,9 @@ public class TradingDTO {
     @ApiModelProperty(value = "1" , example = "1")
     int movingAverageChecker;
 
+    @ApiModelProperty(value = "1" , example = "1")
+    int stopLossChecker;
+
     public TradingEntity toEntity() {
         return TradingEntity.builder()
                 .targetSymbol(targetSymbol)
@@ -63,6 +74,9 @@ public class TradingDTO {
                 .stockSelectionCount(stockSelectionCount)
                 .maxPositionCount(maxPositionCount)
                 .candleCount(candleCount)
+                .shortMovingPeriod(shortMovingPeriod)
+                .midMovingPeriod(midMovingPeriod)
+                .longMovingPeriod(longMovingPeriod)
                 .collateralRate(collateralRate)
                 .trendFollowFlag(trendFollowFlag)
                 //strategyChecker
@@ -74,6 +88,7 @@ public class TradingDTO {
                 .stochRsiChecker(stochRsiChecker)
                 .rsiChecker(rsiChecker)
                 .movingAverageChecker(movingAverageChecker)
+                .stopLossChecker(stopLossChecker)
                 .build();
     }
 }

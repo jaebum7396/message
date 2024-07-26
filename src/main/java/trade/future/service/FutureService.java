@@ -539,9 +539,9 @@ public class FutureService {
             series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
         }
 
-        int shortMovingPeriod = 20;
-        int midPeriod = 30;
-        int longMovingPeriod = 50;
+        int shortMovingPeriod = tradingEntity.getShortMovingPeriod();
+        int midPeriod = tradingEntity.getMidMovingPeriod();
+        int longMovingPeriod = tradingEntity.getLongMovingPeriod();
 
         // 종가 설정
         // Define indicators
@@ -567,6 +567,9 @@ public class FutureService {
         List<Rule> longStopRules = new ArrayList<>();
         List<Rule> shortEntryRules = new ArrayList<>();
         List<Rule> shortStopRules = new ArrayList<>();
+
+        //베이스룰
+        Rule baseRule = new BooleanRule(false){};
 
         // 이동평균선 매수/매도 규칙
         Rule smaBuyingRule = new OverIndicatorRule(sma, ema); // 20MA > 50MA
@@ -627,38 +630,52 @@ public class FutureService {
         };
         shortStopRules.add(shortStopLossRule);
 
-        Rule combinedLongEntryRule = null;
-
         // 전략 조합
-        combinedLongEntryRule =
-                (
-                    bollingerBuyingRule
-                    //.or(macdHistogramPositive)
-                )
-                .or(rsiBuyingRule)
-                //.or(smaBuyingRule)
-                ;
-        Rule combinedShortEntryRule =
-                (
-                    bollingerSellingRule
-                    //.or(macdHistogramNegative)
-                )
-                .or(rsiSellingRule)
-                //.or(smaSellingRule)
-                ;
+        Rule combinedLongEntryRule = baseRule;
+        Rule combinedShortEntryRule = baseRule;
 
-        Rule combinedLongStopRule =
-                longStopLossRule
-                .or(bollingerSellingRule)
-                //.or(macdHistogramNegative)
-                .or(rsiSellingRule)
-                ;
-        Rule combinedShortStopRule =
-                shortStopLossRule
-                .or(bollingerBuyingRule)
-                //.or(macdHistogramPositive)
-                .or(rsiBuyingRule)
-                ;
+        //진입 룰 세팅
+        if(tradingEntity.getBollingerBandChecker() == 1){
+            combinedLongEntryRule = combinedLongEntryRule.or(bollingerBuyingRule);
+            combinedShortEntryRule = combinedShortEntryRule.or(bollingerSellingRule);
+        }
+        if(tradingEntity.getRsiChecker() == 1){
+            combinedLongEntryRule = combinedLongEntryRule.or(rsiBuyingRule);
+            combinedShortEntryRule = combinedShortEntryRule.or(rsiSellingRule);
+        }
+        if(tradingEntity.getMovingAverageChecker() == 1){
+            combinedLongEntryRule = combinedLongEntryRule.or(smaBuyingRule);
+            combinedShortEntryRule = combinedShortEntryRule.or(smaSellingRule);
+        }
+        if(tradingEntity.getMacdHistogramChecker() == 1){
+            combinedLongEntryRule = combinedLongEntryRule.or(macdHistogramPositive);
+            combinedShortEntryRule = combinedShortEntryRule.or(macdHistogramNegative);
+        }
+
+         //.or(longStopLossRule)
+        //청산 룰 세팅
+        Rule combinedLongStopRule = baseRule;
+        Rule combinedShortStopRule = baseRule;
+        if(tradingEntity.getBollingerBandChecker() == 1){
+            combinedLongStopRule = combinedLongStopRule.or(bollingerSellingRule);
+            combinedShortStopRule = combinedShortStopRule.or(bollingerBuyingRule);
+        }
+        if(tradingEntity.getRsiChecker() == 1){
+            combinedLongStopRule = combinedLongStopRule.or(rsiSellingRule);
+            combinedShortStopRule = combinedShortStopRule.or(rsiBuyingRule);
+        }
+        if(tradingEntity.getMovingAverageChecker() == 1){
+            combinedLongStopRule = combinedLongStopRule.or(smaSellingRule);
+            combinedShortStopRule = combinedShortStopRule.or(smaBuyingRule);
+        }
+        if(tradingEntity.getMacdHistogramChecker() == 1){
+            combinedLongStopRule = combinedLongStopRule.or(macdHistogramNegative);
+            combinedShortStopRule = combinedShortStopRule.or(macdHistogramPositive);
+        }
+        if(tradingEntity.getStopLossChecker() == 1){
+            combinedLongStopRule = combinedLongStopRule.or(longStopLossRule);
+            combinedShortStopRule = combinedShortStopRule.or(shortStopLossRule);
+        }
 
         // 전략 생성
         Strategy combinedLongStrategy = new BaseStrategy(combinedLongEntryRule, combinedLongStopRule);
@@ -731,14 +748,30 @@ public class FutureService {
         System.out.println(symbol+"/"+positionSide+" 리포트");
         for (Position position : positions) {
             System.out.println(" "+position);
+
             Trade entry = position.getEntry();
             Trade exit = position.getExit();
-            BigDecimal PNL = TechnicalIndicatorCalculator.calculatePnL(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide, collateral);
+
+            //계약수량=계약금액×레버리지÷진입가격
+            BigDecimal 계약수량 =collateral
+                    .multiply(new BigDecimal(leverage))
+                    .divide(new BigDecimal(entry.getNetPrice().doubleValue()), 4, RoundingMode.UP);
+            //총수수료=2×거래수수료×계약수량×진입가격
+            BigDecimal 총수수료 = 계약수량.multiply(new BigDecimal("0.0004"))
+                    .multiply(new BigDecimal(entry.getNetPrice().doubleValue()))
+                    .multiply(new BigDecimal("2"));
+            String fee = "수수료 : " + 총수수료;
+            총수수료 = 총수수료.setScale(4, RoundingMode.UP);
+
+            BigDecimal PNL = TechnicalIndicatorCalculator.calculatePnL(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide, collateral).subtract(총수수료);
             BigDecimal ROI = TechnicalIndicatorCalculator.calculateROI(BigDecimal.valueOf(entry.getNetPrice().doubleValue()), BigDecimal.valueOf(exit.getNetPrice().doubleValue()), leverage, positionSide);
             String entryExpression = "진입["+entry.getIndex()+"]"+ krTimeExpression(series.getBar(entry.getIndex())) +":"+entry.getNetPrice();
             String exitExpression = "청산["+exit.getIndex()+"]"+ krTimeExpression(series.getBar(exit.getIndex())) +":"+exit.getNetPrice();
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
+
+
+
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
             int i = 1;
