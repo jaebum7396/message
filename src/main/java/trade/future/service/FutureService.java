@@ -244,12 +244,12 @@ public class FutureService {
         String targetSymbol = tradingEntity.getTargetSymbol();
         String interval = tradingEntity.getCandleInterval();
         int leverage = tradingEntity.getLeverage();
-        int stockSelectionCount = tradingEntity.getStockSelectionCount();
-        int maxPositionCount = tradingEntity.getMaxPositionCount();
+        int stockSelectionCount = tradingEntity.getStockSelectionCount(); // 최초에 종목 정보를 몇개를 가져올건지
+        int maxPositionCount = tradingEntity.getMaxPositionCount(); // 최대 빠따든놈의 명 수
         String userCd = tradingEntity.getUserCd();
 
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>())); // 내 계좌정보를 제이슨으로 리턴하는 API
         // printPrettyJson(accountInfo);
 
         System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
@@ -265,7 +265,7 @@ public class FutureService {
         //closeAllPositions();
         System.out.println("symbolParam : " + targetSymbol);
 
-        int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
+        int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size(); // 현재 가능한 포지션 카운트
         boolean nextFlag = true;
         try {
             if (availablePositionCount <= 0) {
@@ -563,11 +563,6 @@ public class FutureService {
         BollingerBandsUpperIndicator upperBBand      = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
         BollingerBandsLowerIndicator lowerBBand      = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
 
-        List<Rule> longEntryRules = new ArrayList<>();
-        List<Rule> longStopRules = new ArrayList<>();
-        List<Rule> shortEntryRules = new ArrayList<>();
-        List<Rule> shortStopRules = new ArrayList<>();
-
         //베이스룰
         Rule baseRule = new BooleanRule(false){};
 
@@ -628,82 +623,103 @@ public class FutureService {
         DecimalNum shortStopLossPercentage = DecimalNum.valueOf(1); // -0.5%
         Rule shortStopLossRule = new StopLossRule(closePrice, shortStopLossPercentage){
         };
-        shortStopRules.add(shortStopLossRule);
 
-        // 전략 조합
-        Rule combinedLongEntryRule = baseRule;
-        Rule combinedShortEntryRule = baseRule;
+        Rule bollingerBandCheckerRule = new BooleanRule(tradingEntity.getBollingerBandChecker() == 1);
+        Rule rsiCheckerRule = new BooleanRule(tradingEntity.getRsiChecker() == 1);
+        Rule movingAverageCheckerRule = new BooleanRule(tradingEntity.getMovingAverageChecker() == 1);
+        Rule macdHistogramCheckerRule = new BooleanRule(tradingEntity.getMacdHistogramChecker() == 1);
+        Rule adxCheckerRule = new BooleanRule(tradingEntity.getAdxChecker() == 1);
+        Rule stochCheckerRule = new BooleanRule(tradingEntity.getStochChecker() == 1);
+        Rule stochRsiCheckerRule = new BooleanRule(tradingEntity.getStochRsiChecker() == 1);
+        Rule stopLossCheckerRule = new BooleanRule(tradingEntity.getStopLossChecker() == 1);
 
-        //진입 룰 세팅
-        if(tradingEntity.getBollingerBandChecker() == 1){
+        // 전략 생성을 위한 룰 리스트
+        List<Rule> longEntryRules = new ArrayList<>();
+        List<Rule> longExitRules = new ArrayList<>();
+        List<Rule> shortEntryRules = new ArrayList<>();
+        List<Rule> shortExitRules = new ArrayList<>();
+
+        if (tradingEntity.getBollingerBandChecker() == 1) {
+            longEntryRules.add(bollingerBuyingRule);
+            longExitRules.add(bollingerSellingRule);
+            shortEntryRules.add(bollingerSellingRule);
+            shortExitRules.add(bollingerBuyingRule);
+        }
+
+        if (tradingEntity.getMovingAverageChecker() == 1) {
+            longEntryRules.add(smaBuyingRule);
+            longExitRules.add(smaSellingRule);
+            shortEntryRules.add(smaSellingRule);
+            shortExitRules.add(smaBuyingRule);
+        }
+
+        if (tradingEntity.getRsiChecker() == 1) {
+            longEntryRules.add(rsiBuyingRule);
+            longExitRules.add(rsiSellingRule);
+            shortEntryRules.add(rsiSellingRule);
+            shortExitRules.add(rsiBuyingRule);
+        }
+
+        if (tradingEntity.getMacdHistogramChecker() == 1) {
+            longEntryRules.add(macdHistogramPositive);
+            longExitRules.add(macdHistogramNegative);
+            shortEntryRules.add(macdHistogramNegative);
+            shortExitRules.add(macdHistogramPositive);
+        }
+
+        if (tradingEntity.getStopLossChecker() == 1) {
+            longExitRules.add(longStopLossRule);
+            shortExitRules.add(shortStopLossRule);
+        }
+
+        // 룰 결합
+        // 룰 결합
+        Rule combinedLongEntryRule = new BooleanRule(false);
+        Rule combinedLongExitRule = new BooleanRule(false);
+        Rule combinedShortEntryRule = new BooleanRule(false);
+        Rule combinedShortExitRule = new BooleanRule(false);
+
+        if (tradingEntity.getBollingerBandChecker() == 1) {
             combinedLongEntryRule = combinedLongEntryRule.or(bollingerBuyingRule);
+            combinedLongExitRule = combinedLongExitRule.or(bollingerSellingRule);
             combinedShortEntryRule = combinedShortEntryRule.or(bollingerSellingRule);
-        }
-        if(tradingEntity.getRsiChecker() == 1){
-            combinedLongEntryRule = combinedLongEntryRule.or(rsiBuyingRule);
-            combinedShortEntryRule = combinedShortEntryRule.or(rsiSellingRule);
-        }
-        if(tradingEntity.getMovingAverageChecker() == 1){
-            combinedLongEntryRule = combinedLongEntryRule.or(smaBuyingRule);
-            combinedShortEntryRule = combinedShortEntryRule.or(smaSellingRule);
-        }
-        if(tradingEntity.getMacdHistogramChecker() == 1){
-            combinedLongEntryRule = combinedLongEntryRule.or(macdHistogramPositive);
-            combinedShortEntryRule = combinedShortEntryRule.or(macdHistogramNegative);
+            combinedShortExitRule = combinedShortExitRule.or(bollingerBuyingRule);
         }
 
-         //.or(longStopLossRule)
-        //청산 룰 세팅
-        Rule combinedLongStopRule = baseRule;
-        Rule combinedShortStopRule = baseRule;
-        if(tradingEntity.getBollingerBandChecker() == 1){
-            combinedLongStopRule = combinedLongStopRule.or(bollingerSellingRule);
-            combinedShortStopRule = combinedShortStopRule.or(bollingerBuyingRule);
+        if (tradingEntity.getMovingAverageChecker() == 1) {
+            combinedLongEntryRule = combinedLongEntryRule.or(smaBuyingRule);
+            combinedLongExitRule = combinedLongExitRule.or(smaSellingRule);
+            combinedShortEntryRule = combinedShortEntryRule.or(smaSellingRule);
+            combinedShortExitRule = combinedShortExitRule.or(smaBuyingRule);
         }
-        if(tradingEntity.getRsiChecker() == 1){
-            combinedLongStopRule = combinedLongStopRule.or(rsiSellingRule);
-            combinedShortStopRule = combinedShortStopRule.or(rsiBuyingRule);
+
+        if (tradingEntity.getRsiChecker() == 1) {
+            combinedLongEntryRule = combinedLongEntryRule.or(rsiBuyingRule);
+            combinedLongExitRule = combinedLongExitRule.or(rsiSellingRule);
+            combinedShortEntryRule = combinedShortEntryRule.or(rsiSellingRule);
+            combinedShortExitRule = combinedShortExitRule.or(rsiBuyingRule);
         }
-        if(tradingEntity.getMovingAverageChecker() == 1){
-            combinedLongStopRule = combinedLongStopRule.or(smaSellingRule);
-            combinedShortStopRule = combinedShortStopRule.or(smaBuyingRule);
+
+        if (tradingEntity.getMacdHistogramChecker() == 1) {
+            combinedLongEntryRule = combinedLongEntryRule.or(macdHistogramPositive);
+            combinedLongExitRule = combinedLongExitRule.or(macdHistogramNegative);
+            combinedShortEntryRule = combinedShortEntryRule.or(macdHistogramNegative);
+            combinedShortExitRule = combinedShortExitRule.or(macdHistogramPositive);
         }
-        if(tradingEntity.getMacdHistogramChecker() == 1){
-            combinedLongStopRule = combinedLongStopRule.or(macdHistogramNegative);
-            combinedShortStopRule = combinedShortStopRule.or(macdHistogramPositive);
-        }
-        if(tradingEntity.getStopLossChecker() == 1){
-            combinedLongStopRule = combinedLongStopRule.or(longStopLossRule);
-            combinedShortStopRule = combinedShortStopRule.or(shortStopLossRule);
-        }
+
+        // 스탑로스 룰 항상 적용
+        combinedLongExitRule = combinedLongExitRule.or(longStopLossRule);
+        combinedShortExitRule = combinedShortExitRule.or(shortStopLossRule);
+
+        // 기본 룰 설정 (모든 체커가 비활성화된 경우)
+        if (combinedLongEntryRule == null) combinedLongEntryRule = new BooleanRule(false);
+        if (combinedLongExitRule == null) combinedLongExitRule = new BooleanRule(false);
+        if (combinedShortEntryRule == null) combinedShortEntryRule = new BooleanRule(false);
+        if (combinedShortExitRule == null) combinedShortExitRule = new BooleanRule(false);
 
         // 전략 생성
-        Strategy combinedLongStrategy = new BaseStrategy(combinedLongEntryRule, combinedLongStopRule);
-        Strategy combinedShortStrategy = new BaseStrategy(combinedShortEntryRule, combinedShortStopRule);
-
-
-        //롱 진입규칙
-        //longEntryRules.add(smaBuyingRule);         // 롱 진입규칙에 이동평균선 매수 규칙 추가
-        longEntryRules.add(bollingerBuyingRule);     // 롱 진입규칙에 볼린저 밴드 매수 규칙 추가
-
-        //롱 청산규칙
-        //longStopRules.add(smaSellingRule);         // 롱 청산규칙에 이동평균선 매도 규칙 추가
-        longStopRules.add(bollingerSellingRule);     // 롱 청산규칙에 볼린저 밴드 매도 규칙 추가
-        longStopRules.add(longStopLossRule);         // 롱 청산규칙에 손절 규칙 추가
-
-        //숏 진입규칙
-        //shortEntryRules.add(smaSellingRule);       // 숏 진입규칙에 이동평균선 매도 규칙 추가
-        shortEntryRules.add(bollingerSellingRule);   // 숏 진입규칙에 볼린저 밴드 매도 규칙 추가
-
-        //숏 청산규칙
-        //shortStopRules.add(smaBuyingRule);         // 숏 청산규칙에 이동평균선 매수 규칙 추가
-        shortStopRules.add(bollingerBuyingRule);     // 숏 청산규칙에 볼린저 밴드 매수 규칙 추가
-        shortStopRules.add(shortStopLossRule);       // 숏 청산규칙에 손절 규칙 추가
-
-        System.out.println("longEntryRules : " + longEntryRules);
-        System.out.println("longStopRules : " + longStopRules);
-        System.out.println("shortEntryRules : " + shortEntryRules);
-        System.out.println("shortStopRules : " + shortStopRules);
+        Strategy combinedLongStrategy = new BaseStrategy(combinedLongEntryRule, combinedLongExitRule);
+        Strategy combinedShortStrategy = new BaseStrategy(combinedShortEntryRule, combinedShortExitRule);
 
         // 백테스트 실행
         BarSeriesManager seriesManager = new BarSeriesManager(series);
@@ -716,9 +732,9 @@ public class FutureService {
 
         // 결과 출력
         System.out.println("");
-        printBackTestResult(longTradingRecord, longEntryRules, longStopRules, series, symbol, leverage, "LONG", maxPositionAmount);
+        printBackTestResult(longTradingRecord, longEntryRules, longExitRules, series, symbol, leverage, "LONG", maxPositionAmount);
         System.out.println("");
-        printBackTestResult(shortTradingRecord, shortEntryRules, shortStopRules, series, symbol, leverage, "SHORT", maxPositionAmount);
+        printBackTestResult(shortTradingRecord, shortEntryRules, shortExitRules, series, symbol, leverage, "SHORT", maxPositionAmount);
 
         // 포지션 거래 결과 분석
         /*AnalysisCriterion profitCriterion = new ProfitCriterion();
@@ -747,8 +763,7 @@ public class FutureService {
         List<Position> losePositions = new ArrayList<>();
         System.out.println(symbol+"/"+positionSide+" 리포트");
         for (Position position : positions) {
-            System.out.println(" "+position);
-
+            //System.out.println(" "+position);
             Trade entry = position.getEntry();
             Trade exit = position.getExit();
 
@@ -769,8 +784,6 @@ public class FutureService {
             String exitExpression = "청산["+exit.getIndex()+"]"+ krTimeExpression(series.getBar(exit.getIndex())) +":"+exit.getNetPrice();
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
-
-
 
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
@@ -1651,7 +1664,8 @@ public class FutureService {
                     tempTradingEntity.setTrend1h(trend1h);
                     tempTradingEntity.setTrend15m(trend15m);
 
-                    Map<String, Object> klineMap = getKlines(tempTradingEntity,true);
+                    /* TODO : 현재 제일 작업이 필요한 부분 - 필요한 트레이딩 데이터를 수집하고 종목을 선정함 */
+                    Map<String, Object> klineMap = getKlines(tempTradingEntity,true); //klines - candle 데이터를 말한다.
                     Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
                     TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tempTradingEntity);
                     if (expectationProfitOpt.isPresent()){
@@ -1956,8 +1970,8 @@ public class FutureService {
     }
 
 
+    // 가상 트레이딩으로 사용되고 있다.
     public Map<String, Object> getKlines(TradingEntity tradingEntity, boolean logFlag) {
-
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
         //printPrettyJson(accountInfo);
@@ -1976,7 +1990,7 @@ public class FutureService {
                 .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
                 .multiply(tradingEntity.getCollateralRate()).setScale(0, RoundingMode.DOWN);
 
-        tradingEntity.setCollateral(maxPositionAmount);
+        tradingEntity.setCollateral(maxPositionAmount); // 해당 빠따든 놈에게 할당된 담보금을 세팅 해준다
 
         String tradingCd = tradingEntity.getTradingCd();
         String symbol = tradingEntity.getSymbol();
@@ -1988,18 +2002,20 @@ public class FutureService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
 
-        paramMap.put("symbol", symbol);
-        paramMap.put("interval", interval);
-        paramMap.put("limit", limit);
+        paramMap.put("symbol", symbol); // BTCUSDT
+        paramMap.put("interval", interval); // 1m, 5m, 15m, 1h, 4h, 1d
+        paramMap.put("limit", limit); // 최대 1500개까지 가져올수 있음.
 
         client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
-        String resultStr = client.market().klines(paramMap);
+        String resultStr = client.market().klines(paramMap); // 바이낸스에서 캔들데이터를 제이슨으로 반환함.
 
         //System.out.println("resultStr : "+ resultStr);
         String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
         System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
         JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
         List<KlineEntity> klineEntities = new ArrayList<>();
+
+        // TA4J 라이브러리 사용 -- 0.16 버전인데 이전버전의 정보가 너무 많다. !주의
         BaseBarSeries series = new BaseBarSeries();
         series.setMaximumBarCount(limit);
         seriesMap.put(tradingCd + "_" + interval, series);
@@ -2019,9 +2035,10 @@ public class FutureService {
             Num close = series.numOf(klineEntity.getClosePrice());
             Num volume = series.numOf(klineEntity.getVolume());
 
+            // 바이낸스에서 가져온 캔들데이터를 시리즈(TA4J의 컬렉션 객체)에다가 세팅하는거
             series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
 
-
+            //기술적 지표를 세팅하는 부분
             if(i!=0){
                 TechnicalIndicatorReportEntity tempReport = technicalIndicatorCalculate(tradingEntity);
                 technicalIndicatorReportEntityArr.add(tempReport);
