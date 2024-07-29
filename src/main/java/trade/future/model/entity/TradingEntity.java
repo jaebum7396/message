@@ -191,6 +191,7 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
         this.stochRsiChecker = original.stochRsiChecker;
         this.rsiChecker = original.rsiChecker;
         this.movingAverageChecker = original.movingAverageChecker;
+        this.stopLossChecker = original.stopLossChecker;
     }
 
     @Override

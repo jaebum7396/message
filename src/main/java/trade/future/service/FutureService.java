@@ -372,6 +372,7 @@ public class FutureService {
     }
 
     public Map<String,Object> backTest(HttpServletRequest request, TradingDTO tradingDTO){
+        System.out.println("backTest >>>>>" + tradingDTO.toString());
         Claims claims = getClaims(request);
         String userCd = String.valueOf(claims.get("userCd"));
         if (userCd == null || userCd.isEmpty()) {
@@ -384,6 +385,7 @@ public class FutureService {
     }
 
     public Map<String, Object> backTest(TradingEntity tradingEntity) {
+        System.out.println("backTest >>>>>" + tradingEntity.toString());
         //변수 설정
         String interval = tradingEntity.getCandleInterval();
         int maxPositionCount = tradingEntity.getMaxPositionCount();
@@ -471,7 +473,7 @@ public class FutureService {
     }
 
     public Map<String, Object> backTestExec(TradingEntity tradingEntity, boolean logFlag) {
-
+        System.out.println("tradingEntity : " + tradingEntity);
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
         JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
         //printPrettyJson(accountInfo);
@@ -592,7 +594,10 @@ public class FutureService {
                 boolean MACD_히스토그램_증가 = macdHistogramGap > 0;
                 boolean 이전_MACD_히스토그램_증가 = previousMacdHistogramGap > 0;
 
-                return MACD_히스토그램_증가 && !이전_MACD_히스토그램_증가 && previousMacdHistogram < 0;
+                return MACD_히스토그램_증가
+                        && !이전_MACD_히스토그램_증가
+                        //&& previousMacdHistogram < 0
+                        ;
             }
         };
         Rule macdHistogramNegative = new Rule() {
@@ -608,16 +613,38 @@ public class FutureService {
                 boolean MACD_히스토그램_증가 = macdHistogramGap > 0;
                 boolean 이전_MACD_히스토그램_증가 = previousMacdHistogramGap > 0;
 
-                return !MACD_히스토그램_증가 && 이전_MACD_히스토그램_증가 && previousMacdHistogram > 0;
+                return !MACD_히스토그램_증가
+                        && 이전_MACD_히스토그램_증가
+                        //&& previousMacdHistogram > 0
+                        ;
             }
         };
 
+        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14);
+
+        Rule atrEntryRule = new OverIndicatorRule(relativeATR, series.numOf(1)) {
+            @Override
+            public boolean isSatisfied(int index) {
+                // Relative ATR이 2%를 초과할 때 (높은 변동성)
+                return relativeATR.getValue(index).isGreaterThan(series.numOf(1));
+            }
+        };
+
+        Rule atrExitRule = new UnderIndicatorRule(relativeATR, series.numOf(0.5)) {
+            @Override
+            public boolean isSatisfied(int index) {
+                // Relative ATR이 1% 미만일 때 (낮은 변동성)
+                return relativeATR.getValue(index).isLessThan(series.numOf(0.5));
+            }
+        };
+
+
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
-        DecimalNum longStopLossPercentage = DecimalNum.valueOf(1); // -0.5%
+        DecimalNum longStopLossPercentage = DecimalNum.valueOf(2); // -0.5%
         Rule longStopLossRule = new StopLossRule(closePrice, longStopLossPercentage){
         };
 
-        DecimalNum shortStopLossPercentage = DecimalNum.valueOf(1); // -0.5%
+        DecimalNum shortStopLossPercentage = DecimalNum.valueOf(2); // -0.5%
         Rule shortStopLossRule = new StopLossRule(closePrice, shortStopLossPercentage){
         };
 
@@ -705,8 +732,19 @@ public class FutureService {
         }
 
         // 스탑로스 룰 항상 적용
-        combinedLongExitRule = combinedLongExitRule.or(longStopLossRule);
-        combinedShortExitRule = combinedShortExitRule.or(shortStopLossRule);
+        if (tradingEntity.getStopLossChecker() == 1) {
+            combinedLongExitRule = combinedLongExitRule.or(longStopLossRule);
+            combinedShortExitRule = combinedShortExitRule.or(shortStopLossRule);
+        }
+
+        System.out.println("tradingEntity : " + tradingEntity);
+
+        //if (tradingEntity.getAtrChecker() == 1) {
+        combinedLongEntryRule = combinedLongEntryRule.and(atrExitRule);
+        combinedLongExitRule = combinedLongExitRule.or(atrEntryRule);
+        combinedShortEntryRule = combinedShortEntryRule.and(atrExitRule);
+        combinedShortExitRule = combinedShortExitRule.or(atrEntryRule);
+        //}
 
         // 기본 룰 설정 (모든 체커가 비활성화된 경우)
         if (combinedLongEntryRule == null) combinedLongEntryRule = new BooleanRule(false);
@@ -715,8 +753,8 @@ public class FutureService {
         if (combinedShortExitRule == null) combinedShortExitRule = new BooleanRule(false);
 
         // 전략 생성
-        Strategy combinedLongStrategy = new BaseStrategy(combinedLongEntryRule, combinedLongExitRule);
-        Strategy combinedShortStrategy = new BaseStrategy(combinedShortEntryRule, combinedShortExitRule);
+        Strategy combinedLongStrategy = new BaseStrategy(combinedShortEntryRule, combinedLongExitRule);
+        Strategy combinedShortStrategy = new BaseStrategy(combinedLongEntryRule, combinedShortExitRule);
 
         // 백테스트 실행
         BarSeriesManager seriesManager = new BarSeriesManager(series);
@@ -759,7 +797,8 @@ public class FutureService {
         List<Position> winPositions = new ArrayList<>();
         List<Position> losePositions = new ArrayList<>();
         System.out.println(symbol+"/"+positionSide+" 리포트");
-        AverageTrueRangeIndicator atrIndicator = new AverageTrueRangeIndicator(series, 14); // 14-period ATR
+        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 30);
+
         for (Position position : positions) {
             //System.out.println(" "+position);
             Trade entry = position.getEntry();
@@ -783,24 +822,22 @@ public class FutureService {
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
 
-            // ATR at the entry point
-            Num atrValue = atrIndicator.getValue(entry.getIndex());
+            // 특정 인덱스에서의 Relative ATR 값을 얻습니다
+            Num atrValue = relativeATR.getValue(entry.getIndex());
             String atrExpression = "ATR at Entry: " + atrValue;
 
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
             int i = 1;
             for (Rule entryRule : entryRules) {
-                if (entryRule.isSatisfied(entry.getIndex(), tradingRecord)||entryRule.isSatisfied(entry.getIndex())) {
-                    entryRuleExpression.append(i).append(" ").append(entryRule.getClass().getSimpleName()).append(" ");
-                    i++;
+                if (entryRule.isSatisfied(entry.getIndex(), tradingRecord) || entryRule.isSatisfied(entry.getIndex())) {
+                    entryRuleExpression.append(entryRule.getClass().getSimpleName()).append(" ");
                 }
             }
-            int j = 1;
-            for (Rule stopRule : stopRules) {
-                if (stopRule.isSatisfied(exit.getIndex(),tradingRecord)||stopRule.isSatisfied(exit.getIndex())) {
-                    stopRuleExpression.append(j).append(" ").append(stopRule.getClass().getSimpleName()).append(" ");
-                    j++;
+
+            for (Rule exitRule : stopRules) {
+                if (exitRule.isSatisfied(exit.getIndex(), tradingRecord) || exitRule.isSatisfied(exit.getIndex())) {
+                    stopRuleExpression.append(exitRule.getClass().getSimpleName()).append(" ");
                 }
             }
             //System.out.println(" "+entry+" / "+exit);

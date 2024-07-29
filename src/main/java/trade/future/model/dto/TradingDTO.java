@@ -61,7 +61,6 @@ public class TradingDTO {
     int rsiChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int movingAverageChecker;
-
     @ApiModelProperty(value = "1" , example = "1")
     int stopLossChecker;
 
