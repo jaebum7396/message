@@ -16,10 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
 import org.ta4j.core.backtest.BarSeriesManager;
-import org.ta4j.core.indicators.EMAIndicator;
-import org.ta4j.core.indicators.MACDIndicator;
-import org.ta4j.core.indicators.RSIIndicator;
-import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
@@ -762,6 +759,7 @@ public class FutureService {
         List<Position> winPositions = new ArrayList<>();
         List<Position> losePositions = new ArrayList<>();
         System.out.println(symbol+"/"+positionSide+" 리포트");
+        AverageTrueRangeIndicator atrIndicator = new AverageTrueRangeIndicator(series, 14); // 14-period ATR
         for (Position position : positions) {
             //System.out.println(" "+position);
             Trade entry = position.getEntry();
@@ -785,6 +783,10 @@ public class FutureService {
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
 
+            // ATR at the entry point
+            Num atrValue = atrIndicator.getValue(entry.getIndex());
+            String atrExpression = "ATR at Entry: " + atrValue;
+
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
             int i = 1;
@@ -802,7 +804,7 @@ public class FutureService {
                 }
             }
             //System.out.println(" "+entry+" / "+exit);
-            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression+" / "+entryRuleExpression+" / "+stopRuleExpression);
+            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression+ " / " + atrExpression + " / " +entryRuleExpression+" / "+stopRuleExpression);
             if(PNL.compareTo(BigDecimal.ZERO) > 0){
                 winPositions.add(position);
             }else if(PNL.compareTo(BigDecimal.ZERO) < 0){
