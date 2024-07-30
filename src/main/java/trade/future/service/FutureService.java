@@ -804,6 +804,11 @@ public class FutureService {
 
     public void printBackTestResult(TradingRecord tradingRecord, List<Rule> entryRules, List<Rule> stopRules, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
 
+        // 트렌드
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        SMAIndicator shortSMA = new SMAIndicator(closePrice, 10); // 10일 단기 이동평균선
+        SMAIndicator longSMA = new SMAIndicator(closePrice, 30); // 30일 장기 이동평균선
+
         // 거래 기록 출력
         List<Position> positions = tradingRecord.getPositions();
         BigDecimal totalProfit = BigDecimal.ZERO;
@@ -838,6 +843,15 @@ public class FutureService {
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
 
+            String trendExpression;
+            if (shortSMA.getValue(entry.getIndex()).isGreaterThan(longSMA.getValue(entry.getIndex()))) {
+                trendExpression = "Trend: " + CONSOLE_COLORS.BRIGHT_GREEN + "상승" + CONSOLE_COLORS.RESET;
+            } else if (shortSMA.getValue(entry.getIndex()).isLessThan(longSMA.getValue(entry.getIndex()))) {
+                trendExpression = "Trend: " + CONSOLE_COLORS.BRIGHT_RED + "하락" + CONSOLE_COLORS.RESET;
+            } else {
+                trendExpression = "Trend: 중립";
+            }
+
             // 특정 인덱스에서의 Relative ATR 값을 얻습니다
             Num atrValue = relativeATR.getValue(entry.getIndex());
             String atrExpression = "ATR at Entry: " + atrValue;
@@ -861,7 +875,7 @@ public class FutureService {
                 }
             }
             //System.out.println(" "+entry+" / "+exit);
-            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression+ " / " + atrExpression+ " / " + adxExpression  + " / " +entryRuleExpression+" / "+stopRuleExpression);
+            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+trendExpression+" / "+ROIExpression+" / "+PNLExpression+ " / " + atrExpression+ " / " + adxExpression  + " / " +entryRuleExpression+" / "+stopRuleExpression);
             if(PNL.compareTo(BigDecimal.ZERO) > 0){
                 winPositions.add(position);
             }else if(PNL.compareTo(BigDecimal.ZERO) < 0){
