@@ -15,12 +15,14 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
-import org.ta4j.core.backtest.BarSeriesManager;
-import org.ta4j.core.indicators.*;
+import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.RSIIndicator;
+import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
-import org.ta4j.core.indicators.bollinger.PercentBIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
@@ -622,15 +624,15 @@ public class FutureService {
 
         RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14);
 
-        Rule atrEntryRule = new OverIndicatorRule(relativeATR, series.numOf(1)) {
+        Rule overAtrRule = new OverIndicatorRule(relativeATR, series.numOf(0.5)) {
             @Override
             public boolean isSatisfied(int index) {
                 // Relative ATR이 2%를 초과할 때 (높은 변동성)
-                return relativeATR.getValue(index).isGreaterThan(series.numOf(1));
+                return relativeATR.getValue(index).isGreaterThan(series.numOf(0.5));
             }
         };
 
-        Rule atrExitRule = new UnderIndicatorRule(relativeATR, series.numOf(0.5)) {
+        Rule underAtrRule = new UnderIndicatorRule(relativeATR, series.numOf(0.5)) {
             @Override
             public boolean isSatisfied(int index) {
                 // Relative ATR이 1% 미만일 때 (낮은 변동성)
@@ -638,14 +640,16 @@ public class FutureService {
             }
         };
 
-
+        int takeProfitRate = tradingEntity.getTakeProfitRate();
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
-        DecimalNum longStopLossPercentage = DecimalNum.valueOf(2); // -0.5%
-        Rule longStopLossRule = new StopLossRule(closePrice, longStopLossPercentage){
+        DecimalNum takeProfitPercentage = DecimalNum.valueOf(takeProfitRate); // -0.5%
+        Rule takeProfitRule = new StopGainRule(closePrice, takeProfitPercentage){
         };
 
-        DecimalNum shortStopLossPercentage = DecimalNum.valueOf(2); // -0.5%
-        Rule shortStopLossRule = new StopLossRule(closePrice, shortStopLossPercentage){
+        int stopLossRate = tradingEntity.getStopLossRate();
+        // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
+        DecimalNum stopLossPercentage = DecimalNum.valueOf(stopLossRate); // -0.5%
+        Rule stopLossRule = new StopLossRule(closePrice, stopLossPercentage){
         };
 
         Rule bollingerBandCheckerRule = new BooleanRule(tradingEntity.getBollingerBandChecker() == 1);
@@ -692,69 +696,77 @@ public class FutureService {
         }
 
         if (tradingEntity.getStopLossChecker() == 1) {
-            longExitRules.add(longStopLossRule);
-            shortExitRules.add(shortStopLossRule);
+            longExitRules.add(stopLossRule);
+            shortExitRules.add(stopLossRule);
         }
 
-        // 룰 결합
-        // 룰 결합
-        Rule combinedLongEntryRule = new BooleanRule(false);
-        Rule combinedLongExitRule = new BooleanRule(false);
-        Rule combinedShortEntryRule = new BooleanRule(false);
-        Rule combinedShortExitRule = new BooleanRule(false);
-
-        if (tradingEntity.getBollingerBandChecker() == 1) {
-            combinedLongEntryRule = combinedLongEntryRule.or(bollingerBuyingRule);
-            combinedLongExitRule = combinedLongExitRule.or(bollingerSellingRule);
-            combinedShortEntryRule = combinedShortEntryRule.or(bollingerSellingRule);
-            combinedShortExitRule = combinedShortExitRule.or(bollingerBuyingRule);
+        if (tradingEntity.getTakeProfitChecker() == 1) {
+            longExitRules.add(takeProfitRule);
+            shortExitRules.add(takeProfitRule);
         }
 
-        if (tradingEntity.getMovingAverageChecker() == 1) {
-            combinedLongEntryRule = combinedLongEntryRule.or(smaBuyingRule);
-            combinedLongExitRule = combinedLongExitRule.or(smaSellingRule);
-            combinedShortEntryRule = combinedShortEntryRule.or(smaSellingRule);
-            combinedShortExitRule = combinedShortExitRule.or(smaBuyingRule);
+        //System.out.println("longEntryRules : " + longEntryRules);
+        //System.out.println("longExitRules : " + longExitRules);
+        //System.out.println("shortEntryRules : " + shortEntryRules);
+        //System.out.println("shortExitRules : " + shortExitRules);
+
+        // 복합 규칙 생성
+        Rule combinedLongEntryRule;
+        if (!longEntryRules.isEmpty()) {
+            combinedLongEntryRule = longEntryRules.get(0);
+            for (int i = 1; i < longEntryRules.size(); i++) {
+                combinedLongEntryRule = new OrRule(combinedLongEntryRule, longEntryRules.get(i));
+            }
+        } else {
+            combinedLongEntryRule = new BooleanRule(true);  // 항상 참인 규칙
         }
+        combinedLongEntryRule = new AndRule(combinedLongEntryRule, tradingEntity.getAtrChecker() == 1 ? overAtrRule : underAtrRule);
 
-        if (tradingEntity.getRsiChecker() == 1) {
-            combinedLongEntryRule = combinedLongEntryRule.or(rsiBuyingRule);
-            combinedLongExitRule = combinedLongExitRule.or(rsiSellingRule);
-            combinedShortEntryRule = combinedShortEntryRule.or(rsiSellingRule);
-            combinedShortExitRule = combinedShortExitRule.or(rsiBuyingRule);
+        Rule combinedLongExitRule;
+        if (!longExitRules.isEmpty()) {
+            combinedLongExitRule = longExitRules.get(0);
+            for (int i = 1; i < longExitRules.size(); i++) {
+                combinedLongExitRule = new OrRule(combinedLongExitRule, longExitRules.get(i));
+            }
+        } else {
+            combinedLongExitRule = new BooleanRule(true);
         }
+        combinedLongExitRule = new OrRule(combinedLongExitRule, tradingEntity.getAtrChecker() == 1 ? underAtrRule:overAtrRule);
 
-        if (tradingEntity.getMacdHistogramChecker() == 1) {
-            combinedLongEntryRule = combinedLongEntryRule.or(macdHistogramPositive);
-            combinedLongExitRule = combinedLongExitRule.or(macdHistogramNegative);
-            combinedShortEntryRule = combinedShortEntryRule.or(macdHistogramNegative);
-            combinedShortExitRule = combinedShortExitRule.or(macdHistogramPositive);
+        Rule combinedShortEntryRule;
+        if (!shortEntryRules.isEmpty()) {
+            combinedShortEntryRule = shortEntryRules.get(0);
+            for (int i = 1; i < shortEntryRules.size(); i++) {
+                combinedShortEntryRule = new OrRule(combinedShortEntryRule, shortEntryRules.get(i));
+            }
+        } else {
+            combinedShortEntryRule = new BooleanRule(true);
         }
+        combinedShortEntryRule = new AndRule(combinedShortEntryRule, tradingEntity.getAtrChecker() == 1 ? overAtrRule:underAtrRule);
 
-        // 스탑로스 룰 항상 적용
-        if (tradingEntity.getStopLossChecker() == 1) {
-            combinedLongExitRule = combinedLongExitRule.or(longStopLossRule);
-            combinedShortExitRule = combinedShortExitRule.or(shortStopLossRule);
+        Rule combinedShortExitRule;
+        if (!shortExitRules.isEmpty()) {
+            combinedShortExitRule = shortExitRules.get(0);
+            for (int i = 1; i < shortExitRules.size(); i++) {
+                combinedShortExitRule = new OrRule(combinedShortExitRule, shortExitRules.get(i));
+            }
+        } else {
+            combinedShortExitRule = new BooleanRule(true);
         }
-
-        System.out.println("tradingEntity : " + tradingEntity);
-
-        //if (tradingEntity.getAtrChecker() == 1) {
-        combinedLongEntryRule = combinedLongEntryRule.and(atrExitRule);
-        combinedLongExitRule = combinedLongExitRule.or(atrEntryRule);
-        combinedShortEntryRule = combinedShortEntryRule.and(atrExitRule);
-        combinedShortExitRule = combinedShortExitRule.or(atrEntryRule);
-        //}
+        combinedShortExitRule = new OrRule(combinedShortExitRule, tradingEntity.getAtrChecker() == 1 ? underAtrRule:overAtrRule);
 
         // 기본 룰 설정 (모든 체커가 비활성화된 경우)
-        if (combinedLongEntryRule == null) combinedLongEntryRule = new BooleanRule(false);
-        if (combinedLongExitRule == null) combinedLongExitRule = new BooleanRule(false);
-        if (combinedShortEntryRule == null) combinedShortEntryRule = new BooleanRule(false);
-        if (combinedShortExitRule == null) combinedShortExitRule = new BooleanRule(false);
+       /*combinedLongEntryRule = new BooleanRule(false);
+       combinedLongExitRule = new BooleanRule(false);
+       combinedShortEntryRule = new BooleanRule(false);
+       combinedShortExitRule = new BooleanRule(false);*/
 
+        int reverseTradeChecker = tradingEntity.getReverseTradeChecker();
         // 전략 생성
-        Strategy combinedLongStrategy = new BaseStrategy(combinedShortEntryRule, combinedLongExitRule);
-        Strategy combinedShortStrategy = new BaseStrategy(combinedLongEntryRule, combinedShortExitRule);
+        Strategy combinedLongStrategy =
+                new BaseStrategy(reverseTradeChecker == 1 ? combinedShortEntryRule : combinedLongEntryRule, combinedLongExitRule);
+        Strategy combinedShortStrategy =
+                new BaseStrategy(reverseTradeChecker == 1 ? combinedLongEntryRule : combinedShortEntryRule, combinedShortExitRule);
 
         // 백테스트 실행
         BarSeriesManager seriesManager = new BarSeriesManager(series);
@@ -791,13 +803,17 @@ public class FutureService {
     }
 
     public void printBackTestResult(TradingRecord tradingRecord, List<Rule> entryRules, List<Rule> stopRules, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
+
         // 거래 기록 출력
         List<Position> positions = tradingRecord.getPositions();
         BigDecimal totalProfit = BigDecimal.ZERO;
         List<Position> winPositions = new ArrayList<>();
         List<Position> losePositions = new ArrayList<>();
         System.out.println(symbol+"/"+positionSide+" 리포트");
-        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 30);
+        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14);
+        // ADX 지표 설정
+        int adxPeriod = 14; // 일반적으로 사용되는 기간
+        ADXIndicator adxIndicator = new ADXIndicator(series, adxPeriod);
 
         for (Position position : positions) {
             //System.out.println(" "+position);
@@ -826,6 +842,10 @@ public class FutureService {
             Num atrValue = relativeATR.getValue(entry.getIndex());
             String atrExpression = "ATR at Entry: " + atrValue;
 
+            // 특정 인덱스에서의 ADX 값을 얻습니다
+            Num adxValue = adxIndicator.getValue(entry.getIndex());
+            String adxExpression = "ADX at Entry: " + adxValue.doubleValue();
+
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
             int i = 1;
@@ -841,7 +861,7 @@ public class FutureService {
                 }
             }
             //System.out.println(" "+entry+" / "+exit);
-            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression+ " / " + atrExpression + " / " +entryRuleExpression+" / "+stopRuleExpression);
+            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+ROIExpression+" / "+PNLExpression+ " / " + atrExpression+ " / " + adxExpression  + " / " +entryRuleExpression+" / "+stopRuleExpression);
             if(PNL.compareTo(BigDecimal.ZERO) > 0){
                 winPositions.add(position);
             }else if(PNL.compareTo(BigDecimal.ZERO) < 0){
@@ -861,6 +881,39 @@ public class FutureService {
         String formattedEndTime = formatter.format(kstEndTime);
         String krTimeExpression = "["+formattedEndTime+"]";
         return krTimeExpression;
+    }
+
+
+
+    private String getSpecificRuleName(Rule rule) {
+        if (rule instanceof OverIndicatorRule) {
+            return "OverIndicatorRule";
+        } else if (rule instanceof UnderIndicatorRule) {
+            return "UnderIndicatorRule";
+        } else if (rule instanceof CrossedDownIndicatorRule) {
+            return "CrossedDownIndicatorRule";
+        } else if (rule instanceof CrossedUpIndicatorRule) {
+            return "CrossedUpIndicatorRule";
+        } else if (rule instanceof StopLossRule) {
+            return "StopLossRule";
+        } else if (rule instanceof BooleanRule) {
+            return "BooleanRule";
+        } else if (rule instanceof AndRule || rule instanceof OrRule) {
+            return getCompositeRuleName(rule);
+        } else {
+            return rule.getClass().getSimpleName();
+        }
+    }
+
+    private String getCompositeRuleName(Rule rule) {
+        if (rule instanceof AndRule) {
+            AndRule andRule = (AndRule) rule;
+            return "AndRule(" + getSpecificRuleName(andRule.getRule1()) + ", " + getSpecificRuleName(andRule.getRule2()) + ")";
+        } else if (rule instanceof OrRule) {
+            OrRule orRule = (OrRule) rule;
+            return "OrRule(" + getSpecificRuleName(orRule.getRule1()) + ", " + getSpecificRuleName(orRule.getRule2()) + ")";
+        }
+        return rule.getClass().getSimpleName();
     }
 
     public Map<String, Object> backTestTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {

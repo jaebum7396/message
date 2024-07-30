@@ -34,9 +34,4 @@ public class RelativeATRIndicator extends CachedIndicator<Num> {
     public String toString() {
         return getClass().getSimpleName() + " period: " + period;
     }
-
-    @Override
-    public int getUnstableBars() {
-        return 0;
-    }
 }

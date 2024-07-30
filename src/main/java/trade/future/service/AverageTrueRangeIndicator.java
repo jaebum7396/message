@@ -44,9 +44,4 @@ public class AverageTrueRangeIndicator extends CachedIndicator<Num> {
 
         return tr1.max(tr2).max(tr3);
     }
-
-    @Override
-    public int getUnstableBars() {
-        return barCount;
-    }
 }

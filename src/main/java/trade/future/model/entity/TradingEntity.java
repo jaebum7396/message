@@ -136,6 +136,21 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "STOP_LOSS_CHECKER")
     int stopLossChecker; // 손절 매매전략 수립
 
+    @Column( name = "STOP_LOSS_RATE")
+    int stopLossRate; // 손절 비율
+
+    @Column( name = "TAKE_PROFIT_CHECKER")
+    int takeProfitChecker; // 익절 매매전략 수립
+
+    @Column( name = "TAKE_PROFIT_RATE")
+    int takeProfitRate; // 익절 비율
+
+    @Column( name = "REVERSE_TRADE_CHECKER")
+    int reverseTradeChecker; // 반대 매매전략 수립
+
+    @Column( name = "ATR_CHECKER")
+    int atrChecker; // ATR 매매전략 수립
+
     int totalTradeCount; // 총 거래 횟수
     int winTradeCount; // 이긴 횟수
     int loseTradeCount; // 진 횟수
@@ -192,6 +207,11 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
         this.rsiChecker = original.rsiChecker;
         this.movingAverageChecker = original.movingAverageChecker;
         this.stopLossChecker = original.stopLossChecker;
+        this.stopLossRate = original.stopLossRate;
+        this.takeProfitChecker = original.takeProfitChecker;
+        this.takeProfitRate = original.takeProfitRate;
+        this.reverseTradeChecker = original.reverseTradeChecker;
+        this.atrChecker = original.atrChecker;
     }
 
     @Override

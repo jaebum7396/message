@@ -29,10 +29,10 @@ public class TradingDTO {
     int stockSelectionCount; // 종목 몇개를 확인할 것인지
     @ApiModelProperty(value = "10", example = "10")
     int maxPositionCount; // 최대 포지션 수
-    @ApiModelProperty(value = "300", example = "300")
+    @ApiModelProperty(value = "1500", example = "1500")
     int candleCount; //
 
-    @ApiModelProperty(value = "5", example = "5")
+    @ApiModelProperty(value = "20", example = "20")
     int shortMovingPeriod; //
     @ApiModelProperty(value = "20", example = "20")
     int midMovingPeriod; //
@@ -45,7 +45,7 @@ public class TradingDTO {
     int trendFollowFlag; // 1: trend follow, -1: trend reverse
 
     //strategyChecker
-    @ApiModelProperty(value = "-1" , example = "-1")
+    @ApiModelProperty(value = "1" , example = "1")
     int bollingerBandChecker;
     @ApiModelProperty(value = "-1" , example = "-1")
     int adxChecker;
@@ -63,6 +63,17 @@ public class TradingDTO {
     int movingAverageChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int stopLossChecker;
+    @ApiModelProperty(value = "2" , example = "2")
+    int stopLossRate;
+    @ApiModelProperty(value = "1" , example = "1")
+    int takeProfitChecker;
+    @ApiModelProperty(value = "3" , example = "3")
+    int takeProfitRate;
+
+    @ApiModelProperty(value = "-1" , example = "-1")
+    int reverseTradeChecker;
+    @ApiModelProperty(value = "1" , example = "1")
+    int atrChecker;
 
     public TradingEntity toEntity() {
         return TradingEntity.builder()
@@ -88,6 +99,11 @@ public class TradingDTO {
                 .rsiChecker(rsiChecker)
                 .movingAverageChecker(movingAverageChecker)
                 .stopLossChecker(stopLossChecker)
+                .stopLossRate(stopLossRate)
+                .takeProfitChecker(takeProfitChecker)
+                .takeProfitRate(takeProfitRate)
+                .reverseTradeChecker(reverseTradeChecker)
+                .atrChecker(atrChecker)
                 .build();
     }
 }
