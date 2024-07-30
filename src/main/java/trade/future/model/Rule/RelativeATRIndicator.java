@@ -1,4 +1,4 @@
-package trade.future.service;
+package trade.future.model.Rule;
 
 import org.springframework.data.mongodb.core.mapping.TimeSeries;
 import org.ta4j.core.BaseBar;

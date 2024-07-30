@@ -1,10 +1,10 @@
-package trade.future.service;
+package trade.future.model.Rule;
 
 import org.ta4j.core.BarSeries;
-import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.num.Num;
+import trade.future.model.Rule.AverageTrueRangeIndicator;
 
 public class VolatilityAndTrendChecker {
     private final AverageTrueRangeIndicator atr;

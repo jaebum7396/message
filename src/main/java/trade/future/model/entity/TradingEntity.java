@@ -177,7 +177,6 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     }
 
     // 복사 생성자
-    // 복사 생성자
     public TradingEntity(TradingEntity original) {
         this.tradingCd = original.tradingCd;
         this.userCd = original.userCd;
@@ -212,6 +211,9 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
         this.takeProfitRate = original.takeProfitRate;
         this.reverseTradeChecker = original.reverseTradeChecker;
         this.atrChecker = original.atrChecker;
+        this.shortMovingPeriod = original.shortMovingPeriod;
+        this.midMovingPeriod = original.midMovingPeriod;
+        this.longMovingPeriod = original.longMovingPeriod;
     }
 
     @Override
