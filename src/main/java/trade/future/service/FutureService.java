@@ -578,7 +578,7 @@ public class FutureService {
         Rule bollingerSellingRule = new CrossedUpIndicatorRule(closePrice, upperBBand); // 가격이 상한선을 돌파할 때 매도
 
         // RSI 매수/매도 규칙
-        int rsiPeriod = 10;
+        int rsiPeriod = longMovingPeriod;
         RSIIndicator rsiIndicator = new RSIIndicator(closePrice, rsiPeriod);
         Rule rsiBuyingRule = new CrossedDownIndicatorRule(rsiIndicator, DecimalNum.valueOf(20)); // RSI가 20 이하로 떨어질 때 매수
         Rule rsiSellingRule = new CrossedUpIndicatorRule(rsiIndicator, DecimalNum.valueOf(70)); // RSI가 70 이상으로 올라갈 때 매도
@@ -600,7 +600,7 @@ public class FutureService {
 
                 return MACD_히스토그램_증가
                         && !이전_MACD_히스토그램_증가
-                        //&& previousMacdHistogram < 0
+                        && previousMacdHistogram < 0
                         ;
             }
         };
@@ -619,7 +619,7 @@ public class FutureService {
 
                 return !MACD_히스토그램_증가
                         && 이전_MACD_히스토그램_증가
-                        //&& previousMacdHistogram > 0
+                        && previousMacdHistogram > 0
                         ;
             }
         };
@@ -651,8 +651,15 @@ public class FutureService {
         int stopLossRate = tradingEntity.getStopLossRate();
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
         DecimalNum stopLossPercentage = DecimalNum.valueOf(stopLossRate); // -0.5%
-        Rule stopLossRule = new StopLossRule(closePrice, stopLossPercentage){
-        };
+        Rule stopLossRule = new StopLossRule(closePrice, stopLossPercentage);
+
+        // 트렌드 판단을 위한 이동평균선 설정
+        SMAIndicator shortSMA = new SMAIndicator(closePrice, 10); // 10일 단기 이동평균선
+        SMAIndicator longSMA = new SMAIndicator(closePrice, 30); // 30일 장기 이동평균선
+
+        // 트렌드 팔로우 규칙 생성
+        Rule upTrendRule = new OverIndicatorRule(shortSMA, longSMA);
+        Rule downTrendRule = new UnderIndicatorRule(shortSMA, longSMA);
 
         Rule bollingerBandCheckerRule = new BooleanRule(tradingEntity.getBollingerBandChecker() == 1);
         Rule rsiCheckerRule = new BooleanRule(tradingEntity.getRsiChecker() == 1);
@@ -763,12 +770,32 @@ public class FutureService {
        combinedShortEntryRule = new BooleanRule(false);
        combinedShortExitRule = new BooleanRule(false);*/
 
+        Rule finalCombinedLongEntryRule = null;
+        Rule finalCombinedShortEntryRule = null;
         int reverseTradeChecker = tradingEntity.getReverseTradeChecker();
+        if(reverseTradeChecker == 1) {
+            finalCombinedLongEntryRule = combinedShortEntryRule;
+            finalCombinedShortEntryRule = combinedLongEntryRule;
+        }else{
+            finalCombinedLongEntryRule = combinedLongEntryRule;
+            finalCombinedShortEntryRule = combinedShortEntryRule;
+        }
+
+        // trendFollowFlag가 1일 경우 상승 트렌드 규칙 추가
+        if (tradingEntity.getTrendFollowFlag() == 1) {
+            finalCombinedLongEntryRule = new AndRule(finalCombinedLongEntryRule, upTrendRule);
+        }
+
+        // trendFollowFlag가 1일 경우 하락 트렌드 규칙 추가
+        if (tradingEntity.getTrendFollowFlag() == 1) {
+            finalCombinedShortEntryRule = new AndRule(finalCombinedShortEntryRule, downTrendRule);
+        }
+
         // 전략 생성
         Strategy combinedLongStrategy =
-                new BaseStrategy(reverseTradeChecker == 1 ? combinedShortEntryRule : combinedLongEntryRule, combinedLongExitRule);
+                new BaseStrategy(finalCombinedLongEntryRule, combinedLongExitRule);
         Strategy combinedShortStrategy =
-                new BaseStrategy(reverseTradeChecker == 1 ? combinedLongEntryRule : combinedShortEntryRule, combinedShortExitRule);
+                new BaseStrategy(finalCombinedShortEntryRule, combinedShortExitRule);
 
         // 백테스트 실행
         BarSeriesManager seriesManager = new BarSeriesManager(series);
@@ -776,8 +803,9 @@ public class FutureService {
         TradingRecord shortTradingRecord = seriesManager.run(combinedShortStrategy, Trade.TradeType.SELL);
 
         // 초기 자산 및 레버리지 설정
-        Num initialBalance = DecimalNum.valueOf(maxPositionAmount); // 초기 자산 10000달러
-        int leverage = tradingEntity.getLeverage(); // 2배 레버리지
+        Num initialBalance = DecimalNum.valueOf(maxPositionAmount); // 초기 자산
+        int leverage = tradingEntity.getLeverage(); // 레버리지
+
 
         // 결과 출력
         System.out.println("");
