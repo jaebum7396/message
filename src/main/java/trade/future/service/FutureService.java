@@ -583,8 +583,6 @@ public class FutureService {
         Rule rsiBuyingRule = new CrossedDownIndicatorRule(rsiIndicator, DecimalNum.valueOf(20)); // RSI가 20 이하로 떨어질 때 매수
         Rule rsiSellingRule = new CrossedUpIndicatorRule(rsiIndicator, DecimalNum.valueOf(70)); // RSI가 70 이상으로 올라갈 때 매도
 
-        MACDIndicator macd = new MACDIndicator(closePrice, 6, 12);
-
         Rule macdHistogramPositive = new Rule(){
             @Override
             public boolean isSatisfied(int i, TradingRecord tradingRecord) {
@@ -600,7 +598,7 @@ public class FutureService {
 
                 return MACD_히스토그램_증가
                         && !이전_MACD_히스토그램_증가
-                        && previousMacdHistogram < 0
+                        //&& previousMacdHistogram < 0
                         ;
             }
         };
@@ -619,7 +617,7 @@ public class FutureService {
 
                 return !MACD_히스토그램_증가
                         && 이전_MACD_히스토그램_증가
-                        && previousMacdHistogram > 0
+                        //&& previousMacdHistogram > 0
                         ;
             }
         };
@@ -660,15 +658,6 @@ public class FutureService {
         // 트렌드 팔로우 규칙 생성
         Rule upTrendRule = new OverIndicatorRule(shortSMA, longSMA);
         Rule downTrendRule = new UnderIndicatorRule(shortSMA, longSMA);
-
-        Rule bollingerBandCheckerRule = new BooleanRule(tradingEntity.getBollingerBandChecker() == 1);
-        Rule rsiCheckerRule = new BooleanRule(tradingEntity.getRsiChecker() == 1);
-        Rule movingAverageCheckerRule = new BooleanRule(tradingEntity.getMovingAverageChecker() == 1);
-        Rule macdHistogramCheckerRule = new BooleanRule(tradingEntity.getMacdHistogramChecker() == 1);
-        Rule adxCheckerRule = new BooleanRule(tradingEntity.getAdxChecker() == 1);
-        Rule stochCheckerRule = new BooleanRule(tradingEntity.getStochChecker() == 1);
-        Rule stochRsiCheckerRule = new BooleanRule(tradingEntity.getStochRsiChecker() == 1);
-        Rule stopLossCheckerRule = new BooleanRule(tradingEntity.getStopLossChecker() == 1);
 
         // 전략 생성을 위한 룰 리스트
         List<Rule> longEntryRules = new ArrayList<>();
@@ -727,7 +716,7 @@ public class FutureService {
                 combinedLongEntryRule = new OrRule(combinedLongEntryRule, longEntryRules.get(i));
             }
         } else {
-            combinedLongEntryRule = new BooleanRule(true);  // 항상 참인 규칙
+            combinedLongEntryRule = new BooleanRule(false);  // 항상 참인 규칙
         }
         combinedLongEntryRule = new AndRule(combinedLongEntryRule, tradingEntity.getAtrChecker() == 1 ? overAtrRule : underAtrRule);
 
@@ -738,9 +727,9 @@ public class FutureService {
                 combinedLongExitRule = new OrRule(combinedLongExitRule, longExitRules.get(i));
             }
         } else {
-            combinedLongExitRule = new BooleanRule(true);
+            combinedLongExitRule = new BooleanRule(false);
         }
-        combinedLongExitRule = new OrRule(combinedLongExitRule, tradingEntity.getAtrChecker() == 1 ? underAtrRule:overAtrRule);
+        //combinedLongExitRule = new OrRule(combinedLongExitRule, tradingEntity.getAtrChecker() == 1 ? underAtrRule:overAtrRule);
 
         Rule combinedShortEntryRule;
         if (!shortEntryRules.isEmpty()) {
@@ -749,7 +738,7 @@ public class FutureService {
                 combinedShortEntryRule = new OrRule(combinedShortEntryRule, shortEntryRules.get(i));
             }
         } else {
-            combinedShortEntryRule = new BooleanRule(true);
+            combinedShortEntryRule = new BooleanRule(false);
         }
         combinedShortEntryRule = new AndRule(combinedShortEntryRule, tradingEntity.getAtrChecker() == 1 ? overAtrRule:underAtrRule);
 
@@ -760,9 +749,9 @@ public class FutureService {
                 combinedShortExitRule = new OrRule(combinedShortExitRule, shortExitRules.get(i));
             }
         } else {
-            combinedShortExitRule = new BooleanRule(true);
+            combinedShortExitRule = new BooleanRule(false);
         }
-        combinedShortExitRule = new OrRule(combinedShortExitRule, tradingEntity.getAtrChecker() == 1 ? underAtrRule:overAtrRule);
+        //combinedShortExitRule = new OrRule(combinedShortExitRule, tradingEntity.getAtrChecker() == 1 ? underAtrRule:overAtrRule);
 
         // 기본 룰 설정 (모든 체커가 비활성화된 경우)
        /*combinedLongEntryRule = new BooleanRule(false);
