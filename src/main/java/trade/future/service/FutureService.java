@@ -622,23 +622,28 @@ public class FutureService {
             }
         };
 
-        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14);
+        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14, 100);
 
-        Rule overAtrRule = new OverIndicatorRule(relativeATR, series.numOf(0.5)) {
+        Rule overAtrRule = new OverIndicatorRule(relativeATR, series.numOf(1)) {
             @Override
             public boolean isSatisfied(int index) {
-                // Relative ATR이 2%를 초과할 때 (높은 변동성)
-                return relativeATR.getValue(index).isGreaterThan(series.numOf(0.5));
+                return relativeATR.getValue(index).isGreaterThan(series.numOf(1));
             }
         };
 
-        Rule underAtrRule = new UnderIndicatorRule(relativeATR, series.numOf(0.5)) {
+        Rule underAtrRule = new UnderIndicatorRule(relativeATR, series.numOf(1)) {
             @Override
             public boolean isSatisfied(int index) {
                 // Relative ATR이 1% 미만일 때 (낮은 변동성)
-                return relativeATR.getValue(index).isLessThan(series.numOf(0.5));
+                return relativeATR.getValue(index).isLessThan(series.numOf(1));
             }
         };
+
+        // ADX 지표 설정
+        int adxPeriod = 14; // 일반적으로 사용되는 기간
+        ADXIndicator adxIndicator = new ADXIndicator(series, adxPeriod);
+        Rule adxEntryRule = new OverIndicatorRule(adxIndicator, DecimalNum.valueOf(20)); // ADX가 20 이상일 때 매수
+        adxEntryRule = adxEntryRule.and(new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(30))); // ADX가 50 이하일 때 매수
 
         int takeProfitRate = tradingEntity.getTakeProfitRate();
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
@@ -653,7 +658,7 @@ public class FutureService {
 
         // 트렌드 판단을 위한 이동평균선 설정
         SMAIndicator shortSMA = new SMAIndicator(closePrice, 10); // 10일 단기 이동평균선
-        SMAIndicator longSMA = new SMAIndicator(closePrice, 30); // 30일 장기 이동평균선
+        SMAIndicator longSMA = new SMAIndicator(closePrice, 20); // 30일 장기 이동평균선
 
         // 트렌드 팔로우 규칙 생성
         Rule upTrendRule = new OverIndicatorRule(shortSMA, longSMA);
@@ -687,9 +692,9 @@ public class FutureService {
         }
 
         if (tradingEntity.getMacdHistogramChecker() == 1) {
-            longEntryRules.add(macdHistogramPositive);
+            //longEntryRules.add(macdHistogramPositive);
             longExitRules.add(macdHistogramNegative);
-            shortEntryRules.add(macdHistogramNegative);
+            //shortEntryRules.add(macdHistogramNegative);
             shortExitRules.add(macdHistogramPositive);
         }
 
@@ -715,10 +720,27 @@ public class FutureService {
             for (int i = 1; i < longEntryRules.size(); i++) {
                 combinedLongEntryRule = new OrRule(combinedLongEntryRule, longEntryRules.get(i));
             }
+            if (tradingEntity.getAdxChecker() == 1) {
+                combinedLongEntryRule = new AndRule(combinedLongEntryRule, adxEntryRule);
+            }
         } else {
             combinedLongEntryRule = new BooleanRule(false);  // 항상 참인 규칙
         }
         combinedLongEntryRule = new AndRule(combinedLongEntryRule, tradingEntity.getAtrChecker() == 1 ? overAtrRule : underAtrRule);
+
+        Rule combinedShortEntryRule;
+        if (!shortEntryRules.isEmpty()) {
+            combinedShortEntryRule = shortEntryRules.get(0);
+            for (int i = 1; i < shortEntryRules.size(); i++) {
+                combinedShortEntryRule = new OrRule(combinedShortEntryRule, shortEntryRules.get(i));
+            }
+            if (tradingEntity.getAdxChecker() == 1) {
+                combinedShortEntryRule = new AndRule(combinedShortEntryRule, adxEntryRule);
+            }
+        } else {
+            combinedShortEntryRule = new BooleanRule(false);
+        }
+        combinedShortEntryRule = new AndRule(combinedShortEntryRule, tradingEntity.getAtrChecker() == 1 ? overAtrRule:underAtrRule);
 
         Rule combinedLongExitRule;
         if (!longExitRules.isEmpty()) {
@@ -730,17 +752,6 @@ public class FutureService {
             combinedLongExitRule = new BooleanRule(false);
         }
         //combinedLongExitRule = new OrRule(combinedLongExitRule, tradingEntity.getAtrChecker() == 1 ? underAtrRule:overAtrRule);
-
-        Rule combinedShortEntryRule;
-        if (!shortEntryRules.isEmpty()) {
-            combinedShortEntryRule = shortEntryRules.get(0);
-            for (int i = 1; i < shortEntryRules.size(); i++) {
-                combinedShortEntryRule = new OrRule(combinedShortEntryRule, shortEntryRules.get(i));
-            }
-        } else {
-            combinedShortEntryRule = new BooleanRule(false);
-        }
-        combinedShortEntryRule = new AndRule(combinedShortEntryRule, tradingEntity.getAtrChecker() == 1 ? overAtrRule:underAtrRule);
 
         Rule combinedShortExitRule;
         if (!shortExitRules.isEmpty()) {
@@ -834,7 +845,7 @@ public class FutureService {
         List<Position> winPositions = new ArrayList<>();
         List<Position> losePositions = new ArrayList<>();
         System.out.println(symbol+"/"+positionSide+" 리포트");
-        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14);
+        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14, 100);
         // ADX 지표 설정
         int adxPeriod = 14; // 일반적으로 사용되는 기간
         ADXIndicator adxIndicator = new ADXIndicator(series, adxPeriod);
