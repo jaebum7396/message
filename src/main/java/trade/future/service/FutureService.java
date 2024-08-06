@@ -586,46 +586,50 @@ public class FutureService {
         Rule baseRule                 = new BooleanRule(false);
 
         // 이동평균선 매수/매도 규칙
-        Rule smaBuyingRule            = (new OverIndicatorRule(sma, ema)).and(movingAverageCheckerRule);
-        Rule smaSellingRule           = (new UnderIndicatorRule(sma, ema)).and(movingAverageCheckerRule);
+        Rule smaBuyingRule            = new OverIndicatorRule(sma, ema);
+        Rule smaSellingRule           = new UnderIndicatorRule(sma, ema);
 
         // 볼린저 밴드 매수/매도 규칙
-        Rule bollingerBuyingRule      = (new CrossedDownIndicatorRule(closePrice, lowerBBand)).and(bollingerBandCheckerRule);
-        Rule bollingerSellingRule     = (new CrossedUpIndicatorRule(closePrice, upperBBand)).and(bollingerBandCheckerRule);
+        Rule bollingerBuyingRule      = new CrossedDownIndicatorRule(closePrice, lowerBBand);
+        Rule bollingerSellingRule     = new CrossedUpIndicatorRule(closePrice, upperBBand);
 
         // RSI 매수/매도 규칙
-        Rule rsiBuyingRule            = (new CrossedDownIndicatorRule(rsiIndicator, 20)).and(rsiCheckerRule); // RSI가 20 이하로 떨어질 때 매수
-        Rule rsiSellingRule           = (new CrossedUpIndicatorRule(rsiIndicator, 70)).and(rsiCheckerRule); // RSI가 70 이상으로 올라갈 때 매도
+        Rule rsiBuyingRule            = new CrossedDownIndicatorRule(rsiIndicator, 20); // RSI가 20 이하로 떨어질 때 매수
+        Rule rsiSellingRule           = new CrossedUpIndicatorRule(rsiIndicator, 70); // RSI가 70 이상으로 올라갈 때 매도
 
         // MACD 히스토그램 매수/매도 규칙
-        Rule macdHistogramPositive    = (new MACDHistogramRule(closePrice, shortMovingPeriod, longMovingPeriod, true)).and(macdHistogramCheckerRule);
-        Rule macdHistogramNegative    = (new MACDHistogramRule(closePrice, shortMovingPeriod, longMovingPeriod, false)).and(macdHistogramCheckerRule);
+        Rule macdHistogramPositive    = new MACDHistogramRule(closePrice, shortMovingPeriod, longMovingPeriod, true);
+        Rule macdHistogramNegative    = new MACDHistogramRule(closePrice, shortMovingPeriod, longMovingPeriod, false);
 
         // 롱 포지션 결합 규칙
         Rule combinedLongEntryRule    = baseRule;
-        combinedLongEntryRule         = (combinedLongEntryRule).or(smaBuyingRule);
-        combinedLongEntryRule         = (combinedLongEntryRule).or(bollingerBuyingRule);
-        combinedLongEntryRule         = (combinedLongEntryRule).or(rsiBuyingRule);
-        combinedLongEntryRule         = (combinedLongEntryRule).or(macdHistogramPositive);
-
         Rule combinedLongExitRule     = baseRule;
-        combinedLongExitRule          = (combinedLongExitRule).or(smaSellingRule);
-        combinedLongExitRule          = (combinedLongExitRule).or(bollingerSellingRule);
-        combinedLongExitRule          = (combinedLongExitRule).or(rsiSellingRule);
-        combinedLongExitRule          = (combinedLongExitRule).or(macdHistogramNegative);
-
-        // 숏 포지션 결합 규칙
         Rule combinedShortEntryRule   = baseRule;
-        combinedLongExitRule          = (combinedLongExitRule).or(smaSellingRule);
-        combinedLongExitRule          = (combinedLongExitRule).or(bollingerSellingRule);
-        combinedLongExitRule          = (combinedLongExitRule).or(rsiSellingRule);
-        combinedLongExitRule          = (combinedLongExitRule).or(macdHistogramNegative);
-
         Rule combinedShortExitRule    = baseRule;
-        combinedShortExitRule         = (combinedShortExitRule).or(smaSellingRule);
-        combinedShortExitRule         = (combinedShortExitRule).or(bollingerSellingRule);
-        combinedShortExitRule         = (combinedShortExitRule).or(rsiSellingRule);
-        combinedShortExitRule         = (combinedShortExitRule).or(macdHistogramNegative);
+        if (tradingEntity.getMovingAverageChecker() == 1) { // 이동평균선 체커가 활성화 되어있을 때
+            combinedLongEntryRule     = new OrRule(combinedLongEntryRule, smaBuyingRule);
+            combinedLongExitRule      = new OrRule(combinedLongExitRule, smaSellingRule);
+            combinedShortEntryRule        = new OrRule(combinedShortEntryRule, smaSellingRule);
+            combinedShortExitRule         = new OrRule(combinedShortExitRule, smaSellingRule);
+        }
+        if (tradingEntity.getBollingerBandChecker() == 1) { // 볼린저 밴드 체커가 활성화 되어있을 때
+            combinedLongEntryRule     = new OrRule(combinedLongEntryRule, bollingerBuyingRule);
+            combinedLongExitRule      = new OrRule(combinedLongExitRule, bollingerSellingRule);
+            combinedShortEntryRule        = new OrRule(combinedShortEntryRule, bollingerSellingRule);
+            combinedShortExitRule         = new OrRule(combinedShortExitRule, bollingerSellingRule);
+        }
+        if (tradingEntity.getRsiChecker() == 1) { // RSI 체커가 활성화 되어있을 때
+            combinedLongEntryRule     = new OrRule(combinedLongEntryRule, rsiBuyingRule);
+            combinedLongExitRule      = new OrRule(combinedLongExitRule, rsiSellingRule);
+            combinedShortEntryRule        = new OrRule(combinedShortEntryRule, rsiSellingRule);
+            combinedShortExitRule         = new OrRule(combinedShortExitRule, rsiSellingRule);
+        }
+        if (tradingEntity.getMacdHistogramChecker() == 1) { // MACD 히스토그램 체커가 활성화 되어있을 때
+            //combinedLongEntryRule     = new OrRule(combinedLongEntryRule, macdHistogramPositive);
+            combinedLongExitRule      = new OrRule(combinedLongExitRule, macdHistogramNegative);
+            //combinedShortEntryRule        = new OrRule(combinedShortEntryRule, macdHistogramNegative);
+            combinedShortExitRule         = new OrRule(combinedShortExitRule, macdHistogramPositive);
+        }
 
         //**********************************************************************************
         // 추가적인 진입 규칙을 적용한다. 
@@ -634,17 +638,16 @@ public class FutureService {
         Rule finalShortEntryRule      = combinedShortEntryRule;
 
         // 상대적 ATR 지수 규칙
-        Rule overAtrRule              = (new OverIndicatorRule(relativeATR, 1)).and(atrCheckerRule);
-        Rule underAtrRule             = (new UnderIndicatorRule(relativeATR, 1)).and(atrCheckerRule);
+        Rule overAtrRule              = (new OverIndicatorRule(relativeATR, 1));
+        Rule underAtrRule             = (new UnderIndicatorRule(relativeATR, 1));
 
         // ADX 진입 규칙
         Rule adxEntryRule             = (new OverIndicatorRule(adxIndicator, DecimalNum.valueOf(20))); // ADX가 20 이상일때
-             adxEntryRule             = (adxEntryRule).and(new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(25))); // ADX가 25 이하일때
-             adxEntryRule             = (adxEntryRule).and(adxCheckerRule);
+             adxEntryRule             = new AndRule(adxEntryRule, new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(25))); // ADX가 25 이하일때
 
         // 트렌드 팔로우 규칙
-        Rule upTrendRule              = (new OverIndicatorRule(trendSma, trendEma)).and(trendFollowCheckerRule);
-        Rule downTrendRule            = (new UnderIndicatorRule(trendSma, trendEma)).and(trendFollowCheckerRule);
+        Rule upTrendRule              = (new OverIndicatorRule(trendSma, trendEma));
+        Rule downTrendRule            = (new UnderIndicatorRule(trendSma, trendEma));
 
         // ATR 규칙 적용
         if (tradingEntity.getAtrChecker() == 1) { // ATR 체커가 활성화 되어있을 때 ATR이 threshold 이상일 때 진입
@@ -654,14 +657,14 @@ public class FutureService {
 
         // ADX 규칙 적용
         if (tradingEntity.getAdxChecker() == 1) { // ADX 체커가 활성화 되어있을 때 ADX가 threshold 이상일 때 진입
-            finalLongEntryRule = new AndRule(finalLongEntryRule, adxEntryRule);
-            finalShortEntryRule = new AndRule(finalShortEntryRule, adxEntryRule);
+            finalLongEntryRule        = new AndRule(finalLongEntryRule, adxEntryRule);
+            finalShortEntryRule       = new AndRule(finalShortEntryRule, adxEntryRule);
         }
 
         // 트렌드 팔로우 규칙 적용
         if (tradingEntity.getTrendFollowFlag() == 1) { // 트렌드 팔로우 체커가 활성화 되어있을 때 트렌드가 일치할 때 진입
-            finalLongEntryRule = new AndRule(finalLongEntryRule, upTrendRule);
-            finalShortEntryRule = new AndRule(finalShortEntryRule, downTrendRule);
+            finalLongEntryRule        = new AndRule(finalLongEntryRule, upTrendRule);
+            finalShortEntryRule       = new AndRule(finalShortEntryRule, downTrendRule);
         }
         
         //**********************************************************************************
@@ -671,8 +674,8 @@ public class FutureService {
         Rule finalShortExitRule       = combinedShortExitRule;
 
         // 손/익절 규칙
-        Rule stopLossRule             = (new StopLossRule(closePrice, stopLossRate)).and(stopLossCheckerRule);
-        Rule takeProfitRule           = (new StopGainRule(closePrice, takeProfitRate)).and(takeProfitCheckerRule);
+        Rule stopLossRule             = new AndRule(new StopLossRule(closePrice, stopLossRate), stopLossCheckerRule);
+        Rule takeProfitRule           = new AndRule(new StopGainRule(closePrice, takeProfitRate), takeProfitCheckerRule);
 
         // 손/익절 규칙 적용
         if (tradingEntity.getStopLossChecker() == 1) { // 손절 체커가 활성화 되어있을 때 손절 체크
@@ -691,6 +694,68 @@ public class FutureService {
 
         strategyMap.put(tradingCd + "_" + interval + "_long_strategy", combinedLongStrategy);
         strategyMap.put(tradingCd + "_" + interval + "_short_strategy", combinedShortStrategy);
+    }
+
+    public Map<String, Object> backTestExec2(TradingEntity tradingEntity, boolean logFlag) {
+        System.out.println("tradingEntity : " + tradingEntity);
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+
+        if(logFlag){
+            System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+            System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+            System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+            System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+        }
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
+
+        BigDecimal maxPositionAmount = totalWalletBalance
+                .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
+                .multiply(tradingEntity.getCollateralRate()).setScale(0, RoundingMode.DOWN);
+
+        tradingEntity.setCollateral(maxPositionAmount);
+
+        String tradingCd = tradingEntity.getTradingCd();
+        String symbol = tradingEntity.getSymbol();
+        String interval = tradingEntity.getCandleInterval();
+        int candleCount = tradingEntity.getCandleCount();
+        int limit = candleCount;
+        long startTime = System.currentTimeMillis(); // 시작 시간 기록
+
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+
+        seriesMaker(tradingEntity, logFlag);
+        strategyMaker(tradingEntity, logFlag);
+
+        BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
+        Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
+        Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
+
+        // 백테스트 실행
+        BarSeriesManager seriesManager = new BarSeriesManager(series);
+        TradingRecord longTradingRecord = seriesManager.run(longStrategy);
+        TradingRecord shortTradingRecord = seriesManager.run(shortStrategy, Trade.TradeType.SELL);
+
+        // 초기 자산 및 레버리지 설정
+        Num initialBalance = DecimalNum.valueOf(maxPositionAmount); // 초기 자산
+        int leverage = tradingEntity.getLeverage(); // 레버리지
+
+        // 결과 출력
+        System.out.println("");
+        printBackTestResult(longTradingRecord, series, symbol, leverage, "LONG", maxPositionAmount);
+        System.out.println("");
+        printBackTestResult(shortTradingRecord, series, symbol, leverage, "SHORT", maxPositionAmount);
+
+        System.out.println("");
+        System.out.println("롱 매매횟수 : "+longTradingRecord.getPositionCount());
+        System.out.println("숏 매매횟수 : "+shortTradingRecord.getPositionCount());
+
+        //System.out.println("최종 롱 수익(레버리지 적용): " + longLeveragedProfit);
+
+        return resultMap;
     }
 
     public Map<String, Object> backTestExec(TradingEntity tradingEntity, boolean logFlag) {
@@ -725,37 +790,8 @@ public class FutureService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
 
-        paramMap.put("symbol", symbol);
-        paramMap.put("interval", interval);
-        paramMap.put("limit", limit);
-
-        client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
-        String resultStr = client.market().klines(paramMap);
-
-        //System.out.println("resultStr : "+ resultStr);
-        String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
-        System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
-        JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
-        List<KlineEntity> klineEntities = new ArrayList<>();
-        BaseBarSeries series = new BaseBarSeries();
-        series.setMaximumBarCount(limit);
-        seriesMap.put(tradingCd + "_" + interval, series);
-
-        BigDecimal expectationProfit = BigDecimal.ZERO;
-        for (int i = 0; i < jsonArray.length(); i++) {
-            JSONArray klineArray = jsonArray.getJSONArray(i);
-            KlineEntity klineEntity = parseKlineEntity(klineArray);
-            //System.out.println(klineArray);
-            klineEntities.add(klineEntity);
-
-            Num open = series.numOf(klineEntity.getOpenPrice());
-            Num high = series.numOf(klineEntity.getHighPrice());
-            Num low = series.numOf(klineEntity.getLowPrice());
-            Num close = series.numOf(klineEntity.getClosePrice());
-            Num volume = series.numOf(klineEntity.getVolume());
-
-            series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
-        }
+        seriesMaker(tradingEntity, logFlag);
+        BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
 
         int shortMovingPeriod = tradingEntity.getShortMovingPeriod();
         int midPeriod = tradingEntity.getMidMovingPeriod();
@@ -1024,9 +1060,9 @@ public class FutureService {
 
         // 결과 출력
         System.out.println("");
-        printBackTestResult(longTradingRecord, shortEntryRules, longExitRules, series, symbol, leverage, "LONG", maxPositionAmount);
+        printBackTestResult(longTradingRecord, series, symbol, leverage, "LONG", maxPositionAmount);
         System.out.println("");
-        printBackTestResult(shortTradingRecord, longEntryRules, shortExitRules, series, symbol, leverage, "SHORT", maxPositionAmount);
+        printBackTestResult(shortTradingRecord, series, symbol, leverage, "SHORT", maxPositionAmount);
 
         // 포지션 거래 결과 분석
         /*AnalysisCriterion profitCriterion = new ProfitCriterion();
@@ -1047,7 +1083,7 @@ public class FutureService {
         return resultMap;
     }
 
-    public void printBackTestResult(TradingRecord tradingRecord, List<Rule> entryRules, List<Rule> stopRules, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
+    public void printBackTestResult(TradingRecord tradingRecord, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
 
         // 트렌드
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -1114,7 +1150,7 @@ public class FutureService {
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
             int i = 1;
-            for (Rule entryRule : entryRules) {
+            /* for (Rule entryRule : entryRules) {
                 if (entryRule.isSatisfied(entry.getIndex(), tradingRecord) || entryRule.isSatisfied(entry.getIndex())) {
                     entryRuleExpression.append(entryRule.getClass().getSimpleName()).append(" ");
                 }
@@ -1124,7 +1160,7 @@ public class FutureService {
                 if (exitRule.isSatisfied(exit.getIndex(), tradingRecord) || exitRule.isSatisfied(exit.getIndex())) {
                     stopRuleExpression.append(exitRule.getClass().getSimpleName()).append(" ");
                 }
-            }
+            }*/
             //System.out.println(" "+entry+" / "+exit);
             System.out.println("  "+entryExpression
                     + slash + exitExpression
