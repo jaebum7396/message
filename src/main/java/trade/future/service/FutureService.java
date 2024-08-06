@@ -643,7 +643,7 @@ public class FutureService {
         int adxPeriod = 14; // 일반적으로 사용되는 기간
         ADXIndicator adxIndicator = new ADXIndicator(series, adxPeriod);
         Rule adxEntryRule = new OverIndicatorRule(adxIndicator, DecimalNum.valueOf(20)); // ADX가 20 이상일 때 매수
-        adxEntryRule = adxEntryRule.and(new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(30))); // ADX가 50 이하일 때 매수
+        adxEntryRule = adxEntryRule.and(new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(25))); // ADX가 50 이하일 때 매수
 
         int takeProfitRate = tradingEntity.getTakeProfitRate();
         // 손절 규칙 추가: 가격이 진입 가격에서 -0.5% 아래로 떨어졌을 때
@@ -837,7 +837,7 @@ public class FutureService {
         // 트렌드
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         SMAIndicator shortSMA = new SMAIndicator(closePrice, 10); // 10일 단기 이동평균선
-        SMAIndicator longSMA = new SMAIndicator(closePrice, 30); // 30일 장기 이동평균선
+        SMAIndicator longSMA = new SMAIndicator(closePrice, 20); // 30일 장기 이동평균선
 
         // 거래 기록 출력
         List<Position> positions = tradingRecord.getPositions();
@@ -884,11 +884,17 @@ public class FutureService {
 
             // 특정 인덱스에서의 Relative ATR 값을 얻습니다
             Num atrValue = relativeATR.getValue(entry.getIndex());
-            String atrExpression = "ATR at Entry: " + atrValue;
+            String atrExpression = "ATR: " + atrValue;
 
             // 특정 인덱스에서의 ADX 값을 얻습니다
             Num adxValue = adxIndicator.getValue(entry.getIndex());
-            String adxExpression = "ADX at Entry: " + adxValue.doubleValue();
+            String adxExpression = "ADX: " + adxValue.doubleValue();
+
+            // 진입 시 거래량 정보 가져오기
+            double  entryVolume = getRelativeVolume(series, entry.getIndex(), 20);
+            String volumeExpression = "Volume: " + entryVolume;
+
+            String slash = "/";
 
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
@@ -905,7 +911,16 @@ public class FutureService {
                 }
             }
             //System.out.println(" "+entry+" / "+exit);
-            System.out.println("  "+entryExpression+" / "+exitExpression+" / "+trendExpression+" / "+ROIExpression+" / "+PNLExpression+ " / " + atrExpression+ " / " + adxExpression  + " / " +entryRuleExpression+" / "+stopRuleExpression);
+            System.out.println("  "+entryExpression
+                    + slash + exitExpression
+                    + slash + trendExpression
+                    + slash + ROIExpression
+                    + slash + PNLExpression
+                    + slash + volumeExpression
+                    + slash + atrExpression
+                    + slash + adxExpression
+                    + slash + entryRuleExpression
+                    + slash + stopRuleExpression);
             if(PNL.compareTo(BigDecimal.ZERO) > 0){
                 winPositions.add(position);
             }else if(PNL.compareTo(BigDecimal.ZERO) < 0){
@@ -915,6 +930,16 @@ public class FutureService {
         }
         System.out.println(" ");
         System.out.println(symbol+"/"+positionSide+"(승패 : "+winPositions.size()+"/"+losePositions.size()+") : 최종 수익: " + totalProfit);
+    }
+
+    // 거래량 상대화 메서드 (예: 20일 평균 대비)
+    private double getRelativeVolume(BarSeries series, int index, int period) {
+        double sumVolume = 0;
+        for (int i = Math.max(0, index - period + 1); i <= index; i++) {
+            sumVolume += series.getBar(i).getVolume().doubleValue();
+        }
+        double avgVolume = sumVolume / Math.min(period, index + 1);
+        return series.getBar(index).getVolume().doubleValue() / avgVolume;
     }
 
 
