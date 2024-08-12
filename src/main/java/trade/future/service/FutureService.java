@@ -864,7 +864,7 @@ public class FutureService {
 
         // ADX 진입 규칙 -- ADX 지표가 임계값-l 이상이고 임계값 -h 미만일 때 진입,
         Rule adxEntryRule = new OverIndicatorRule(adxIndicator, DecimalNum.valueOf(20)); // ADX가 20 이상일 때 매수
-        adxEntryRule = adxEntryRule.and(new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(25))); // ADX가 50 이하일 때 매수
+        adxEntryRule = adxEntryRule.and(new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(50))); // ADX가 50 이하일 때 매수
 
         // 트렌드 팔로우 규칙 -- 현재 감시하고 있는 추세보다 큰 추세에서의 트렌드를 추종한다.
         Rule upTrendRule = new OverIndicatorRule(shortSMA, longSMA);
@@ -904,8 +904,13 @@ public class FutureService {
         if (tradingEntity.getMlModelChecker() == 1) { // ML 모델 사용 여부를 확인하는 새로운 플래그
             longEntryRules.add(mlRule);
             shortEntryRules.add(new NotRule(mlRule));
-            longExitRules.add(new NotRule(mlRule));
-            shortExitRules.add(mlRule);
+
+            // 머신러닝 룰은 손익률이 1 이상일 때만 적용
+            Rule longExitMARule = new AndRule(new NotRule(mlRule), longMinimumProfitRule);
+            Rule shortExitMARule = new AndRule(mlRule, shortMinimumProfitRule);
+
+            longExitRules.add(longExitMARule);
+            shortExitRules.add(shortExitMARule);
         }
 
         if (tradingEntity.getBollingerBandChecker() == 1) {
