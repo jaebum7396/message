@@ -34,9 +34,7 @@ import org.ta4j.core.rules.*;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.TradingException;
-import trade.future.model.Rule.AverageTrueRangeIndicator;
-import trade.future.model.Rule.MACDHistogramRule;
-import trade.future.model.Rule.RelativeATRIndicator;
+import trade.future.model.Rule.*;
 import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
 import trade.future.model.enums.ADX_GRADE;
@@ -872,6 +870,14 @@ public class FutureService {
         Rule upTrendRule = new OverIndicatorRule(shortSMA, longSMA);
         Rule downTrendRule = new UnderIndicatorRule(shortSMA, longSMA);
 
+        Rule highVolumeRule = new RelativeVolumeRule(series, 20, 1.5, true);
+
+        // 머신러닝 룰 생성
+        MLModel mlModel = new MLModel();
+        mlModel.train(series);  // 먼저 모델을 학습시켜야 합니다
+        //Rule mlRule = new MLPredictionRule(mlModel, series, 0.5);
+        Rule mlRule = new MLPredictionRule(mlModel, series, 0.5);
+
         //**********************************************************************************
         // 추가적인 청산 규칙.
         //**********************************************************************************
@@ -883,12 +889,24 @@ public class FutureService {
         int stopLossRate = tradingEntity.getStopLossRate();
         Rule stopLossRule = new StopLossRule(closePrice, stopLossRate);
 
+        Rule profitableLongRule = new ProfitableRule(closePrice, true);
+        Rule profitableShortRule = new ProfitableRule(closePrice, false);
+
+        Rule longMinimumProfitRule = new MinimumProfitRule(closePrice, true, takeProfitRate);
+        Rule shortMinimumProfitRule = new MinimumProfitRule(closePrice, false, takeProfitRate);
 
         // 전략 생성을 위한 룰 리스트
         List<Rule> longEntryRules = new ArrayList<>();
         List<Rule> longExitRules = new ArrayList<>();
         List<Rule> shortEntryRules = new ArrayList<>();
         List<Rule> shortExitRules = new ArrayList<>();
+
+        if (tradingEntity.getMlModelChecker() == 1) { // ML 모델 사용 여부를 확인하는 새로운 플래그
+            longEntryRules.add(mlRule);
+            shortEntryRules.add(new NotRule(mlRule));
+            longExitRules.add(new NotRule(mlRule));
+            shortExitRules.add(mlRule);
+        }
 
         if (tradingEntity.getBollingerBandChecker() == 1) {
             longEntryRules.add(bollingerBuyingRule);
@@ -899,23 +917,37 @@ public class FutureService {
 
         if (tradingEntity.getMovingAverageChecker() == 1) {
             longEntryRules.add(smaBuyingRule);
-            longExitRules.add(smaSellingRule);
             shortEntryRules.add(smaSellingRule);
-            shortExitRules.add(smaBuyingRule);
+
+            // 이동평균선 룰은 손익률이 1 이상일 때만 적용
+            Rule longExitMARule = new AndRule(smaSellingRule, longMinimumProfitRule);
+            Rule shortExitMARule = new AndRule(smaBuyingRule, shortMinimumProfitRule);
+
+            longExitRules.add(longExitMARule);
+            shortExitRules.add(shortExitMARule);
         }
 
         if (tradingEntity.getRsiChecker() == 1) {
             longEntryRules.add(rsiBuyingRule);
-            longExitRules.add(rsiSellingRule);
             shortEntryRules.add(rsiSellingRule);
-            shortExitRules.add(rsiBuyingRule);
+
+            Rule longExitRule = new AndRule(rsiSellingRule, longMinimumProfitRule);
+            Rule shortExitRule = new AndRule(rsiBuyingRule, shortMinimumProfitRule);
+
+            longExitRules.add(longExitRule);
+            shortExitRules.add(shortExitRule);
         }
 
         if (tradingEntity.getMacdHistogramChecker() == 1) { // macd 히스토그램은 진입 시에 사용하지 않는다.
             //longEntryRules.add(macdHistogramPositive);
-            longExitRules.add(macdHistogramNegative);
             //shortEntryRules.add(macdHistogramNegative);
-            shortExitRules.add(macdHistogramPositive);
+
+            // macd 히스토그램 룰은 손익률이 1 이상일 때만 적용
+            Rule longExitRule = new AndRule(macdHistogramNegative, longMinimumProfitRule);
+            Rule shortExitRule = new AndRule(macdHistogramPositive, shortMinimumProfitRule);
+
+            longExitRules.add(longExitRule);
+            shortExitRules.add(shortExitRule);
         }
 
         if (tradingEntity.getStopLossChecker() == 1) {

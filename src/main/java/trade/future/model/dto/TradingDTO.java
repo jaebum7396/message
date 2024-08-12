@@ -74,6 +74,8 @@ public class TradingDTO {
     int reverseTradeChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int atrChecker;
+    @ApiModelProperty(value = "1" , example = "1")
+    int mlModelChecker;
 
     public TradingEntity toEntity() {
         return TradingEntity.builder()
@@ -104,6 +106,7 @@ public class TradingDTO {
                 .takeProfitRate(takeProfitRate)
                 .reverseTradeChecker(reverseTradeChecker)
                 .atrChecker(atrChecker)
+                .mlModelChecker(mlModelChecker)
                 .build();
     }
 }

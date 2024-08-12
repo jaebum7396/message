@@ -151,6 +151,9 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "ATR_CHECKER")
     int atrChecker; // ATR 매매전략 수립
 
+    @Column( name = "ML_MODEL_CHECKER")
+    int mlModelChecker; // 머신러닝 모델로 매매전략 수립
+
     int totalTradeCount; // 총 거래 횟수
     int winTradeCount; // 이긴 횟수
     int loseTradeCount; // 진 횟수
@@ -205,6 +208,7 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
         this.stochRsiChecker = original.stochRsiChecker;
         this.rsiChecker = original.rsiChecker;
         this.movingAverageChecker = original.movingAverageChecker;
+        this.mlModelChecker = original.mlModelChecker;
         this.stopLossChecker = original.stopLossChecker;
         this.stopLossRate = original.stopLossRate;
         this.takeProfitChecker = original.takeProfitChecker;
