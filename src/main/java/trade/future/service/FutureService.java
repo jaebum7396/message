@@ -345,6 +345,11 @@ public class FutureService {
                     newTradingEntity.setStochRsiChecker(tradingEntity.getStochRsiChecker());
                     newTradingEntity.setRsiChecker(tradingEntity.getRsiChecker());
                     newTradingEntity.setMovingAverageChecker(tradingEntity.getMovingAverageChecker());
+                    newTradingEntity.setMlModelChecker(tradingEntity.getMlModelChecker());
+                    newTradingEntity.setStopLossChecker(tradingEntity.getStopLossChecker());
+                    newTradingEntity.setStopLossRate(tradingEntity.getStopLossRate());
+                    newTradingEntity.setTakeProfitChecker(tradingEntity.getTakeProfitChecker());
+                    newTradingEntity.setTakeProfitRate(tradingEntity.getTakeProfitRate());
 
                     /*TradingEntity tradingEntity = TradingEntity.builder()
                             .symbol(symbol)
@@ -561,7 +566,7 @@ public class FutureService {
         ADXIndicator adxIndicator = new ADXIndicator(series, 14);
 
         //**********************************************************************************
-        // 룰을 정의한다. 룰 기본규칙은 (기술지표에 기반한 기본 룰 and checkerRule) 
+        // 룰을 정의한다. 룰 기본규칙은 (기술지표에 기반한 기본 룰 and checkerRule)
         //**********************************************************************************
         int takeProfitRate = tradingEntity.getTakeProfitRate();
         int stopLossRate = tradingEntity.getStopLossRate();
@@ -630,7 +635,7 @@ public class FutureService {
         }
 
         //**********************************************************************************
-        // 추가적인 진입 규칙을 적용한다. 
+        // 추가적인 진입 규칙을 적용한다.
         //**********************************************************************************
         Rule finalLongEntryRule       = combinedLongEntryRule;
         Rule finalShortEntryRule      = combinedShortEntryRule;
@@ -641,7 +646,7 @@ public class FutureService {
 
         // ADX 진입 규칙
         Rule adxEntryRule             = (new OverIndicatorRule(adxIndicator, DecimalNum.valueOf(20))); // ADX가 20 이상일때
-             adxEntryRule             = new AndRule(adxEntryRule, new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(25))); // ADX가 25 이하일때
+        adxEntryRule             = new AndRule(adxEntryRule, new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(25))); // ADX가 25 이하일때
 
         // 트렌드 팔로우 규칙
         Rule upTrendRule              = (new OverIndicatorRule(trendSma, trendEma));
@@ -664,7 +669,7 @@ public class FutureService {
             finalLongEntryRule        = new AndRule(finalLongEntryRule, upTrendRule);
             finalShortEntryRule       = new AndRule(finalShortEntryRule, downTrendRule);
         }
-        
+
         //**********************************************************************************
         // 추가적인 청산 규칙을 적용한다.
         //**********************************************************************************
@@ -756,39 +761,15 @@ public class FutureService {
         return resultMap;
     }
 
-    public Map<String, Object> backTestExec(TradingEntity tradingEntity, boolean logFlag) {
+    public void strategyMaker2(TradingEntity tradingEntity, boolean logFlag) {
         System.out.println("tradingEntity : " + tradingEntity);
-        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
-        //printPrettyJson(accountInfo);
-
-        if(logFlag){
-            System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
-            System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
-            System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
-            System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
-        }
-
-        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
-        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
-
-        BigDecimal maxPositionAmount = totalWalletBalance
-                .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
-                .multiply(tradingEntity.getCollateralRate()).setScale(0, RoundingMode.DOWN);
-
-        tradingEntity.setCollateral(maxPositionAmount);
 
         String tradingCd = tradingEntity.getTradingCd();
-        String symbol = tradingEntity.getSymbol();
-        String interval = tradingEntity.getCandleInterval();
-        int candleCount = tradingEntity.getCandleCount();
+        String symbol    = tradingEntity.getSymbol();
+        String interval  = tradingEntity.getCandleInterval();
+        int candleCount  = tradingEntity.getCandleCount();
         int limit = candleCount;
-        long startTime = System.currentTimeMillis(); // 시작 시간 기록
 
-        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
-        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-
-        seriesMaker(tradingEntity, logFlag);
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
 
         int shortMovingPeriod = tradingEntity.getShortMovingPeriod();
@@ -812,8 +793,8 @@ public class FutureService {
         SMAIndicator ema = new SMAIndicator(closePrice, longMovingPeriod);  //장기 이동평균선
 
         // 트렌드 판단을 위한 이동평균선 설정
-        SMAIndicator shortSMA = new SMAIndicator(closePrice, 10); // 10일 단기 이동평균선
-        SMAIndicator longSMA = new SMAIndicator(closePrice, 20); // 30일 장기 이동평균선
+        SMAIndicator shortSMA = new SMAIndicator(closePrice, shortMovingPeriod*2); // 10일 단기 이동평균선
+        SMAIndicator longSMA = new SMAIndicator(closePrice, longMovingPeriod*2); // 30일 장기 이동평균선
 
         // 볼린저 밴드 설정
         int barCount = 20;
@@ -858,9 +839,9 @@ public class FutureService {
         // 추가적인 진입 규칙.
         //**********************************************************************************
 
-        // ATR 상대지표 규칙 -- ATR 지표(변동성 지표)를 상대적인 표현으로 바꾼 커스텀 지표 
+        // ATR 상대지표 규칙 -- ATR 지표(변동성 지표)를 상대적인 표현으로 바꾼 커스텀 지표
         Rule overAtrRule = new OverIndicatorRule(relativeATR, series.numOf(1));
-        Rule underAtrRule = new UnderIndicatorRule(relativeATR, series.numOf(1));
+        Rule underAtrRule = new UnderIndicatorRule(relativeATR, series.numOf(3));
 
         // ADX 진입 규칙 -- ADX 지표가 임계값-l 이상이고 임계값 -h 미만일 때 진입,
         Rule adxEntryRule = new OverIndicatorRule(adxIndicator, DecimalNum.valueOf(20)); // ADX가 20 이상일 때 매수
@@ -977,6 +958,7 @@ public class FutureService {
             }
             if (tradingEntity.getAtrChecker() == 1) {
                 combinedLongEntryRule = new AndRule(combinedLongEntryRule, overAtrRule);
+                combinedLongEntryRule = new AndRule(combinedLongEntryRule, underAtrRule);
             }
             if (tradingEntity.getTrendFollowFlag() == 1) {
                 combinedLongEntryRule = new AndRule(combinedLongEntryRule, upTrendRule);
@@ -993,6 +975,7 @@ public class FutureService {
             }
             if (tradingEntity.getAdxChecker() == 1) {
                 combinedShortEntryRule = new AndRule(combinedShortEntryRule, adxEntryRule);
+                combinedShortEntryRule = new AndRule(combinedShortEntryRule, underAtrRule);
             }
             if (tradingEntity.getAtrChecker() == 1) {
                 combinedShortEntryRule = new AndRule(combinedShortEntryRule, overAtrRule);
@@ -1039,12 +1022,55 @@ public class FutureService {
         Strategy combinedLongStrategy  = new BaseStrategy(finalCombinedLongEntryRule, combinedLongExitRule);
         Strategy combinedShortStrategy = new BaseStrategy(finalCombinedShortEntryRule, combinedShortExitRule);
 
+        // 전략 생성
+        strategyMap.put(tradingCd + "_" + interval + "_long_strategy", combinedLongStrategy);
+        strategyMap.put(tradingCd + "_" + interval + "_short_strategy", combinedShortStrategy);
+    }
+
+    public Map<String, Object> backTestExec(TradingEntity tradingEntity, boolean logFlag) {
+        System.out.println("tradingEntity : " + tradingEntity);
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        //printPrettyJson(accountInfo);
+
+        if(logFlag){
+            System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
+            System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
+            System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+            System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+        }
+
+        BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
+        BigDecimal totalWalletBalance = new BigDecimal(String.valueOf(accountInfo.get("totalWalletBalance")));
+
+        BigDecimal maxPositionAmount = totalWalletBalance
+                .divide(new BigDecimal(tradingEntity.getMaxPositionCount()),0, RoundingMode.DOWN)
+                .multiply(tradingEntity.getCollateralRate()).setScale(0, RoundingMode.DOWN);
+
+        tradingEntity.setCollateral(maxPositionAmount);
+
+        String tradingCd = tradingEntity.getTradingCd();
+        String symbol = tradingEntity.getSymbol();
+        String interval = tradingEntity.getCandleInterval();
+        int candleCount = tradingEntity.getCandleCount();
+        int limit = candleCount;
+        long startTime = System.currentTimeMillis(); // 시작 시간 기록
+
+        Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+
+        // 시리즈 생성
+        seriesMaker(tradingEntity, logFlag);
+        BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
+        // 전략 생성
+        strategyMaker2(tradingEntity, logFlag);
+        Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
+        Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
+
         // 백테스트 실행
-        BarSeriesManager seriesManager   = new BarSeriesManager(series);
-
-        TradingRecord longTradingRecord  = seriesManager.run(combinedLongStrategy);
-        TradingRecord shortTradingRecord = seriesManager.run(combinedShortStrategy, Trade.TradeType.SELL);
-
+        BarSeriesManager seriesManager = new BarSeriesManager(series);
+        TradingRecord longTradingRecord = seriesManager.run(longStrategy);
+        TradingRecord shortTradingRecord = seriesManager.run(shortStrategy, Trade.TradeType.SELL);
         int leverage = tradingEntity.getLeverage(); // 레버리지
 
         // 결과 출력
@@ -3138,6 +3164,62 @@ public class FutureService {
                 //.marketCondition(marketCondition)
                 .build();
         return technicalIndicatorReport;
+    }
+
+    private TechnicalIndicatorReportEntity technicalIndicatorCalculate2(TradingEntity tradingEntity) {
+        String tradingCd = tradingEntity.getTradingCd();
+        String symbol = tradingEntity.getSymbol();
+        String interval = tradingEntity.getCandleInterval();
+
+        BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
+
+        // 기존에 생성된 전략 가져오기
+        Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
+        Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
+
+        int endIndex = series.getEndIndex();
+
+        // 지표 계산
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        OpenPriceIndicator openPrice = new OpenPriceIndicator(series);
+        HighPriceIndicator highPrice = new HighPriceIndicator(series);
+        LowPriceIndicator lowPrice = new LowPriceIndicator(series);
+
+        int shortMovingPeriod = tradingEntity.getShortMovingPeriod();
+        int longMovingPeriod = tradingEntity.getLongMovingPeriod();
+
+        SMAIndicator sma = new SMAIndicator(closePrice, shortMovingPeriod);
+        EMAIndicator ema = new EMAIndicator(closePrice, longMovingPeriod);
+        RSIIndicator rsi = new RSIIndicator(closePrice, longMovingPeriod);
+
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, longMovingPeriod);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(ema);
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+
+        ADXIndicator adx = new ADXIndicator(series, longMovingPeriod);
+
+        // 시그널 생성
+        int longSignal = longStrategy.shouldEnter(endIndex) ? 1 : (longStrategy.shouldExit(endIndex) ? -1 : 0);
+        int shortSignal = shortStrategy.shouldEnter(endIndex) ? -1 : (shortStrategy.shouldExit(endIndex) ? 1 : 0);
+
+        // 보고서 생성 및 반환
+        return TechnicalIndicatorReportEntity.builder()
+                .symbol(symbol)
+                .endTime(series.getBar(endIndex).getEndTime().toLocalDateTime())
+                .openPrice(BigDecimal.valueOf(openPrice.getValue(endIndex).doubleValue()))
+                .closePrice(BigDecimal.valueOf(closePrice.getValue(endIndex).doubleValue()))
+                .highPrice(BigDecimal.valueOf(highPrice.getValue(endIndex).doubleValue()))
+                .lowPrice(BigDecimal.valueOf(lowPrice.getValue(endIndex).doubleValue()))
+                .sma(BigDecimal.valueOf(sma.getValue(endIndex).doubleValue()))
+                .ema(BigDecimal.valueOf(ema.getValue(endIndex).doubleValue()))
+                .rsi(BigDecimal.valueOf(rsi.getValue(endIndex).doubleValue()))
+                .ubb(BigDecimal.valueOf(upperBBand.getValue(endIndex).doubleValue()))
+                .mbb(BigDecimal.valueOf(middleBBand.getValue(endIndex).doubleValue()))
+                .lbb(BigDecimal.valueOf(lowerBBand.getValue(endIndex).doubleValue()))
+                .currentAdx(adx.getValue(endIndex).doubleValue())
+                //.strongSignal(strongSignal)
+                .build();
     }
 
     public Claims getClaims(HttpServletRequest request){
