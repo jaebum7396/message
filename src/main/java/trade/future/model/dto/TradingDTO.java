@@ -41,24 +41,23 @@ public class TradingDTO {
 
     @ApiModelProperty(value = "1" , example = "0.95")
     BigDecimal collateralRate; //매매에 사용할 담보금 비율
-    @ApiModelProperty(value = "-1" , example = "-1")
+    @ApiModelProperty(value = "1" , example = "1") // 이 플래그가 1일 시에 추세를 따르게 됨(큰 추세와 일치할때만 포지션에 진입함)
     int trendFollowFlag; // 1: trend follow, -1: trend reverse
 
     //strategyChecker
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int bollingerBandChecker;
     @ApiModelProperty(value = "-1" , example = "-1")
-    int adxChecker;
-    @ApiModelProperty(value = "1" , example = "1")
     int macdHistogramChecker;
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int macdCrossChecker;
     @ApiModelProperty(value = "-1" , example = "-1")
     int stochChecker;
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int stochRsiChecker;
-    @ApiModelProperty(value = "1" , example = "1")
+    @ApiModelProperty(value = "-1" , example = "-1")
     int rsiChecker;
+
     @ApiModelProperty(value = "1" , example = "1")
     int movingAverageChecker;
     @ApiModelProperty(value = "1" , example = "1")
@@ -70,12 +69,15 @@ public class TradingDTO {
     @ApiModelProperty(value = "3" , example = "3")
     int takeProfitRate;
 
-    @ApiModelProperty(value = "-1" , example = "-1")
-    int reverseTradeChecker;
+    @ApiModelProperty(value = "1" , example = "1")
+    int adxChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int atrChecker;
     @ApiModelProperty(value = "1" , example = "1")
     int mlModelChecker;
+
+    @ApiModelProperty(value = "-1" , example = "-1") //사용하지 않는다.
+    int reverseTradeChecker;
 
     public TradingEntity toEntity() {
         return TradingEntity.builder()
