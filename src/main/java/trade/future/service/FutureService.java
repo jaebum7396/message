@@ -15,9 +15,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
-import org.ta4j.core.indicators.EMAIndicator;
-import org.ta4j.core.indicators.RSIIndicator;
-import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
@@ -130,10 +128,6 @@ public class FutureService {
         tradingEntity.setTrend4h(trend4h);
         tradingEntity.setTrend1h(trend1h);
         tradingEntity.setTrend15m(trend15m);
-        //getKlines(tradingEntity.getTradingCd(), tradingEntity.getSymbol(), "5m", 50);
-        /*if (streamId.equals("1")){
-            throw new RuntimeException("강제예외 발생");
-        }*/
         log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
     }
 
@@ -151,28 +145,8 @@ public class FutureService {
         if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
             log.error("[FAILURE] >>>>> "+tradingEntity.getTradingCd()+ "/" +tradingEntity.getSymbol());
-           /* autoTradingRestart(tradingEntity);
-            System.out.println("[RECOVER] >>>>> "+tradingEntityOpt.get().toString());
-            TradingEntity tradingEntity = tradingEntityOpt.get();
-            tradingEntity.setTradingStatus("CLOSE");
-            tradingRepository.save(tradingEntity);
-            //System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
-            failureCount++;
-            if(failureCount>4){
-                System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
-                //onFailureCallback(streamId);
-            }else{
-                ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-                Runnable task = () -> {
-                    TradingEntity currentTrading = autoTradeStreamOpen(tradingEntity);
-                    System.out.println("[RECOVER] >>>>> "+streamId +" 번 스트림을 "+currentTrading.getStreamId() + " 번으로 복구 합니다.");
-                };
-                // 5초 후에 task 실행
-                scheduler.schedule(task, 5, TimeUnit.SECONDS);
-            }*/
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
-            //onFailureCallback(streamId);
         }
     }
 
@@ -576,9 +550,21 @@ public class FutureService {
 
         // 머신러닝 룰 생성
         MLModel mlModel = new MLModel();
-        mlModel.train(series);
-        //Rule mlRule = new MLPredictionRule(mlModel, series, 0.5);
-        Rule mlRule = new MLPredictionRule(mlModel, series, 0.5);
+        int totalSize = series.getBarCount();
+        int trainSize = (int) (totalSize * 0.5);
+        System.out.println("Train data size: " + trainSize);
+
+        // 훈련 데이터와 테스트 데이터 분리
+        BarSeries trainSeries = series.getSubSeries(0, trainSize);
+        BarSeries testSeries = series.getSubSeries(trainSize, totalSize);
+        // 머신러닝에 쓰일 지표 초기화
+        List<Indicator<Num>> indicators = initializeIndicators(series);
+        double upThreshold = 0.6;   // 60% 이상의 상승 확률일 때 매수 신호
+        double downThreshold = 0.6; // 60% 이상의 하락 확률일 때 매도 신호
+
+        mlModel.train(testSeries, indicators, trainSize);
+        //  MLRule 생성
+        Rule mlRule = new MLRule(mlModel, indicators, upThreshold, downThreshold);
 
         //**********************************************************************************
         // 추가적인 청산 규칙.
@@ -611,11 +597,11 @@ public class FutureService {
             shortEntryRules.add(new NotRule(mlRule));
 
             // 머신러닝 룰은 손익률이 1 이상일 때만 적용
-            Rule longExitMARule = new AndRule(new NotRule(mlRule), longMinimumProfitRule);
-            Rule shortExitMARule = new AndRule(mlRule, shortMinimumProfitRule);
+            Rule longExitMLRule = new AndRule(new NotRule(mlRule), longMinimumProfitRule);
+            Rule shortExitMLRule = new AndRule(mlRule, shortMinimumProfitRule);
 
-            longExitRules.add(longExitMARule);
-            shortExitRules.add(shortExitMARule);
+            longExitRules.add(longExitMLRule);
+            shortExitRules.add(shortExitMLRule);
         }
 
         if (tradingEntity.getBollingerBandChecker() == 1) {
@@ -789,17 +775,25 @@ public class FutureService {
         Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
         Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
+        int totalSize = series.getBarCount();
+        int trainSize = (int) (totalSize * 0.5);
+        System.out.println("Train data size: " + trainSize);
+
+        // 훈련 데이터와 테스트 데이터 분리
+        BarSeries trainSeries = series.getSubSeries(0, trainSize);
+        BaseBarSeries testSeries = series.getSubSeries(trainSize, totalSize);
+
         // 백테스트 실행
-        BarSeriesManager seriesManager = new BarSeriesManager(series);
+        BarSeriesManager seriesManager = new BarSeriesManager(testSeries);
         TradingRecord longTradingRecord = seriesManager.run(longStrategy);
         TradingRecord shortTradingRecord = seriesManager.run(shortStrategy, Trade.TradeType.SELL);
         int leverage = tradingEntity.getLeverage(); // 레버리지
 
         // 결과 출력
         System.out.println("");
-        printBackTestResult(longTradingRecord, series, symbol, leverage, "LONG", maxPositionAmount);
+        printBackTestResult(longTradingRecord, testSeries, symbol, leverage, "LONG", maxPositionAmount);
         System.out.println("");
-        printBackTestResult(shortTradingRecord, series, symbol, leverage, "SHORT", maxPositionAmount);
+        printBackTestResult(shortTradingRecord, testSeries, symbol, leverage, "SHORT", maxPositionAmount);
 
         System.out.println("");
         System.out.println("롱 매매횟수 : "+longTradingRecord.getPositionCount());
@@ -906,6 +900,25 @@ public class FutureService {
         }
         System.out.println(" ");
         System.out.println(symbol+"/"+positionSide+"(승패 : "+winPositions.size()+"/"+losePositions.size()+") : 최종 수익: " + totalProfit);
+    }
+
+    private List<Indicator<Num>> initializeIndicators(BarSeries series) {
+        List<Indicator<Num>> indicators = new ArrayList<>();
+        indicators.add(new RSIIndicator(new ClosePriceIndicator(series), 14));
+        indicators.add(new RSIIndicator(new ClosePriceIndicator(series), 28));
+        indicators.add(new MACDIndicator(new ClosePriceIndicator(series)));
+        indicators.add(new EMAIndicator(new ClosePriceIndicator(series), 20));
+        indicators.add(new EMAIndicator(new ClosePriceIndicator(series), 50));
+        indicators.add(new BollingerBandsMiddleIndicator(new ClosePriceIndicator(series)));
+        indicators.add(new StochasticOscillatorKIndicator(series, 14));
+        indicators.add(new ATRIndicator(series, 14));
+        indicators.add(new ADXIndicator(series, 14));
+        indicators.add(new CCIIndicator(series, 20));
+        indicators.add(new ROCIndicator(new ClosePriceIndicator(series), 10));
+        indicators.add(new WilliamsRIndicator(series, 14));
+        indicators.add(new CMOIndicator(new ClosePriceIndicator(series), 14));
+        indicators.add(new ParabolicSarIndicator(series));
+        return indicators;
     }
 
     // 거래량 상대화 메서드 (예: 20일 평균 대비)
