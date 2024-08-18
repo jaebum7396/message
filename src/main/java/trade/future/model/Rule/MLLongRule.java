@@ -27,7 +27,7 @@ public class MLLongRule implements Rule {
         double[] probabilities = model.predictProbabilities(indicators, index);
 
         if (probabilities[2] > threshold) {
-            log.info("상승시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
+            //log.info("상승시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
             return true;
         }
         return false;

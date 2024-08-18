@@ -68,6 +68,7 @@ spring:
 logging:
   level:
     root: info
+    smile.math: WARN
     org:
       hibernate:
         SQL: warn

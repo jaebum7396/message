@@ -32,6 +32,7 @@ import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.TradingException;
 import trade.future.ml.MLModel;
+import trade.future.ml.SignalProximityScanner;
 import trade.future.model.Rule.*;
 import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
@@ -111,6 +112,7 @@ public class FutureMLService {
     public String BASE_URL;
     int failureCount = 0;
     private HashMap<String, BaseBarSeries> seriesMap = new HashMap<String, BaseBarSeries>();
+    private HashMap<String, MLModel> mlModelMap = new HashMap<String, MLModel>();
     private HashMap<String, Strategy> strategyMap = new HashMap<String, Strategy>();
     private final Map<String, TradingEntity> TRADING_ENTITYS = new HashMap<>();
 
@@ -308,16 +310,30 @@ public class FutureMLService {
                     }
 
                 }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
+                    List<Indicator<Num>> indicators = initializeIndicators(series);
+                    MLModel currentModel = mlModelMap.get(tradingCd);
+                    double threshold = 0.6; // 시그널 임계값
+                    double proximityThreshold = 0.1; // 근접 임계값
+                    SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, currentModel, threshold, proximityThreshold);
+                    scanner.printSignalProximity(symbol);
+
                     boolean enterFlag = false;
                     enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                     if (enterFlag) {
                         System.out.println("숏 포지션 오픈");
                         //makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
-                    }else{
+                    } else{
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈");
                             //makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                        }else{
+                            if(!scanner.isNearSignal()){
+                                restartTrading(tradingEntity);
+                                System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+                                log.info("스트림 종료");
+                                printTradingEntitys();
+                            }
                         }
                     }
                 });
@@ -725,6 +741,7 @@ public class FutureMLService {
                     }
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 autoTradingOpen(tradingEntity);
                 nextFlag = false;
             }
@@ -849,7 +866,7 @@ public class FutureMLService {
 
         int count = 0;
         for (Map<String, Object> item : sortedByQuoteVolume) {
-            System.out.println("현재 가능한 포지션 갯수("+maxPositionCount+"-"+TRADING_ENTITYS.size()+") : " + (maxPositionCount - TRADING_ENTITYS.size()));
+            System.out.println("현재 가능한 트레이딩 갯수("+maxPositionCount+"-"+TRADING_ENTITYS.size()+") : " + (maxPositionCount - TRADING_ENTITYS.size()));
             int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
             if (availablePositionCount <= 0) {
                 break;
@@ -867,22 +884,33 @@ public class FutureMLService {
             List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
             if (tradingEntityList.isEmpty()) { //오픈된 트레이딩이 없다면
                 Map<String, Object> klineMap = backTestExec(tempTradingEntity, true);
+
+                BaseBarSeries series = seriesMap.get(tempTradingEntity.getTradingCd() + "_" + tempTradingEntity.getCandleInterval());
+                List<Indicator<Num>> indicators = initializeIndicators(series); // 이 메서드는 구현해야 함
+                MLModel mlModel = mlModelMap.get(tempTradingEntity.getTradingCd());
+                double threshold = 0.6; // 시그널 임계값
+                double proximityThreshold = 0.1; // 근접 임계값
+                SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
+                scanner.printSignalProximity(symbol);
+
                 Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
 
-                if (expectationProfitOpt.isPresent()){
-                    BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
-                    BigDecimal winTradeCount = new BigDecimal(String.valueOf(klineMap.get("winTradeCount")));
-                    BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
+                //if (expectationProfitOpt.isPresent()){
+                //    BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
+                //    BigDecimal winTradeCount = new BigDecimal(String.valueOf(klineMap.get("winTradeCount")));
+                //    BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                     if (
                         true
-                        &&expectationProfit.compareTo(BigDecimal.ONE) > 0
+                        && scanner.isNearSignal() // 시그널 근접 여부
+                        //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
                         //&& (winTradeCount.compareTo(loseTradeCount) > 0)
                     ) {
-                        System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
+                        //System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
+                        System.out.println("[관심종목추가]symbol : " + symbol);
                         overlappingData.add(item);
                         count++;
                     }
-                }
+                //}
             }
         }
 
@@ -1105,10 +1133,11 @@ public class FutureMLService {
         double downThreshold = 0.6; // 60% 이상의 하락 확률일 때 매도 신호
 
         mlModel.train(testSeries, indicators, trainSize);
+        mlModelMap.put(tradingCd, mlModel);
         //  MLRule 생성
 
-        double entryThreshold = 0.6;
-        double exitThreshold = 0.6;
+        double entryThreshold = 0.5;
+        double exitThreshold = 0.5;
 
         Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
@@ -1312,7 +1341,7 @@ public class FutureMLService {
         int candleCount = tradingEntity.getCandleCount();
         int limit = candleCount;
 
-        if(logFlag){
+        if(false){
             System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
             System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
             System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
@@ -1336,7 +1365,7 @@ public class FutureMLService {
 
         int totalSize = series.getBarCount();
         int trainSize = (int) (totalSize * 0.5);
-        System.out.println("Train data size: " + trainSize);
+        //System.out.println("Train data size: " + trainSize);
 
         // 훈련 데이터와 테스트 데이터 분리
         BarSeries trainSeries = series.getSubSeries(0, trainSize);
@@ -1376,8 +1405,6 @@ public class FutureMLService {
                 printTradingSignals(symbol, series.getBar(i), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
             }
         }
-
-
         // 결과 출력
         if(false) {
             System.out.println("");
@@ -1404,7 +1431,9 @@ public class FutureMLService {
         BigDecimal totalProfit = BigDecimal.ZERO;
         List<Position> winPositions = new ArrayList<>();
         List<Position> losePositions = new ArrayList<>();
-        System.out.println(symbol+"/"+positionSide+" 리포트");
+        if (logFlag) {
+            System.out.println(symbol+"/"+positionSide+" 리포트");
+        }
         RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14, 100);
         // ADX 지표 설정
         int adxPeriod = 14; // 일반적으로 사용되는 기간

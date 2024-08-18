@@ -27,7 +27,7 @@ public class MLShortRule implements Rule {
         double[] probabilities = model.predictProbabilities(indicators, index);
 
         if (probabilities[0] > threshold) {
-            log.info("하락시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
+            //log.info("하락시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
             return true;
         }
         return false;
