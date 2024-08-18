@@ -267,6 +267,13 @@ public class FutureMLService {
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
+                boolean longShouldEnter = longStrategy.shouldEnter(series.getEndIndex());
+                boolean longShouldExit = longStrategy.shouldExit(series.getEndIndex());
+                boolean shortShouldEnter = shortStrategy.shouldEnter(series.getEndIndex());
+                boolean shortShouldExit = shortStrategy.shouldExit(series.getEndIndex());
+
+                printTradingSignals(symbol, series.getLastBar(), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
+
                 Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                 openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
                     PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
@@ -288,9 +295,9 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (closePosition.getPositionStatus().equals("OPEN")) {
                         if (closePosition.getPositionSide().equals("LONG")) {
-                            exitFlag = longStrategy.shouldExit(series.getEndIndex());
+                            //exitFlag = longStrategy.shouldExit(series.getEndIndex());
                         } else if (closePosition.getPositionSide().equals("SHORT")) {
-                            exitFlag = shortStrategy.shouldExit(series.getEndIndex());
+                            //exitFlag = shortStrategy.shouldExit(series.getEndIndex());
                         }
                     }
                     if (exitFlag) {
@@ -305,12 +312,12 @@ public class FutureMLService {
                     enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                     if (enterFlag) {
                         System.out.println("숏 포지션 오픈");
-                        makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
+                        //makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
                     }else{
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈");
-                            makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                            //makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                         }
                     }
                 });
@@ -582,10 +589,10 @@ public class FutureMLService {
         klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
         klineEvent.setTradingEntity(tradingEntity);
 
-        System.out.println("tradingEntity.getTradingCd() : " + tradingEntity.getTradingCd());
+        //System.out.println("tradingEntity.getTradingCd() : " + tradingEntity.getTradingCd());
         // 캔들데이터 분석을 위한 bar 세팅
         settingBar(tradingEntity.getTradingCd(), event);
-        strategyMaker(tradingEntity, false);
+        //strategyMaker(tradingEntity, false);
 
         // 포지션 엔티티 생성
         PositionEntity positionEntity = PositionEntity.builder()
@@ -594,6 +601,7 @@ public class FutureMLService {
                 .build();
         klineEvent.getKlineEntity().setPositionEntity(positionEntity);
         klineEvent = eventRepository.save(klineEvent);
+
         Optional<EventEntity> eventEntity = eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN");
         if(!eventEntity.isEmpty()){
             System.out.println("포지션 오픈중 : " +  eventEntity.get().getKlineEntity().getPositionEntity());
@@ -614,7 +622,6 @@ public class FutureMLService {
         ZonedDateTime closeTime = CommonUtils.convertTimestampToDateTime(klineObj.getLong("T")).atZone(ZoneOffset.UTC);
         ZonedDateTime kstEndTime = closeTime.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
         String formattedEndTime = formatter.format(kstEndTime);
-        System.out.println("한국시간 : " + formattedEndTime);
 
         Num open   = series.numOf(klineObj.getDouble("o"));
         Num high   = series.numOf(klineObj.getDouble("h"));
@@ -1099,7 +1106,18 @@ public class FutureMLService {
 
         mlModel.train(testSeries, indicators, trainSize);
         //  MLRule 생성
-        Rule mlRule = new MLRule(mlModel, indicators, upThreshold, downThreshold);
+
+        double entryThreshold = 0.6;
+        double exitThreshold = 0.6;
+
+        Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
+        Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
+
+        Rule mlLongExitRule  = new MLShortRule(mlModel, indicators, exitThreshold);
+        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
+
+
+        //Rule mlRule = new MLRule(mlModel, indicators, upThreshold, downThreshold);
 
         //**********************************************************************************
         // 추가적인 청산 규칙.
@@ -1128,15 +1146,20 @@ public class FutureMLService {
 
         // ML 모델 사용 여부를 확인하는 플래그
         if (tradingEntity.getMlModelChecker() == 1) {
-            longEntryRules.add(mlRule);
-            shortEntryRules.add(new NotRule(mlRule));
+
+            longEntryRules.add(mlLongEntryRule);
+            shortEntryRules.add(mlShortEntryRule);
+
+            longExitRules.add(mlLongExitRule);
+            shortExitRules.add(mlShortExitRule);
 
             // 머신러닝 룰은 손익률이 1 이상일 때만 적용
-            Rule longExitMLRule = new AndRule(new NotRule(mlRule), longMinimumProfitRule);
-            Rule shortExitMLRule = new AndRule(mlRule, shortMinimumProfitRule);
+            //Rule longExitMLRule = new AndRule(new NotRule(mlRule), longMinimumProfitRule);
+            //Rule shortExitMLRule = new AndRule(mlRule, shortMinimumProfitRule);
 
-            longExitRules.add(longExitMLRule);
-            shortExitRules.add(shortExitMLRule);
+            //longExitRules.add(longExitMLRule);
+            //shortExitRules.add(shortExitMLRule);
+
         }
 
         if (tradingEntity.getBollingerBandChecker() == 1) {
@@ -1328,8 +1351,10 @@ public class FutureMLService {
         long endTime = System.currentTimeMillis(); // 종료 시간 기록
         long elapsedTime = endTime - startTime; // 실행 시간 계산
         System.out.println("");
-        HashMap<String, Object> longTradingResult = backTestResult(longTradingRecord, testSeries, symbol, leverage, "LONG", maxPositionAmount);
-        HashMap<String, Object> shortTradingResult = backTestResult(shortTradingRecord, testSeries, symbol, leverage, "SHORT", maxPositionAmount);
+        HashMap<String, Object> longTradingResult = new HashMap<String, Object>();
+        HashMap<String, Object> shortTradingResult = new HashMap<String, Object>();
+        longTradingResult  = backTestResult(longTradingRecord, testSeries, symbol, leverage, "LONG", maxPositionAmount, false);
+        shortTradingResult = backTestResult(shortTradingRecord, testSeries, symbol, leverage, "SHORT", maxPositionAmount, false);
 
         int winTradeCount = (int) longTradingResult.get("winTradeCount") + (int) shortTradingResult.get("winTradeCount");
         int loseTradeCount = (int) longTradingResult.get("loseTradeCount") + (int) shortTradingResult.get("loseTradeCount");
@@ -1338,9 +1363,23 @@ public class FutureMLService {
         resultMap.put("loseTradeCount", loseTradeCount);
         resultMap.put("expectationProfit", expectationProfit);
 
+        /* TODO : 룰이 어떻게 작동하는지 */
+        if(false){
+            for(int i = 0; i < series.getBarCount(); i++){
+                TradingRecord longRecord = new BaseTradingRecord();
+                TradingRecord shortRecord = new BaseTradingRecord(Trade.TradeType.SELL);
+                boolean longShouldEnter = longStrategy.shouldEnter(i, longRecord);
+                boolean longShouldExit = longStrategy.shouldExit(i, longRecord);
+                boolean shortShouldEnter = shortStrategy.shouldEnter(i, shortRecord);
+                boolean shortShouldExit = shortStrategy.shouldExit(i, shortRecord);
+
+                printTradingSignals(symbol, series.getBar(i), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
+            }
+        }
+
 
         // 결과 출력
-        if(logFlag) {
+        if(false) {
             System.out.println("");
             System.out.println("롱 매매횟수 : "+longTradingRecord.getPositionCount());
             System.out.println("숏 매매횟수 : "+shortTradingRecord.getPositionCount());
@@ -1352,7 +1391,7 @@ public class FutureMLService {
         return resultMap;
     }
 
-    public HashMap<String, Object> backTestResult(TradingRecord tradingRecord, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral) {
+    public HashMap<String, Object> backTestResult(TradingRecord tradingRecord, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral, boolean logFlag) {
         HashMap<String, Object> resultMap = new HashMap<>();
 
         // 트렌드
@@ -1420,28 +1459,18 @@ public class FutureMLService {
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
             int i = 1;
-            /* for (Rule entryRule : entryRules) {
-                if (entryRule.isSatisfied(entry.getIndex(), tradingRecord) || entryRule.isSatisfied(entry.getIndex())) {
-                    entryRuleExpression.append(entryRule.getClass().getSimpleName()).append(" ");
-                }
+            if (logFlag){
+                System.out.println("  "+entryExpression
+                        + slash + exitExpression
+                        + slash + trendExpression
+                        + slash + ROIExpression
+                        + slash + PNLExpression
+                        + slash + volumeExpression
+                        + slash + atrExpression
+                        + slash + adxExpression
+                        + slash + entryRuleExpression
+                        + slash + stopRuleExpression);
             }
-
-            for (Rule exitRule : stopRules) {
-                if (exitRule.isSatisfied(exit.getIndex(), tradingRecord) || exitRule.isSatisfied(exit.getIndex())) {
-                    stopRuleExpression.append(exitRule.getClass().getSimpleName()).append(" ");
-                }
-            }*/
-            //System.out.println(" "+entry+" / "+exit);
-            System.out.println("  "+entryExpression
-                    + slash + exitExpression
-                    + slash + trendExpression
-                    + slash + ROIExpression
-                    + slash + PNLExpression
-                    + slash + volumeExpression
-                    + slash + atrExpression
-                    + slash + adxExpression
-                    + slash + entryRuleExpression
-                    + slash + stopRuleExpression);
             if(PNL.compareTo(BigDecimal.ZERO) > 0){
                 winPositions.add(position);
             }else if(PNL.compareTo(BigDecimal.ZERO) < 0){
@@ -1449,8 +1478,10 @@ public class FutureMLService {
             }
             totalProfit = totalProfit.add(PNL);
         }
-        System.out.println(" ");
-        System.out.println(symbol+"/"+positionSide+"(승패 : "+winPositions.size()+"/"+losePositions.size()+") : 최종 수익: " + totalProfit);
+        if (logFlag){
+            System.out.println(" ");
+            System.out.println(symbol+"/"+positionSide+"(승패 : "+winPositions.size()+"/"+losePositions.size()+") : 최종 수익: " + totalProfit);
+        }
         resultMap.put("winTradeCount", winPositions.size());
         resultMap.put("loseTradeCount", losePositions.size());
         resultMap.put("expectationProfit", totalProfit);
@@ -1571,6 +1602,28 @@ public class FutureMLService {
         System.out.printf(format, "미실현수익", accountInfo.optString("totalUnrealizedProfit", "N/A"));
         System.out.printf(format, "현재자산", accountInfo.optString("totalMarginBalance", "N/A"));
         System.out.printf(line, "-".repeat(14), "-".repeat(22));
+    }
+
+    public void printTradingSignals(String symbol, Bar currentBar,
+                                    boolean longShouldEnter, boolean longShouldExit,
+                                    boolean shortShouldEnter, boolean shortShouldExit) {
+        System.out.println("한국시간 : " + krTimeExpression(currentBar));
+        String header = String.format("| %-15s | %-22s | %-14s | %-14s | %-15s | %-15s |",
+                "Symbol", "Current Bar", "Long Enter", "Long Exit", "Short Enter", "Short Exit");
+        String separatorLine = "+-----------------+------------------------+----------------+----------------+-----------------+-----------------+";
+        String dataLine = String.format("| %-15s | %-22s | %-14s | %-14s | %-15s | %-15s |",
+                symbol,
+                krTimeExpression(currentBar),
+                longShouldEnter ? "YES" : "NO",
+                longShouldExit ? "YES" : "NO",
+                shortShouldEnter ? "YES" : "NO",
+                shortShouldExit ? "YES" : "NO");
+
+        System.out.println(separatorLine);
+        System.out.println(header);
+        System.out.println(separatorLine);
+        System.out.println(dataLine);
+        System.out.println(separatorLine);
     }
 
     public Claims getClaims(HttpServletRequest request){
