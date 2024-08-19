@@ -456,7 +456,7 @@ public class FutureService {
         }
     }
 
-    public void strategyMaker(TradingEntity tradingEntity, boolean logFlag) {
+    public void strategyMaker(TradingEntity tradingEntity, boolean testFlag, boolean logFlag) {
         System.out.println("tradingEntity : " + tradingEntity);
 
         String tradingCd = tradingEntity.getTradingCd();
@@ -562,7 +562,11 @@ public class FutureService {
         double upThreshold = 0.6;   // 60% 이상의 상승 확률일 때 매수 신호
         double downThreshold = 0.6; // 60% 이상의 하락 확률일 때 매도 신호
 
-        mlModel.train(testSeries, indicators, trainSize);
+        if (testFlag){
+            mlModel.train(testSeries, indicators, trainSize);
+        } else {
+            mlModel.train(series, indicators, totalSize);
+        }
         //  MLRule 생성
         Rule mlRule = new MLRule(mlModel, indicators, upThreshold, downThreshold);
 
@@ -771,7 +775,7 @@ public class FutureService {
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
 
         // 전략 생성
-        strategyMaker(tradingEntity, logFlag);
+        strategyMaker(tradingEntity, true, logFlag);
         Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
         Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 

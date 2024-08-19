@@ -121,7 +121,7 @@ public class FutureMLService {
         // 시리즈 생성
         seriesMaker(tradingEntity, false);
         // 전략 생성
-        strategyMaker(tradingEntity, false);
+        strategyMaker(tradingEntity, true, false);
         log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
     }
 
@@ -346,7 +346,7 @@ public class FutureMLService {
                 // klineEvent를 데이터베이스에 저장
                 EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
                 BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
-                strategyMaker(tradingEntity, true);
+                strategyMaker(tradingEntity, false,true);
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
@@ -981,7 +981,7 @@ public class FutureMLService {
                 String interval = tempTradingEntity.getCandleInterval();
 
                 seriesMaker(tempTradingEntity, false);
-                strategyMaker(tempTradingEntity, false);
+                strategyMaker(tempTradingEntity, false, false);
 
                 BaseBarSeries series = seriesMap.get(tempTradingEntity.getTradingCd() + "_" + tempTradingEntity.getCandleInterval());
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
@@ -1131,7 +1131,7 @@ public class FutureMLService {
         }
     }
 
-    public void strategyMaker(TradingEntity tradingEntity, boolean logFlag) {
+    public void strategyMaker(TradingEntity tradingEntity, boolean testFlag, boolean logFlag) {
         //System.out.println("tradingEntity : " + tradingEntity);
 
         String tradingCd = tradingEntity.getTradingCd();
@@ -1235,7 +1235,11 @@ public class FutureMLService {
 
         // 머신러닝에 쓰일 지표 초기화
         List<Indicator<Num>> indicators = initializeIndicators(series);
-        mlModel.train(testSeries, indicators, trainSize);
+        if (testFlag){
+            mlModel.train(testSeries, indicators, trainSize);
+        }else{
+            mlModel.train(series, indicators, totalSize);
+        }
         mlModelMap.put(tradingCd, mlModel);
 
         //  MLRule 생성
@@ -1459,7 +1463,7 @@ public class FutureMLService {
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
 
         // 전략 생성
-        strategyMaker(tradingEntity, logFlag);
+        strategyMaker(tradingEntity, true, logFlag);
         Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
         Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
