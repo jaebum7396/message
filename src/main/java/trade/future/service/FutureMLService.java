@@ -359,7 +359,7 @@ public class FutureMLService {
                 List<Indicator<Num>> indicators = initializeIndicators(series);
 
                 double threshold = 0.5; // 시그널 임계값
-                double proximityThreshold = 0.1; // 근접 임계값
+                double proximityThreshold = 0.3; // 근접 임계값
                 SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
                 scanner.printSignalProximity(symbol);
 
