@@ -354,6 +354,7 @@ public class FutureMLService {
                 boolean shortShouldEnter = shortStrategy.shouldEnter(series.getEndIndex());
                 boolean shortShouldExit = shortStrategy.shouldExit(series.getEndIndex());
 
+                System.out.println("listening : " + symbol);
                 printTradingSignals(symbol, series.getLastBar(), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
                 MLModel mlModel = mlModelMap.get(tradingCd);
                 List<Indicator<Num>> indicators = initializeIndicators(series);
