@@ -85,7 +85,7 @@ public class MLModel {
             //logger.info("Estimated probabilities: " + Arrays.toString(probabilities));
             return probabilities;
         } catch (Exception e) {
-            //logger.severe("Error in predictProbabilities: " + e.getMessage());
+            logger.severe("Error in predictProbabilities: " + e.getMessage());
             e.printStackTrace();
             return new double[]{1.0/3, 1.0/3, 1.0/3};
         }
