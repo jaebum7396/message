@@ -411,7 +411,7 @@ public class FutureMLService {
                             System.out.println("롱 포지션 오픈");
                             makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                         }else{
-                            if(!scanner.isNearSignal()){
+                            if(!scanner.isLikelyToMove()){
                                 restartTrading(tradingEntity);
                                 System.out.println("closeTradingEntity >>>>> " + tradingEntity);
                                 log.info("스트림 종료");
@@ -997,7 +997,8 @@ public class FutureMLService {
                 //    BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                     if (
                         true
-                        && scanner.isNearSignal() // 시그널 근접 여부
+                        //&& scanner.isNearSignal() // 시그널 근접 여부
+                        && scanner.isLikelyToMove() // 움직일 가능성 여부
                         //&& (longEntrySignal || shortEntrySignal)
                         //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
                         //&& (winTradeCount.compareTo(loseTradeCount) > 0)

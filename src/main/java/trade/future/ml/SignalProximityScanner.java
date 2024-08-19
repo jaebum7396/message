@@ -50,6 +50,14 @@ public class SignalProximityScanner {
         return Math.abs(probability - threshold) <= proximityThreshold;
     }
 
+    public boolean isLikelyToMove() {
+        int currentIndex = series.getEndIndex();
+        double[] probabilities = model.predictProbabilities(indicators, currentIndex);
+
+        // probabilities[1]은 횡보(중립) 확률
+        return probabilities[1] < 0.8;
+    }
+
     public void printSignalProximity(String symbol) {
         BarSeries series = this.series;
         List<Indicator<Num>> indicators = this.indicators;
