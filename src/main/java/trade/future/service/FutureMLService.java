@@ -397,7 +397,7 @@ public class FutureMLService {
                     }
 
                 }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
-                    scanner.printSignalProximity(symbol);
+                    //scanner.printSignalProximity(symbol);
                     boolean enterFlag = false;
                     enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                     if (enterFlag) {
