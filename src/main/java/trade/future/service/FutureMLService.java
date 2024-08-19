@@ -886,7 +886,7 @@ public class FutureMLService {
                         autoTradingOpenFlag = false;
                         autoTradingOpen(newTradingEntity);
                     }
-                    printTradingEntitys();
+                    //printTradingEntitys();
                 });
             }
         }
@@ -1636,7 +1636,7 @@ public class FutureMLService {
         indicators.add(new ROCIndicator(new ClosePriceIndicator(series), 10));
         indicators.add(new WilliamsRIndicator(series, 14));
         indicators.add(new CMOIndicator(new ClosePriceIndicator(series), 14));
-        indicators.add(new ParabolicSarIndicator(series));
+        //indicators.add(new ParabolicSarIndicator(series));
         return indicators;
     }
 

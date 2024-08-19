@@ -109,7 +109,7 @@ public class MLModel {
         } catch (Exception e) {
             logger.severe("Error in predictProbabilities: " + e.getMessage());
             e.printStackTrace();
-            return new double[]{1.0/3, 1.0/3, 1.0/3};
+            return new double[]{0, 100, 0};
         }
     }
 
