@@ -744,7 +744,12 @@ public class FutureMLService {
         return autoTradingOpen(tradingEntity);
     }
 
+    boolean autoTradingOpenFlag = false;
     public Map<String, Object> autoTradingOpen(TradingEntity tradingEntity) {
+        if (autoTradingOpenFlag) {
+            throw new RuntimeException("이미 실행중입니다.");
+        }
+        autoTradingOpenFlag = true;
         log.info("autoTradingOpen >>>>>");
 
         // *************************************************************************************************
@@ -823,6 +828,7 @@ public class FutureMLService {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+                autoTradingOpenFlag = false;
                 autoTradingOpen(tradingEntity);
                 nextFlag = false;
             }
@@ -875,12 +881,14 @@ public class FutureMLService {
                             TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(newTradingEntity));
                         }
                     } catch (Exception e) {
+                        autoTradingOpenFlag = false;
                         autoTradingOpen(newTradingEntity);
                     }
                     printTradingEntitys();
                 });
             }
         }
+        autoTradingOpenFlag = false;
         return resultMap;
     }
 
