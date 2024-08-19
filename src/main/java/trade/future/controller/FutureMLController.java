@@ -37,4 +37,10 @@ public class FutureMLController {
     public ResponseEntity autoTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
         return commonUtils.okResponsePackaging(futureMLService.autoTradingOpen(request, tradingDTO));
     }
+
+    @GetMapping(value = "/future/ml/close")
+    @Operation(summary="자동매매를 종료합니다.", description="모든 포지션을 종료합니다.")
+    public void closeAllPositions() {
+        futureMLService.closeAllPositions();
+    }
 }

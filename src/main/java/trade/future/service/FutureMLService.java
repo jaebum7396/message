@@ -2,6 +2,8 @@ package trade.future.service;
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -30,13 +32,11 @@ import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.*;
 import trade.common.CommonUtils;
 import trade.configuration.MyWebSocketClientImpl;
-import trade.exception.TradingException;
 import trade.future.ml.MLModel;
 import trade.future.ml.SignalProximityScanner;
 import trade.future.model.Rule.*;
 import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
-import trade.future.model.enums.ADX_GRADE;
 import trade.future.model.enums.CONSOLE_COLORS;
 import trade.future.repository.EventRepository;
 import trade.future.repository.PositionRepository;
@@ -48,17 +48,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
-import java.time.Duration;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static trade.common.CommonUtils.parseKlineEntity;
-import static trade.common.NumberUtils.doulbleToBigDecimal;
 
 @Slf4j
 @Service
@@ -122,12 +118,63 @@ public class FutureMLService {
         log.info("[OPEN] >>>>> " + streamId + " 번 스트림("+tradingEntity.getSymbol()+")을 오픈합니다.");
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
-        //backTestExec(tradingEntity, false);
         // 시리즈 생성
         seriesMaker(tradingEntity, false);
         // 전략 생성
         strategyMaker(tradingEntity, false);
         log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
+
+        BaseBarSeries series = seriesMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval());
+        Strategy longStrategy = strategyMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval() + "_long_strategy");
+        Strategy shortStrategy = strategyMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval() + "_short_strategy");
+        MLModel mlModel = mlModelMap.get(tradingEntity.getTradingCd());
+
+        System.out.println("!!!lastBar : " + series.getLastBar());
+
+        boolean longEntrySignal = longStrategy.shouldEnter(series.getEndIndex());
+        boolean longExitSignal = longStrategy.shouldExit(series.getEndIndex());
+        boolean shortEntrySignal = shortStrategy.shouldEnter(series.getEndIndex());
+        boolean shortExitSignal = shortStrategy.shouldExit(series.getEndIndex());
+        printTradingSignals(tradingEntity.getSymbol(), series.getLastBar(), longEntrySignal, longExitSignal, shortEntrySignal, shortExitSignal);
+        List<Indicator<Num>> indicators = initializeIndicators(series);
+
+        double threshold = 0.5; // 시그널 임계값
+        double proximityThreshold = 0.1; // 근접 임계값
+        SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
+        scanner.printSignalProximity(tradingEntity.getSymbol());
+
+        //마지막 캔들데이터를 가져와서 저장한다.
+        String klineJson = convertBarToKlineJson(series.getLastBar(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
+        EventEntity klineEvent = null;
+        klineEvent = CommonUtils.convertKlineEventDTO(klineJson).toEntity();
+        klineEvent.setTradingEntity(tradingEntity);
+        PositionEntity positionEntity = PositionEntity.builder()
+                .positionStatus("NONE")
+                .klineEntity(klineEvent.getKlineEntity())
+                .build();
+        klineEvent.getKlineEntity().setPositionEntity(positionEntity);
+        klineEvent = eventRepository.save(klineEvent);
+
+        boolean enterFlag = false;
+        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+        Optional<EventEntity> eventEntity = eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN");
+        if(eventEntity.isEmpty()){
+            if (enterFlag) {
+                System.out.println("숏 포지션 오픈");
+                makeOpenOrder(klineEvent, "SHORT", "숏 포지션 오픈");
+            } else {
+                enterFlag = longStrategy.shouldEnter(series.getEndIndex());
+                if (enterFlag) {
+                    System.out.println("롱 포지션 오픈");
+                    makeOpenOrder(klineEvent, "LONG", "롱 포지션 오픈");
+                } else {
+                    restartTrading(tradingEntity);
+                }
+            }
+        }else{
+            System.out.println("포지션 오픈중 : " +  eventEntity.get().getKlineEntity().getPositionEntity());
+            restartTrading(tradingEntity);
+        }
     }
 
     public void onCloseCallback(String streamId) {
@@ -201,6 +248,57 @@ public class FutureMLService {
         }
     }
 
+    public static String convertBarToKlineJson(Bar bar, String symbol, String interval) {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode rootNode = mapper.createObjectNode();
+        ObjectNode dataNode = mapper.createObjectNode();
+        ObjectNode kNode = mapper.createObjectNode();
+
+        long endTimeMillis = bar.getEndTime().toInstant().toEpochMilli();
+        long startTimeMillis = bar.getBeginTime().toInstant().toEpochMilli();
+
+        dataNode.put("e", "kline");
+        dataNode.put("stream", symbol + "@kline_" + interval); // Stream name (symbol@kline_<interval>
+        dataNode.put("E", System.currentTimeMillis());
+        dataNode.put("s", symbol);
+
+        kNode.put("t", startTimeMillis);
+        kNode.put("T", endTimeMillis);
+        kNode.put("s", symbol);
+        kNode.put("i", interval);
+        kNode.put("f", 100); // Placeholder for first trade ID
+        kNode.put("L", 200); // Placeholder for last trade ID
+        kNode.put("o", formatPrice(bar.getOpenPrice().doubleValue()));
+        kNode.put("c", formatPrice(bar.getClosePrice().doubleValue()));
+        kNode.put("h", formatPrice(bar.getHighPrice().doubleValue()));
+        kNode.put("l", formatPrice(bar.getLowPrice().doubleValue()));
+        kNode.put("v", formatVolume(bar.getVolume().doubleValue()));
+        kNode.put("n", bar.getTrades()); // Number of trades
+        kNode.put("x", true); // Assume the kline is closed
+        kNode.put("q", formatVolume(bar.getAmount().doubleValue())); // Quote asset volume
+        kNode.put("V", formatVolume(bar.getVolume().doubleValue() / 2)); // Taker buy base asset volume (estimated)
+        kNode.put("Q", formatVolume(bar.getAmount().doubleValue() / 2)); // Taker buy quote asset volume (estimated)
+        kNode.put("B", "123456"); // Ignore
+
+        dataNode.set("k", kNode);
+        rootNode.set("data", dataNode);
+
+        try {
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(rootNode);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Error converting to JSON";
+        }
+    }
+
+    private static String formatPrice(double price) {
+        return String.format("%.8f", price);
+    }
+
+    private static String formatVolume(double volume) {
+        return String.format("%.6f", volume);
+    }
+
     private List<TradingEntity> getTradingEntity(String symbol) {
         return tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
     }
@@ -208,6 +306,40 @@ public class FutureMLService {
     public void streamClose(int streamId) {
         log.info("streamClose >>>>> " + streamId);
         umWebSocketStreamClient.closeConnection(streamId);
+    }
+
+    public void closeAllPositions(){
+        log.info("모든 포지션 종료");
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+        /*JSONArray balanceInfo = new JSONArray(client.account().futuresAccountBalance(new LinkedHashMap<>()));
+        printPrettyJson(balanceInfo);*/
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        JSONArray positions = accountInfo.getJSONArray("positions");
+        positions.forEach(position -> {
+            JSONObject symbolObj = new JSONObject(position.toString());
+            if(new BigDecimal(String.valueOf(symbolObj.get("positionAmt"))).compareTo(new BigDecimal("0")) != 0){
+                LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+                String symbol = String.valueOf(symbolObj.get("symbol"));
+                TRADING_ENTITYS.remove(symbol);
+                paramMap.put("symbol", symbol);
+                paramMap.put("positionSide", symbolObj.get("positionSide"));
+                paramMap.put("side", symbolObj.get("positionSide").equals("LONG") ? "SELL" : "BUY");
+                BigDecimal positionAmt = new BigDecimal(symbolObj.getString("positionAmt"));
+                paramMap.put("quantity", positionAmt.abs()); // 절대값으로 설정
+                paramMap.put("type", "MARKET");
+                try {
+                    Map<String,Object> resultMap = orderSubmit(paramMap);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+        List<EventEntity> eventEntities = eventRepository.findEventByPositionStatus("OPEN");
+        for(EventEntity eventEntity : eventEntities){
+            eventEntity.getKlineEntity().getPositionEntity().setPositionStatus("CLOSE");
+            eventRepository.save(eventEntity);
+        }
+        allStreamClose();
     }
 
     public void allStreamClose() {
@@ -252,7 +384,7 @@ public class FutureMLService {
             if(tradingEntitys.size() != 1){
                 throw new RuntimeException("트레이딩이 존재하지 않거나 중복되어있습니다.");
             }
-        } catch (Exception e){
+        } catch (Exception e) {
             nextFlag = false;
             e.printStackTrace();
             for(TradingEntity tradingEntity:tradingEntitys){
@@ -310,32 +442,33 @@ public class FutureMLService {
                     }
 
                 }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
-                    List<Indicator<Num>> indicators = initializeIndicators(series);
-                    MLModel currentModel = mlModelMap.get(tradingCd);
-                    double threshold = 0.6; // 시그널 임계값
-                    double proximityThreshold = 0.1; // 근접 임계값
-                    SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, currentModel, threshold, proximityThreshold);
-                    scanner.printSignalProximity(symbol);
+                    restartTrading(tradingEntity);
 
-                    boolean enterFlag = false;
-                    enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                    if (enterFlag) {
-                        System.out.println("숏 포지션 오픈");
-                        //makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
-                    } else{
-                        enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                        if (enterFlag) {
-                            System.out.println("롱 포지션 오픈");
-                            //makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
-                        }else{
-                            if(!scanner.isNearSignal()){
-                                restartTrading(tradingEntity);
-                                System.out.println("closeTradingEntity >>>>> " + tradingEntity);
-                                log.info("스트림 종료");
-                                printTradingEntitys();
-                            }
-                        }
-                    }
+                    //List<Indicator<Num>> indicators = initializeIndicators(series);
+                    //MLModel currentModel = mlModelMap.get(tradingCd);
+                    //double threshold = 0.6; // 시그널 임계값
+                    //double proximityThreshold = 0.1; // 근접 임계값
+                    //SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, currentModel, threshold, proximityThreshold);
+                    //scanner.printSignalProximity(symbol);
+                    //boolean enterFlag = false;
+                    //enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+                    //if (enterFlag) {
+                    //    System.out.println("숏 포지션 오픈");
+                    //    //makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
+                    //} else{
+                    //    enterFlag = longStrategy.shouldEnter(series.getEndIndex());
+                    //    if (enterFlag) {
+                    //        System.out.println("롱 포지션 오픈");
+                    //        //makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                    //    }else{
+                    //        if(!scanner.isNearSignal()){
+                    //            restartTrading(tradingEntity);
+                    //            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+                    //            log.info("스트림 종료");
+                    //            printTradingEntitys();
+                    //        }
+                    //    }
+                    //}
                 });
             }
         }
@@ -883,17 +1016,30 @@ public class FutureMLService {
 
             List<TradingEntity> tradingEntityList = tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
             if (tradingEntityList.isEmpty()) { //오픈된 트레이딩이 없다면
-                Map<String, Object> klineMap = backTestExec(tempTradingEntity, true);
+                // Map<String, Object> klineMap = backTestExec(tempTradingEntity, true);
+                // Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
+
+                String tradingCd = tempTradingEntity.getTradingCd();
+                String interval = tempTradingEntity.getCandleInterval();
+
+                seriesMaker(tempTradingEntity, false);
+                strategyMaker(tempTradingEntity, false);
 
                 BaseBarSeries series = seriesMap.get(tempTradingEntity.getTradingCd() + "_" + tempTradingEntity.getCandleInterval());
-                List<Indicator<Num>> indicators = initializeIndicators(series); // 이 메서드는 구현해야 함
+                Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
+                Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
                 MLModel mlModel = mlModelMap.get(tempTradingEntity.getTradingCd());
-                double threshold = 0.6; // 시그널 임계값
+                boolean longEntrySignal = longStrategy.shouldEnter(series.getEndIndex());
+                boolean longExitSignal = longStrategy.shouldExit(series.getEndIndex());
+                boolean shortEntrySignal = shortStrategy.shouldEnter(series.getEndIndex());
+                boolean shortExitSignal = shortStrategy.shouldExit(series.getEndIndex());
+                //printTradingSignals(symbol, series.getLastBar(), longEntrySignal, longExitSignal, shortEntrySignal, shortExitSignal);
+                List<Indicator<Num>> indicators = initializeIndicators(series);
+
+                double threshold = 0.5; // 시그널 임계값
                 double proximityThreshold = 0.1; // 근접 임계값
                 SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
                 scanner.printSignalProximity(symbol);
-
-                Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
 
                 //if (expectationProfitOpt.isPresent()){
                 //    BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
@@ -901,9 +1047,10 @@ public class FutureMLService {
                 //    BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                     if (
                         true
-                        && scanner.isNearSignal() // 시그널 근접 여부
+                        //&& scanner.isNearSignal() // 시그널 근접 여부
                         //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
                         //&& (winTradeCount.compareTo(loseTradeCount) > 0)
+                        && (longEntrySignal || shortEntrySignal)
                     ) {
                         //System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
                         System.out.println("[관심종목추가]symbol : " + symbol);
@@ -988,8 +1135,7 @@ public class FutureMLService {
     }
 
     public void seriesMaker(TradingEntity tradingEntity, boolean logFlag) {
-        System.out.println("tradingEntity : " + tradingEntity);
-
+        //System.out.println("tradingEntity : " + tradingEntity);
         String tradingCd = tradingEntity.getTradingCd();
         String symbol    = tradingEntity.getSymbol();
         String interval  = tradingEntity.getCandleInterval();
@@ -1009,7 +1155,7 @@ public class FutureMLService {
         BaseBarSeries series = new BaseBarSeries();
         series.setMaximumBarCount(limit);
         seriesMap.put(tradingCd + "_" + interval, series);
-        System.out.println("series : " + seriesMap.get(tradingCd + "_" + interval));
+        //System.out.println("series : " + seriesMap.get(tradingCd + "_" + interval));
 
         BigDecimal expectationProfit = BigDecimal.ZERO;
         for (int i = 0; i < jsonArray.length(); i++) {
@@ -1027,7 +1173,7 @@ public class FutureMLService {
     }
 
     public void strategyMaker(TradingEntity tradingEntity, boolean logFlag) {
-        System.out.println("tradingEntity : " + tradingEntity);
+        //System.out.println("tradingEntity : " + tradingEntity);
 
         String tradingCd = tradingEntity.getTradingCd();
         String symbol    = tradingEntity.getSymbol();
@@ -1041,7 +1187,7 @@ public class FutureMLService {
         int midPeriod = tradingEntity.getMidMovingPeriod();
         int longMovingPeriod = tradingEntity.getLongMovingPeriod();
 
-        log.info("SYMBOL : " + symbol);
+        //log.info("SYMBOL : " + symbol);
 
         // 종가 설정
         OpenPriceIndicator  openPrice   = new OpenPriceIndicator(series); //시가
@@ -1122,29 +1268,24 @@ public class FutureMLService {
         MLModel mlModel = new MLModel();
         int totalSize = series.getBarCount();
         int trainSize = (int) (totalSize * 0.5);
-        System.out.println("Train data size: " + trainSize);
+        // System.out.println("Train data size: " + trainSize);
 
         // 훈련 데이터와 테스트 데이터 분리
         BarSeries trainSeries = series.getSubSeries(0, trainSize);
         BarSeries testSeries = series.getSubSeries(trainSize, totalSize);
+
         // 머신러닝에 쓰일 지표 초기화
         List<Indicator<Num>> indicators = initializeIndicators(series);
-        double upThreshold = 0.6;   // 60% 이상의 상승 확률일 때 매수 신호
-        double downThreshold = 0.6; // 60% 이상의 하락 확률일 때 매도 신호
-
         mlModel.train(testSeries, indicators, trainSize);
         mlModelMap.put(tradingCd, mlModel);
+
         //  MLRule 생성
-
         double entryThreshold = 0.5;
-        double exitThreshold = 0.5;
-
-        Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
+        double exitThreshold  = 0.5;
+        Rule mlLongEntryRule  = new MLLongRule(mlModel, indicators, entryThreshold);
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
-
-        Rule mlLongExitRule  = new MLShortRule(mlModel, indicators, exitThreshold);
-        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
-
+        Rule mlLongExitRule   = new MLShortRule(mlModel, indicators, exitThreshold);
+        Rule mlShortExitRule  = new MLLongRule(mlModel, indicators, exitThreshold);
 
         //Rule mlRule = new MLRule(mlModel, indicators, upThreshold, downThreshold);
 
@@ -1379,7 +1520,7 @@ public class FutureMLService {
 
         long endTime = System.currentTimeMillis(); // 종료 시간 기록
         long elapsedTime = endTime - startTime; // 실행 시간 계산
-        System.out.println("");
+        //System.out.println("");
         HashMap<String, Object> longTradingResult = new HashMap<String, Object>();
         HashMap<String, Object> shortTradingResult = new HashMap<String, Object>();
         longTradingResult  = backTestResult(longTradingRecord, testSeries, symbol, leverage, "LONG", maxPositionAmount, false);
@@ -1621,16 +1762,16 @@ public class FutureMLService {
 
     public void printAccountInfo(JSONObject accountInfo) {
         String format = "| %-12s | %20s |%n";
-        String line = "+%-14s+%22s+%n";
+        String line = "+%-15s+%20s+%n";
 
-        System.out.printf(line, "-".repeat(14), "-".repeat(22));
+        System.out.printf(line, "-".repeat(15), "-".repeat(22));
         System.out.printf(format, "항목", "금액");
-        System.out.printf(line, "-".repeat(14), "-".repeat(22));
+        System.out.printf(line, "-".repeat(15), "-".repeat(22));
         System.out.printf(format, "사용가능", accountInfo.optString("availableBalance", "N/A"));
         System.out.printf(format, "담보금", accountInfo.optString("totalWalletBalance", "N/A"));
         System.out.printf(format, "미실현수익", accountInfo.optString("totalUnrealizedProfit", "N/A"));
         System.out.printf(format, "현재자산", accountInfo.optString("totalMarginBalance", "N/A"));
-        System.out.printf(line, "-".repeat(14), "-".repeat(22));
+        System.out.printf(line, "-".repeat(15), "-".repeat(22));
     }
 
     public void printTradingSignals(String symbol, Bar currentBar,
