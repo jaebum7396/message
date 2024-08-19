@@ -123,58 +123,6 @@ public class FutureMLService {
         // 전략 생성
         strategyMaker(tradingEntity, false);
         log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
-
-        BaseBarSeries series = seriesMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval());
-        Strategy longStrategy = strategyMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval() + "_long_strategy");
-        Strategy shortStrategy = strategyMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval() + "_short_strategy");
-        MLModel mlModel = mlModelMap.get(tradingEntity.getTradingCd());
-
-        System.out.println("!!!lastBar : " + series.getLastBar());
-
-        boolean longEntrySignal = longStrategy.shouldEnter(series.getEndIndex());
-        boolean longExitSignal = longStrategy.shouldExit(series.getEndIndex());
-        boolean shortEntrySignal = shortStrategy.shouldEnter(series.getEndIndex());
-        boolean shortExitSignal = shortStrategy.shouldExit(series.getEndIndex());
-        printTradingSignals(tradingEntity.getSymbol(), series.getLastBar(), longEntrySignal, longExitSignal, shortEntrySignal, shortExitSignal);
-        List<Indicator<Num>> indicators = initializeIndicators(series);
-
-        double threshold = 0.5; // 시그널 임계값
-        double proximityThreshold = 0.1; // 근접 임계값
-        SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
-        scanner.printSignalProximity(tradingEntity.getSymbol());
-
-        //마지막 캔들데이터를 가져와서 저장한다.
-        String klineJson = convertBarToKlineJson(series.getLastBar(), tradingEntity.getSymbol(), tradingEntity.getCandleInterval());
-        EventEntity klineEvent = null;
-        klineEvent = CommonUtils.convertKlineEventDTO(klineJson).toEntity();
-        klineEvent.setTradingEntity(tradingEntity);
-        PositionEntity positionEntity = PositionEntity.builder()
-                .positionStatus("NONE")
-                .klineEntity(klineEvent.getKlineEntity())
-                .build();
-        klineEvent.getKlineEntity().setPositionEntity(positionEntity);
-        klineEvent = eventRepository.save(klineEvent);
-
-        boolean enterFlag = false;
-        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-        Optional<EventEntity> eventEntity = eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN");
-        if(eventEntity.isEmpty()){
-            if (enterFlag) {
-                System.out.println("숏 포지션 오픈");
-                makeOpenOrder(klineEvent, "SHORT", "숏 포지션 오픈");
-            } else {
-                enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                if (enterFlag) {
-                    System.out.println("롱 포지션 오픈");
-                    makeOpenOrder(klineEvent, "LONG", "롱 포지션 오픈");
-                } else {
-                    restartTrading(tradingEntity);
-                }
-            }
-        }else{
-            System.out.println("포지션 오픈중 : " +  eventEntity.get().getKlineEntity().getPositionEntity());
-            restartTrading(tradingEntity);
-        }
     }
 
     public void onCloseCallback(String streamId) {
@@ -407,6 +355,13 @@ public class FutureMLService {
                 boolean shortShouldExit = shortStrategy.shouldExit(series.getEndIndex());
 
                 printTradingSignals(symbol, series.getLastBar(), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
+                MLModel mlModel = mlModelMap.get(tradingCd);
+                List<Indicator<Num>> indicators = initializeIndicators(series);
+
+                double threshold = 0.5; // 시그널 임계값
+                double proximityThreshold = 0.1; // 근접 임계값
+                SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
+                scanner.printSignalProximity(symbol);
 
                 Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                 openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
@@ -444,31 +399,26 @@ public class FutureMLService {
                 }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
                     restartTrading(tradingEntity);
 
-                    //List<Indicator<Num>> indicators = initializeIndicators(series);
-                    //MLModel currentModel = mlModelMap.get(tradingCd);
-                    //double threshold = 0.6; // 시그널 임계값
-                    //double proximityThreshold = 0.1; // 근접 임계값
-                    //SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, currentModel, threshold, proximityThreshold);
-                    //scanner.printSignalProximity(symbol);
-                    //boolean enterFlag = false;
-                    //enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                    //if (enterFlag) {
-                    //    System.out.println("숏 포지션 오픈");
-                    //    //makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
-                    //} else{
-                    //    enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                    //    if (enterFlag) {
-                    //        System.out.println("롱 포지션 오픈");
-                    //        //makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
-                    //    }else{
-                    //        if(!scanner.isNearSignal()){
-                    //            restartTrading(tradingEntity);
-                    //            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
-                    //            log.info("스트림 종료");
-                    //            printTradingEntitys();
-                    //        }
-                    //    }
-                    //}
+                    scanner.printSignalProximity(symbol);
+                    boolean enterFlag = false;
+                    enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+                    if (enterFlag) {
+                        System.out.println("숏 포지션 오픈");
+                        makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
+                    } else{
+                        enterFlag = longStrategy.shouldEnter(series.getEndIndex());
+                        if (enterFlag) {
+                            System.out.println("롱 포지션 오픈");
+                            makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                        }else{
+                            if(!scanner.isNearSignal()){
+                                restartTrading(tradingEntity);
+                                System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+                                log.info("스트림 종료");
+                                printTradingEntitys();
+                            }
+                        }
+                    }
                 });
             }
         }
@@ -753,7 +703,7 @@ public class FutureMLService {
 
         Optional<EventEntity> eventEntity = eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN");
         if(!eventEntity.isEmpty()){
-            System.out.println("포지션 오픈중 : " +  eventEntity.get().getKlineEntity().getPositionEntity());
+            //System.out.println("포지션 오픈중 : " +  eventEntity.get().getKlineEntity().getPositionEntity());
         }
         return klineEvent;
     }
@@ -1037,7 +987,7 @@ public class FutureMLService {
                 List<Indicator<Num>> indicators = initializeIndicators(series);
 
                 double threshold = 0.5; // 시그널 임계값
-                double proximityThreshold = 0.1; // 근접 임계값
+                double proximityThreshold = 0.3; // 근접 임계값
                 SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
                 scanner.printSignalProximity(symbol);
 
@@ -1047,10 +997,10 @@ public class FutureMLService {
                 //    BigDecimal loseTradeCount = new BigDecimal(String.valueOf(klineMap.get("loseTradeCount")));
                     if (
                         true
-                        //&& scanner.isNearSignal() // 시그널 근접 여부
+                        && scanner.isNearSignal() // 시그널 근접 여부
+                        //&& (longEntrySignal || shortEntrySignal)
                         //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
                         //&& (winTradeCount.compareTo(loseTradeCount) > 0)
-                        && (longEntrySignal || shortEntrySignal)
                     ) {
                         //System.out.println("[관심종목추가]symbol : " + symbol + " expectationProfit : " + expectationProfit);
                         System.out.println("[관심종목추가]symbol : " + symbol);
@@ -1523,8 +1473,8 @@ public class FutureMLService {
         //System.out.println("");
         HashMap<String, Object> longTradingResult = new HashMap<String, Object>();
         HashMap<String, Object> shortTradingResult = new HashMap<String, Object>();
-        longTradingResult  = backTestResult(longTradingRecord, testSeries, symbol, leverage, "LONG", maxPositionAmount, false);
-        shortTradingResult = backTestResult(shortTradingRecord, testSeries, symbol, leverage, "SHORT", maxPositionAmount, false);
+        longTradingResult  = backTestResult(longTradingRecord, testSeries, symbol, leverage, "LONG", maxPositionAmount, true);
+        shortTradingResult = backTestResult(shortTradingRecord, testSeries, symbol, leverage, "SHORT", maxPositionAmount, true);
 
         int winTradeCount = (int) longTradingResult.get("winTradeCount") + (int) shortTradingResult.get("winTradeCount");
         int loseTradeCount = (int) longTradingResult.get("loseTradeCount") + (int) shortTradingResult.get("loseTradeCount");
