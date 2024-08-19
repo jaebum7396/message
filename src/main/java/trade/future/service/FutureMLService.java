@@ -384,9 +384,9 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (closePosition.getPositionStatus().equals("OPEN")) {
                         if (closePosition.getPositionSide().equals("LONG")) {
-                            //exitFlag = longStrategy.shouldExit(series.getEndIndex());
+                            exitFlag = longStrategy.shouldExit(series.getEndIndex());
                         } else if (closePosition.getPositionSide().equals("SHORT")) {
-                            //exitFlag = shortStrategy.shouldExit(series.getEndIndex());
+                            exitFlag = shortStrategy.shouldExit(series.getEndIndex());
                         }
                     }
                     if (exitFlag) {
@@ -1714,7 +1714,7 @@ public class FutureMLService {
         });
 
         System.out.printf(line, "-".repeat(12), "-".repeat(12), "-".repeat(12));
-        System.out.println("총 " + TRADING_ENTITYS.size() + "개의 오픈된 포지션이 있습니다.");
+        System.out.println("총 " + TRADING_ENTITYS.size() + "개의 오픈된 트레이딩이 있습니다.");
     }
 
     public void printAccountInfo(JSONObject accountInfo) {
