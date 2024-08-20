@@ -15,14 +15,19 @@ import java.util.stream.IntStream;
 public class MLModel {
     private static final Logger logger = Logger.getLogger(MLModel.class.getName());
     private RandomForest model;
-    private static final double PRICE_CHANGE_THRESHOLD = 0.2; // 0.5% threshold, 필요에 따라 조정 가능
+    private final double priceChangeThreshold;
+    private static final int MINIMUM_DATA_POINTS = 50; // 최소 필요 데이터 포인트 수
 
-    private static final int MINIMUM_DATA_POINTS = 50; // 예시 값, 실제 필요한 최소 데이터 포인트 수에 맞게 조정
+    public MLModel(double priceChangeThreshold) {
+        this.priceChangeThreshold = priceChangeThreshold;
+        logger.info("MLModel 생성. 가격 변동 임계값: " + priceChangeThreshold);
+    }
 
     public void train(BarSeries series, List<Indicator<Num>> indicators, int trainSize) {
         try {
+            // 충분한 데이터가 있는지 확인
             if (series.getBarCount() < MINIMUM_DATA_POINTS) {
-                logger.warning("Not enough data points for training. Required: " + MINIMUM_DATA_POINTS + ", Available: " + series.getBarCount());
+                logger.warning("훈련에 필요한 데이터 포인트가 부족합니다. 필요: " + MINIMUM_DATA_POINTS + ", 가용: " + series.getBarCount());
                 return;
             }
 
@@ -30,49 +35,56 @@ public class MLModel {
             double[][] X = new double[trainSize][indicators.size()];
             int[] y = new int[trainSize];
 
+            // 특성(X)과 레이블(y) 데이터 준비
             for (int i = 0; i < trainSize; i++) {
+                // 각 지표의 값을 특성으로 사용
                 for (int j = 0; j < indicators.size(); j++) {
                     Num value = indicators.get(j).getValue(i);
                     if (value == null) {
-                        logger.warning("Null value encountered for indicator " + j + " at index " + i);
+                        logger.warning("지표 " + j + "의 " + i + "번째 인덱스에서 null 값 발견");
                         return;
                     }
                     X[i][j] = value.doubleValue();
                 }
 
+                // 다음 봉의 가격 변화를 기반으로 레이블 생성
                 if (i + 1 < totalSize) {
                     double currentPrice = series.getBar(i).getClosePrice().doubleValue();
                     double nextPrice = series.getBar(i + 1).getClosePrice().doubleValue();
                     if (currentPrice == 0) {
-                        logger.warning("Zero price encountered at index " + i);
+                        logger.warning(i + "번째 인덱스에서 0의 가격 발견");
                         return;
                     }
                     double priceChangePercent = (nextPrice - currentPrice) / currentPrice * 100;
 
-                    if (priceChangePercent > PRICE_CHANGE_THRESHOLD) y[i] = 1;
-                    else if (priceChangePercent < -PRICE_CHANGE_THRESHOLD) y[i] = -1;
+                    // 가격 변화에 따라 레이블 할당 (1: 상승, -1: 하락, 0: 유지)
+                    if (priceChangePercent > priceChangeThreshold) y[i] = 1;
+                    else if (priceChangePercent < -priceChangeThreshold) y[i] = -1;
                     else y[i] = 0;
                 } else {
-                    y[i] = 0;
+                    y[i] = 0; // 마지막 데이터 포인트
                 }
             }
 
+            // 특성 이름 생성
             String[] featureNames = IntStream.range(0, indicators.size())
                     .mapToObj(i -> "feature" + i)
                     .toArray(String[]::new);
 
+            // DataFrame 생성 및 모델 학습
             DataFrame df = DataFrame.of(X, featureNames);
             df = df.merge(IntVector.of("y", y));
 
             Formula formula = Formula.lhs("y");
             this.model = RandomForest.fit(formula, df);
-            logger.info("Model training completed successfully.");
+            logger.info("모델 학습이 성공적으로 완료되었습니다.");
         } catch (Exception e) {
-            logger.severe("Error during model training: " + e.getMessage());
+            logger.severe("모델 학습 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
+    // 예측 메서드
     public int predict(List<Indicator<Num>> indicators, int index) {
         double prediction = predictRaw(indicators, index);
         if (prediction > 0.5) {
@@ -84,10 +96,10 @@ public class MLModel {
         }
     }
 
+    // 확률 예측 메서드
     public double[] predictProbabilities(List<Indicator<Num>> indicators, int index) {
         try {
             double rawPrediction = predictRaw(indicators, index);
-            //logger.info("Raw prediction: " + rawPrediction);
 
             // 원시 예측값을 확률로 변환
             double[] probabilities = new double[3];
@@ -104,25 +116,28 @@ public class MLModel {
                 probabilities[0] = probabilities[2] = Math.abs(rawPrediction) / 2;
             }
 
-            //logger.info("Estimated probabilities: " + Arrays.toString(probabilities));
             return probabilities;
         } catch (Exception e) {
-            logger.severe("Error in predictProbabilities: " + e.getMessage());
+            logger.severe("확률 예측 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
-            return new double[]{0, 100, 0};
+            return new double[]{0, 100, 0};  // 오류 시 기본값 반환
         }
     }
 
+    // 원시 예측 메서드
     private double predictRaw(List<Indicator<Num>> indicators, int index) {
+        // 특성 데이터 준비
         double[] features = new double[indicators.size()];
         for (int i = 0; i < indicators.size(); i++) {
             features[i] = indicators.get(i).getValue(index).doubleValue();
         }
 
+        // 특성 이름 생성
         String[] featureNames = IntStream.range(0, indicators.size())
                 .mapToObj(i -> "feature" + i)
                 .toArray(String[]::new);
 
+        // DataFrame 생성 및 예측
         double[][] featuresArray = new double[][]{features};
         DataFrame df = DataFrame.of(featuresArray, featureNames);
 

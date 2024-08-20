@@ -463,6 +463,7 @@ public class FutureService {
         String symbol    = tradingEntity.getSymbol();
         String interval  = tradingEntity.getCandleInterval();
         int candleCount  = tradingEntity.getCandleCount();
+        double priceChangeThreshold = tradingEntity.getPriceChangeThreshold();
         int limit = candleCount;
 
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
@@ -549,7 +550,7 @@ public class FutureService {
         Rule highVolumeRule = new RelativeVolumeRule(series, 20, 1.5, true);
 
         // 머신러닝 룰 생성
-        MLModel mlModel = new MLModel();
+        MLModel mlModel = new MLModel(priceChangeThreshold);
         int totalSize = series.getBarCount();
         int trainSize = (int) (totalSize * 0.5);
         System.out.println("Train data size: " + trainSize);

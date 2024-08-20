@@ -154,6 +154,9 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "ML_MODEL_CHECKER")
     int mlModelChecker; // 머신러닝 모델로 매매전략 수립
 
+    @Column( name = "PRICE_CHANGE_THRESHOLD")
+    double priceChangeThreshold; // 가격 변동 임계값
+
     int totalTradeCount; // 총 거래 횟수
     int winTradeCount; // 이긴 횟수
     int loseTradeCount; // 진 횟수
@@ -218,6 +221,7 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
         this.shortMovingPeriod = original.shortMovingPeriod;
         this.midMovingPeriod = original.midMovingPeriod;
         this.longMovingPeriod = original.longMovingPeriod;
+        this.priceChangeThreshold = original.priceChangeThreshold;
     }
 
     @Override
