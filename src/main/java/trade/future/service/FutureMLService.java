@@ -1287,8 +1287,8 @@ public class FutureMLService {
 
             longExitRules.add(mlLongExitRule);
             shortExitRules.add(mlShortExitRule);
-            longExitRules.add(mlExitRule);
-            shortExitRules.add(mlExitRule);
+            //longExitRules.add(mlExitRule);
+            //shortExitRules.add(mlExitRule);
 
             // 머신러닝 룰은 손익률이 1 이상일 때만 적용
             //Rule longExitMLRule = new AndRule(new NotRule(mlRule), longMinimumProfitRule);
