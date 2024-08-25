@@ -32,4 +32,12 @@ public class MLShortRule implements Rule {
         }
         return false;
     }
+
+    @Override
+    public String toString() {
+        return String.format("MLShortRule(model=%s, indicators=%d, threshold=%.2f)",
+                model.getClass().getSimpleName(),
+                indicators.size(),
+                threshold);
+    }
 }

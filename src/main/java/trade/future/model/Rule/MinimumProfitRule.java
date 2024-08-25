@@ -19,6 +19,9 @@ public class MinimumProfitRule implements Rule {
 
     @Override
     public boolean isSatisfied(int index, TradingRecord tradingRecord) {
+        if (tradingRecord == null) {
+            return false;
+        }
         if (tradingRecord.getCurrentPosition().isOpened()) {
             Trade entryTrade = tradingRecord.getCurrentPosition().getEntry();
             Num entryPrice = entryTrade.getNetPrice();

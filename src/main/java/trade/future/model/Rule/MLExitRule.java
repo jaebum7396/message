@@ -31,4 +31,12 @@ public class MLExitRule implements Rule {
         }
         return false;
     }
+
+    @Override
+    public String toString() {
+        return String.format("MLExitRule(model=%s, indicators=%d, threshold=%.2f)",
+                model.getClass().getSimpleName(),
+                indicators.size(),
+                threshold);
+    }
 }
