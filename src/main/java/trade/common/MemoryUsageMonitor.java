@@ -14,11 +14,25 @@ public class MemoryUsageMonitor {
         long allocatedMemory = runtime.totalMemory();
         long freeMemory = runtime.freeMemory();
 
-        System.out.println("==== Memory Usage ====");
-        System.out.println("Free memory: " + format.format(freeMemory / MEGABYTE) + " MB");
-        System.out.println("Allocated memory: " + format.format(allocatedMemory / MEGABYTE) + " MB");
-        System.out.println("Max memory: " + format.format(maxMemory / MEGABYTE) + " MB");
-        System.out.println("Total free memory: " + format.format((freeMemory + (maxMemory - allocatedMemory)) / MEGABYTE) + " MB");
+        long totalFreeMemory = freeMemory + (maxMemory - allocatedMemory);
+        long usedMemory = allocatedMemory - freeMemory;
+
+        System.out.println("┌───────────────────┬────────────────┬────────────┐");
+        System.out.println("│ Memory Type       │ Amount (MB)    │ Percentage │");
+        System.out.println("├───────────────────┼────────────────┼────────────┤");
+        printRow("Max Memory", maxMemory, maxMemory);
+        printRow("Allocated Memory", allocatedMemory, maxMemory);
+        printRow("Used Memory", usedMemory, maxMemory);
+        printRow("Free Memory", freeMemory, maxMemory);
+        printRow("Total Free Memory", totalFreeMemory, maxMemory);
+        System.out.println("└───────────────────┴────────────────┴────────────┘");
+    }
+
+    private static void printRow(String type, long memory, long total) {
+        System.out.printf("│ %-17s │ %14s │ %8.2f%% │%n",
+                type,
+                NumberFormat.getInstance().format(memory / MEGABYTE),
+                (double) memory / total * 100);
     }
 
     public static void printMemoryUsageWithGC() {
