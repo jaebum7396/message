@@ -19,21 +19,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
 import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.adx.ADXIndicator;
-import org.ta4j.core.indicators.adx.MinusDIIndicator;
-import org.ta4j.core.indicators.adx.PlusDIIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.helpers.HighPriceIndicator;
-import org.ta4j.core.indicators.helpers.LowPriceIndicator;
-import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.*;
 import trade.common.CommonUtils;
+import trade.common.MemoryUsageMonitor;
 import trade.configuration.MyWebSocketClientImpl;
+import trade.exception.AutoTradingDuplicateException;
 import trade.future.ml.MLModel;
 import trade.future.ml.SignalProximityScanner;
 import trade.future.model.Rule.*;
@@ -262,9 +259,9 @@ public class FutureMLService {
     public void closeAllPositions(){
         log.info("모든 포지션 종료");
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        /*JSONArray balanceInfo = new JSONArray(client.account().futuresAccountBalance(new LinkedHashMap<>()));
-        printPrettyJson(balanceInfo);*/
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(requestParam));
         JSONArray positions = accountInfo.getJSONArray("positions");
         positions.forEach(position -> {
             JSONObject symbolObj = new JSONObject(position.toString());
@@ -315,6 +312,10 @@ public class FutureMLService {
         tradingEntity = tradingRepository.save(tradingEntity);
         streamClose(tradingEntity.getStreamId());
         TRADING_ENTITYS.remove(tradingEntity.getSymbol());
+        seriesMap.remove(tradingEntity.getTradingCd()+"_"+tradingEntity.getCandleInterval());
+        strategyMap.remove(tradingEntity.getTradingCd()+"_"+tradingEntity.getCandleInterval()+"_long_strategy");
+        strategyMap.remove(tradingEntity.getTradingCd()+"_"+tradingEntity.getCandleInterval()+"_short_strategy");
+        mlModelMap.remove(tradingEntity.getTradingCd());
         autoTradingOpen(tradingEntity);
     }
 
@@ -332,12 +333,14 @@ public class FutureMLService {
         List<TradingEntity> tradingEntitys = new ArrayList<>();
         try{
             tradingEntitys = getTradingEntity(symbol);
-            if(tradingEntitys.size() != 1){
-                throw new RuntimeException("트레이딩이 존재하지 않거나 중복되어있습니다.");
+            if(tradingEntitys.size() == 0){
+                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 존재하지 않습니다.");
+            }
+            if(tradingEntitys.size() > 1){
+                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어있습니다.");
             }
         } catch (Exception e) {
             nextFlag = false;
-            e.printStackTrace();
             for(TradingEntity tradingEntity:tradingEntitys){
                 restartTrading(tradingEntity);
             }
@@ -553,6 +556,7 @@ public class FutureMLService {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
+            requestParam.put("timestamp", getServerTime());
             requestParam.remove("leverage");
             log.info("!!!new Order : " + requestParam);
             String orderResult = client.account().newOrder(requestParam);
@@ -577,11 +581,12 @@ public class FutureMLService {
         return stopLossParamMap;
     }
 
-    public Map<String, Object> leverageChange(LinkedHashMap<String, Object> leverageParam) throws Exception {
+    public Map<String, Object> leverageChange(LinkedHashMap<String, Object> requestParam) throws Exception {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-            String leverageChangeResult = client.account().changeInitialLeverage(leverageParam);
+            requestParam.put("timestamp", getServerTime());
+            String leverageChangeResult = client.account().changeInitialLeverage(requestParam);
             resultMap.put("result", leverageChangeResult);
         } catch (Exception e) {
             throw e;
@@ -589,11 +594,12 @@ public class FutureMLService {
         return resultMap;
     }
 
-    public Map<String, Object> marginTypeChange(LinkedHashMap<String, Object> marginTypeParam) throws Exception {
+    public Map<String, Object> marginTypeChange(LinkedHashMap<String, Object> requestParam) throws Exception {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
         try{
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-            String leverageChangeResult = client.account().changeMarginType(marginTypeParam);
+            requestParam.put("timestamp", getServerTime());
+            String leverageChangeResult = client.account().changeMarginType(requestParam);
             resultMap.put("result", leverageChangeResult);
         } catch (Exception e) {
             throw e;
@@ -604,7 +610,9 @@ public class FutureMLService {
     public Optional<JSONObject> getPosition(String symbol, String positionSide){
         AtomicReference<Optional<JSONObject>> positionOpt = new AtomicReference<>(Optional.empty());
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(requestParam));
         JSONArray positions = accountInfo.getJSONArray("positions");
         positions.forEach(position -> { //포지션을 찾는다.
             JSONObject positionObj = new JSONObject(position.toString());
@@ -739,6 +747,10 @@ public class FutureMLService {
         }
     }
 
+    public String getServerTime() {
+        return umFuturesClientImpl.market().time();
+    }
+
     public Map<String, Object> autoTradingOpen(HttpServletRequest request, TradingDTO tradingDTO) {
         Claims claims = getClaims(request);
         String userCd = String.valueOf(claims.get("userCd"));
@@ -751,8 +763,9 @@ public class FutureMLService {
 
     boolean autoTradingOpenFlag = false;
     public Map<String, Object> autoTradingOpen(TradingEntity tradingEntity) {
+        MemoryUsageMonitor.printMemoryUsage();
         if (autoTradingOpenFlag) {
-            throw new RuntimeException("이미 실행중입니다.");
+            throw new AutoTradingDuplicateException("이미 실행중입니다.");
         }
         autoTradingOpenFlag = true;
         log.info("autoTradingOpen >>>>>");
@@ -769,7 +782,10 @@ public class FutureMLService {
         String userCd = tradingEntity.getUserCd();                        // 로그인한 사용자 코드
 
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));   // 내 계좌정보를 제이슨으로 리턴하는 API
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(requestParam));
+
         printAccountInfo(accountInfo);                                                                         //계좌정보 이쁘게 표현
 
         BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));     // 사용 가능한 담보금
@@ -827,12 +843,11 @@ public class FutureMLService {
                         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
                         if(tradingEntityOpt.isPresent()){
                             printTradingEntitys();
-                            throw new RuntimeException("이미 오픈된 트레이딩이 존재합니다.");
+                            throw new AutoTradingDuplicateException(symbol+" 이미 오픈된 트레이딩이 존재합니다.");
                         }
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
                 autoTradingOpenFlag = false;
                 autoTradingOpen(tradingEntity);
                 nextFlag = false;
@@ -952,8 +967,9 @@ public class FutureMLService {
         //  24시간 거래량이 높은 순으로 정렬해서 가져옴
         // *************************************************************************************************
         // 바이낸스 API를 통해 종목을 가져옴
-        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-        String resultStr = umFuturesClientImpl.market().ticker24H(paramMap);
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        String resultStr = umFuturesClientImpl.market().ticker24H(requestParam);
         JSONArray resultArray = new JSONArray(resultStr);
         //printPrettyJson(resultArray);
 
@@ -1062,9 +1078,9 @@ public class FutureMLService {
         int stockSelectionCount = tradingEntity.getStockSelectionCount();
 
         Map<String, Object> resultMap = new LinkedHashMap<>();
-        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-
-        String resultStr = umFuturesClientImpl.market().ticker24H(paramMap);
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        String resultStr = umFuturesClientImpl.market().ticker24H(requestParam);
         JSONArray resultArray = new JSONArray(resultStr);
 
         // 거래량(QuoteVolume - 기준 화폐)을 기준으로 내림차순으로 정렬해서 가져옴
@@ -1111,12 +1127,13 @@ public class FutureMLService {
         int candleCount  = tradingEntity.getCandleCount();
         int limit = candleCount;
 
-        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
-        paramMap.put("symbol", symbol);
-        paramMap.put("interval", interval);
-        paramMap.put("limit", limit);
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        requestParam.put("symbol", symbol);
+        requestParam.put("interval", interval);
+        requestParam.put("limit", limit);
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
-        String resultStr = client.market().klines(paramMap);
+        String resultStr = client.market().klines(requestParam);
 
         String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
         System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
@@ -1345,7 +1362,9 @@ public class FutureMLService {
         long startTime = System.currentTimeMillis(); // 시작 시간 기록
 
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
-        JSONObject accountInfo = new JSONObject(client.account().accountInformation(new LinkedHashMap<>()));
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        JSONObject accountInfo = new JSONObject(client.account().accountInformation(requestParam));
         //printPrettyJson(accountInfo);
 
         BigDecimal availableBalance = new BigDecimal(String.valueOf(accountInfo.get("availableBalance")));
