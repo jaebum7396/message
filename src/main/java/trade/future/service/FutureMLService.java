@@ -113,7 +113,7 @@ public class FutureMLService {
 
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
-                .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
+                .orElseThrow(() -> new AutoTradingDuplicateException(streamId + "번 트레이딩이 존재하지 않습니다."));
         log.info("[OPEN] >>>>> " + streamId + " 번 스트림("+tradingEntity.getSymbol()+")을 오픈합니다.");
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
@@ -121,23 +121,22 @@ public class FutureMLService {
         seriesMaker(tradingEntity, false);
         // 전략 생성
         strategyMaker(tradingEntity, true, false);
-        log.info("tradingSaved >>>>> "+tradingEntity.getTradingCd() + " : " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
+        log.info("tradingSaved >>>>> "+tradingEntity.getSymbol() + "("+tradingEntity.getStreamId()+") : " + tradingEntity.getTradingCd());
     }
 
     public void onCloseCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
-                .orElseThrow(() -> new RuntimeException(streamId + "번 트레이딩이 존재하지 않습니다."));
+                .orElseThrow(() -> new AutoTradingDuplicateException(streamId + "번 트레이딩이 존재하지 않습니다."));
         System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
         tradingEntity.setTradingStatus("CLOSE");
         tradingRepository.save(tradingEntity);
     }
 
     public void onFailureCallback(String streamId) {
-        System.out.println("[FAILURE] >>>>> " + streamId + " 예기치 못하게 스트림이 실패하였습니다. ");
         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)));
         if(tradingEntityOpt.isPresent()){
             TradingEntity tradingEntity = tradingEntityOpt.get();
-            log.error("[FAILURE] >>>>> "+tradingEntity.getTradingCd()+ "/" +tradingEntity.getSymbol());
+            log.error("tradingSaved >>>>> "+tradingEntity.getSymbol() + "("+tradingEntity.getStreamId()+") : " + tradingEntity.getTradingCd());
             restartTrading(tradingEntity);
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
@@ -310,6 +309,7 @@ public class FutureMLService {
         tradingEntity.setPositionStatus("CLOSE");
         tradingEntity.setTradingStatus("CLOSE");
         tradingEntity = tradingRepository.save(tradingEntity);
+        log.info("restartTrading >>>>> " + tradingEntity.getSymbol()+ " : " + tradingEntity.getTradingCd());
         streamClose(tradingEntity.getStreamId());
         TRADING_ENTITYS.remove(tradingEntity.getSymbol());
         seriesMap.remove(tradingEntity.getTradingCd()+"_"+tradingEntity.getCandleInterval());
@@ -418,9 +418,8 @@ public class FutureMLService {
                             makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                         }else{
                             if(!scanner.isLikelyToMove()){
+                                log.info("스트림 종료 >>>>> " + tradingEntity);
                                 restartTrading(tradingEntity);
-                                System.out.println("closeTradingEntity >>>>> " + tradingEntity);
-                                log.info("스트림 종료");
                                 printTradingEntitys();
                             }
                         }
@@ -1302,7 +1301,7 @@ public class FutureMLService {
         strategyMap.put(tradingCd + "_" + interval + "_short_strategy", combinedShortStrategy);
 
         // 전략 구성 출력
-        if (true) {
+        if (false) {
             System.out.println("\n===== " + tradingCd + " " + interval + " 전략 구성 =====");
             System.out.println("Long 전략:");
             System.out.println("  진입 규칙: " + describeRule(finalCombinedLongEntryRule));

@@ -20,7 +20,7 @@ public class MLModel {
 
     public MLModel(double priceChangeThreshold) {
         this.priceChangeThreshold = priceChangeThreshold;
-        logger.info("MLModel 생성. 가격 변동 임계값: " + priceChangeThreshold);
+        //logger.info("MLModel 생성. 가격 변동 임계값: " + priceChangeThreshold);
     }
 
     public void train(BarSeries series, List<Indicator<Num>> indicators, int trainSize) {
