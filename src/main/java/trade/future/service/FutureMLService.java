@@ -119,8 +119,6 @@ public class FutureMLService {
         tradingRepository.save(tradingEntity);
         // 시리즈 생성
         seriesMaker(tradingEntity, false);
-        // 전략 생성
-        strategyMaker(tradingEntity, true, false);
         log.info("tradingSaved >>>>> "+tradingEntity.getSymbol() + "("+tradingEntity.getStreamId()+") : " + tradingEntity.getTradingCd());
     }
 
@@ -130,6 +128,7 @@ public class FutureMLService {
         System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
         tradingEntity.setTradingStatus("CLOSE");
         tradingRepository.save(tradingEntity);
+        resourceCleanup(tradingEntity);
     }
 
     public void onFailureCallback(String streamId) {
@@ -193,6 +192,25 @@ public class FutureMLService {
                 initialDelayMillis *= 2;
             }
         }
+    }
+
+    // 리소스 정리
+    public void resourceCleanup(TradingEntity tradingEntity) {
+        String symbol = tradingEntity.getSymbol();
+        String tradingCd = tradingEntity.getTradingCd();
+        String candleInterval = tradingEntity.getCandleInterval();
+
+        TRADING_ENTITYS.remove(symbol);
+        seriesMap.remove(tradingCd + "_" + candleInterval);
+        strategyMap.remove(tradingCd + "_" + candleInterval + "_long_strategy");
+        strategyMap.remove(tradingCd + "_" + candleInterval + "_short_strategy");
+        mlModelMap.remove(tradingCd);
+
+        // 제거된 객체들에 대한 참조를 명시적으로 null 처리
+        tradingEntity = null;
+
+        // 메모리 사용량 출력
+        new MemoryUsageMonitor().printMemoryUsage();
     }
 
     public static String convertBarToKlineJson(Bar bar, String symbol, String interval) {
@@ -311,11 +329,7 @@ public class FutureMLService {
         tradingEntity = tradingRepository.save(tradingEntity);
         log.info("restartTrading >>>>> " + tradingEntity.getSymbol()+ " : " + tradingEntity.getTradingCd());
         streamClose(tradingEntity.getStreamId());
-        TRADING_ENTITYS.remove(tradingEntity.getSymbol());
-        seriesMap.remove(tradingEntity.getTradingCd()+"_"+tradingEntity.getCandleInterval());
-        strategyMap.remove(tradingEntity.getTradingCd()+"_"+tradingEntity.getCandleInterval()+"_long_strategy");
-        strategyMap.remove(tradingEntity.getTradingCd()+"_"+tradingEntity.getCandleInterval()+"_short_strategy");
-        mlModelMap.remove(tradingEntity.getTradingCd());
+        resourceCleanup(tradingEntity);
         autoTradingOpen(tradingEntity);
     }
 
