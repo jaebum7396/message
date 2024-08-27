@@ -1010,7 +1010,7 @@ public class FutureMLService {
             if (tradingEntityList.isEmpty()) { //오픈된 트레이딩이 없다면
                 // Map<String, Object> klineMap = backTestExec(tempTradingEntity, true);
                 // Optional<Object> expectationProfitOpt = Optional.ofNullable(klineMap.get("expectationProfit"));
-
+                tempTradingEntity.setTradingCd(UUID.randomUUID().toString());
                 String tradingCd = tempTradingEntity.getTradingCd();
                 String interval = tempTradingEntity.getCandleInterval();
 
@@ -1056,6 +1056,7 @@ public class FutureMLService {
                         count++;
                     }
                 //}
+                resourceCleanup(tempTradingEntity);
             }
         }
 
@@ -1698,12 +1699,12 @@ public class FutureMLService {
             return;
         }
 
-        String format = "| %-10s | %-10s | %-10s |%n";
-        String line = "+%12s+%12s+%12s+%n";
+        String format = "| %-20s | %-10s | %-10s |%n";
+        String line = "+%22s+%12s+%12s+%n";
 
-        System.out.printf(line, "-".repeat(12), "-".repeat(12), "-".repeat(12));
+        System.out.printf(line, "-".repeat(20), "-".repeat(12), "-".repeat(12));
         System.out.printf(format, "Symbol", "Size", "Entry Price");
-        System.out.printf(line, "-".repeat(12), "-".repeat(12), "-".repeat(12));
+        System.out.printf(line, "-".repeat(20), "-".repeat(12), "-".repeat(12));
 
         TRADING_ENTITYS.forEach((symbol, tradingEntity) -> {
             System.out.printf(format,
@@ -1713,7 +1714,7 @@ public class FutureMLService {
             );
         });
 
-        System.out.printf(line, "-".repeat(12), "-".repeat(12), "-".repeat(12));
+        System.out.printf(line, "-".repeat(20), "-".repeat(12), "-".repeat(12));
         System.out.println("총 " + TRADING_ENTITYS.size() + "개의 오픈된 트레이딩이 있습니다.");
     }
 
