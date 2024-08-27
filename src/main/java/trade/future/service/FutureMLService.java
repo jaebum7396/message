@@ -1228,7 +1228,7 @@ public class FutureMLService {
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
         Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
         Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
-        Rule mlExitRule = new MLExitRule(mlModel, indicators, 0.9);
+        Rule mlExitRule = new MLExitRule(mlModel, indicators, 0.8);
 
         // 손익 규칙
         int takeProfitRate = tradingEntity.getTakeProfitRate();
