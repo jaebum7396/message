@@ -51,6 +51,7 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
         if (connections.containsKey(connectionId)) {
             connections.get(connectionId).close();
             logger.info("Closing Connection ID {}", connectionId);
+            TradingEntitys.remove(connectionId);
             connections.remove(connectionId);
         } else {
             logger.info("Connection ID {} does not exist!", connectionId);
