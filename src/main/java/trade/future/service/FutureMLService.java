@@ -59,11 +59,17 @@ import static trade.common.CommonUtils.parseKlineEntity;
 @Service
 @Transactional
 public class FutureMLService {
+    public String BINANCE_API_KEY;
+    public String BINANCE_SECRET_KEY;
+    public static final String BASE_URL_TEST = "https://testnet.binance.vision";
+    public static final String BASE_URL_REAL = "wss://ws-api.binance.com:443/ws-api/v3";
+    UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     public FutureMLService(
             @Value("${binance.real.api.key}") String BINANCE_REAL_API_KEY
             , @Value("${binance.real.secret.key}") String BINANCE_REAL_SECRET_KEY
             , @Value("${binance.testnet.api.key}") String BINANCE_TEST_API_KEY
             , @Value("${binance.testnet.secret.key}") String BINANCE_TEST_SECRET_KEY) {
+
         boolean DEV_MODE = false;
         if(DEV_MODE){
             this.BINANCE_API_KEY = BINANCE_TEST_API_KEY;
@@ -84,15 +90,8 @@ public class FutureMLService {
     @Autowired TradingRepository tradingRepository;
     @Autowired TechnicalIndicatorRepository technicalIndicatorRepository;
     @Autowired MyWebSocketClientImpl umWebSocketStreamClient;
-
-    public static final String BASE_URL_TEST = "https://testnet.binance.vision";
-    public static final String BASE_URL_REAL = "wss://ws-api.binance.com:443/ws-api/v3";
-
     @Value("${jwt.secret.key}") private String JWT_SECRET_KEY;
-    public String BINANCE_API_KEY;
-    public String BINANCE_SECRET_KEY;
 
-    UMFuturesClientImpl umFuturesClientImpl = new UMFuturesClientImpl();
     private final WebSocketCallback noopCallback = msg -> {};
     private final WebSocketCallback openCallback = this::onOpenCallback;
     private final WebSocketCallback onMessageCallback = this::onMessageCallback;
@@ -101,7 +100,6 @@ public class FutureMLService {
 
     // 원하는 형식의 날짜 포맷 지정
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
     public JSONObject exchangeInfo;
     public JSONArray symbols;
     public String BASE_URL;
@@ -1678,11 +1676,14 @@ public class FutureMLService {
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("busd"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("usdc"))
                 //제외 종목
-                /* .filter(item -> !item.get("symbol").toString().toLowerCase().contains("btc"))
-                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("eth"))
-                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
-                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("sol"))
-                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))*/
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
+                //개새끼 코인들 다 제외
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("doge"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("floki"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("shiba"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("eos"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
                 .limit(limit)
                 .collect(Collectors.toList());
         topLimitItems.forEach(item -> {

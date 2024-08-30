@@ -60,8 +60,7 @@ public class MyWebSocketConnection extends WebSocketConnection {
         } else {
             System.err.println("WebSocket failure - No response available");
         }
-        t.printStackTrace();  // 에러 스택 트레이스 출력
-
+        //t.printStackTrace();  // 에러 스택 트레이스 출력
         // 자원 정리
         cleanUpResources();
         onFailureCallback.onReceive(String.valueOf(super.getConnectionId()));
