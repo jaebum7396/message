@@ -50,6 +50,7 @@ import java.security.Key;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -104,10 +105,10 @@ public class FutureMLService {
     public JSONArray symbols;
     public String BASE_URL;
     int failureCount = 0;
-    private HashMap<String, BaseBarSeries> seriesMap = new HashMap<String, BaseBarSeries>();
-    private HashMap<String, MLModel> mlModelMap = new HashMap<String, MLModel>();
-    private HashMap<String, Strategy> strategyMap = new HashMap<String, Strategy>();
-    private final Map<String, TradingEntity> TRADING_ENTITYS = new HashMap<>();
+    private ConcurrentHashMap<String, BaseBarSeries> seriesMap = new ConcurrentHashMap <String, BaseBarSeries>();
+    private ConcurrentHashMap <String, MLModel> mlModelMap = new ConcurrentHashMap <String, MLModel>();
+    private ConcurrentHashMap <String, Strategy> strategyMap = new ConcurrentHashMap <String, Strategy>();
+    private final ConcurrentHashMap <String, TradingEntity> TRADING_ENTITYS = new ConcurrentHashMap <>();
 
     public void onOpenCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
