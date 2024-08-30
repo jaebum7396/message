@@ -207,6 +207,7 @@ public class FutureMLService {
         // 제거된 객체들에 대한 참조를 명시적으로 null 처리
         tradingEntity = null;
 
+        printTradingEntitys();
         // 메모리 사용량 출력
         new MemoryUsageMonitor().printMemoryUsage();
     }
@@ -431,7 +432,6 @@ public class FutureMLService {
                             if(!scanner.isLikelyToMove()){
                                 log.info("스트림 종료 >>>>> " + tradingEntity);
                                 restartTrading(tradingEntity);
-                                printTradingEntitys();
                             }
                         }
                     }
