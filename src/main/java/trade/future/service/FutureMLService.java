@@ -118,6 +118,7 @@ public class FutureMLService {
         // 시리즈 생성
         seriesMaker(tradingEntity, false);
         log.info("tradingSaved >>>>> "+tradingEntity.getSymbol() + "("+tradingEntity.getStreamId()+") : " + tradingEntity.getTradingCd());
+        printTradingEntitys();
     }
 
     public void onCloseCallback(String streamId) {
@@ -127,6 +128,7 @@ public class FutureMLService {
         tradingEntity.setTradingStatus("CLOSE");
         tradingRepository.save(tradingEntity);
         resourceCleanup(tradingEntity);
+        printTradingEntitys();
     }
 
     public void onFailureCallback(String streamId) {
@@ -138,6 +140,7 @@ public class FutureMLService {
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
         }
+        printTradingEntitys();
     }
 
     public void onMessageCallback(String event){
@@ -207,7 +210,6 @@ public class FutureMLService {
         // 제거된 객체들에 대한 참조를 명시적으로 null 처리
         tradingEntity = null;
 
-        printTradingEntitys();
         // 메모리 사용량 출력
         new MemoryUsageMonitor().printMemoryUsage();
     }
@@ -513,7 +515,6 @@ public class FutureMLService {
             restartTrading(tradingEntity);
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
-            printTradingEntitys();
         }
     }
 
