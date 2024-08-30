@@ -327,7 +327,6 @@ public class FutureMLService {
         tradingEntity = tradingRepository.save(tradingEntity);
         log.info("restartTrading >>>>> " + tradingEntity.getSymbol()+ " : " + tradingEntity.getTradingCd());
         streamClose(tradingEntity.getStreamId());
-        resourceCleanup(tradingEntity);
         autoTradingOpen(tradingEntity);
     }
 
