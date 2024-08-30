@@ -129,7 +129,6 @@ public class FutureMLService {
         tradingEntity.setTradingStatus("CLOSE");
         tradingRepository.save(tradingEntity);
         resourceCleanup(tradingEntity);
-        printTradingEntitys();
     }
 
     public void onFailureCallback(String streamId) {
@@ -141,7 +140,6 @@ public class FutureMLService {
         } else {
             System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
         }
-        printTradingEntitys();
     }
 
     public void onMessageCallback(String event){
@@ -203,6 +201,7 @@ public class FutureMLService {
         String candleInterval = tradingEntity.getCandleInterval();
 
         TRADING_ENTITYS.remove(symbol);
+        printTradingEntitys();
         seriesMap.remove(tradingCd + "_" + candleInterval);
         strategyMap.remove(tradingCd + "_" + candleInterval + "_long_strategy");
         strategyMap.remove(tradingCd + "_" + candleInterval + "_short_strategy");
@@ -331,6 +330,7 @@ public class FutureMLService {
         tradingEntity = tradingRepository.save(tradingEntity);
         log.info("restartTrading >>>>> " + tradingEntity.getSymbol()+ " : " + tradingEntity.getTradingCd());
         streamClose(tradingEntity.getStreamId());
+        resourceCleanup(tradingEntity);
         autoTradingOpen(tradingEntity);
     }
 
