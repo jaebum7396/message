@@ -119,7 +119,6 @@ public class FutureMLService {
         // 시리즈 생성
         seriesMaker(tradingEntity, false);
         log.info("tradingSaved >>>>> "+tradingEntity.getSymbol() + "("+tradingEntity.getStreamId()+") : " + tradingEntity.getTradingCd());
-        printTradingEntitys();
     }
 
     public void onCloseCallback(String streamId) {
@@ -266,7 +265,7 @@ public class FutureMLService {
     }
 
     private List<TradingEntity> getTradingEntity(String symbol) {
-        return tradingRepository.findBySymbolAndTradingStatus(symbol, "OPEN");
+        return tradingRepository.findBySymbolAndTradingStatus(symbol.toUpperCase(), "OPEN");
     }
 
     public void streamClose(int streamId) {
