@@ -540,13 +540,13 @@ public class FutureMLService {
                 // 레버리지를 반영하여 스탑로스 가격 계산
                 BigDecimal stopLossPrice;
                 if (positionSide.equals("LONG")) {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.30).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                 } else {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.20).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.30).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
                 }
                 stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
-                //LinkedHashMap<String, Object> stopLossOrder = makeStopLossOrder(tradingEntity, stopLossPrice, quantity);
-                //paramMap.put("stopLossOrder", stopLossOrder);
+                LinkedHashMap<String, Object> stopLossOrder = makeStopLossOrder(tradingEntity, stopLossPrice, quantity);
+                paramMap.put("stopLossOrder", stopLossOrder);
             } else {
                 System.out.println("명목가치(" + notional + ")가 최소주문가능금액보다 작습니다.");
                 // throw new TradingException(tradingEntity);
@@ -1221,12 +1221,13 @@ public class FutureMLService {
         MLModel mlModel = setupMLModel(series, tradingEntity, testFlag, shortMovingPeriod, longMovingPeriod);
         List<Indicator<Num>> indicators = initializeIndicators(series, shortMovingPeriod, longMovingPeriod);
 
+        double volatilityThreshold = 1;
         double entryThreshold = 0.5;
         double exitThreshold = 0.5;
-        Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
-        Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
-        Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
-        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
+        Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold, volatilityThreshold);
+        Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold, volatilityThreshold);
+        Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold, volatilityThreshold);
+        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold, volatilityThreshold);
         Rule mlExitRule = new MLExitRule(mlModel, indicators, 0.8);
 
         // 손익 규칙
@@ -1704,14 +1705,14 @@ public class FutureMLService {
         String line = "+%22s+%12s+%12s+%n";
 
         System.out.printf(line, "-".repeat(20), "-".repeat(12), "-".repeat(12));
-        System.out.printf(format, "Symbol", "Size", "Entry Price");
+        System.out.printf(format, "Symbol", "Side", "Entry Price");
         System.out.printf(line, "-".repeat(20), "-".repeat(12), "-".repeat(12));
 
         TRADING_ENTITYS.forEach((symbol, tradingEntity) -> {
             System.out.printf(format,
                     symbol,
                     tradingEntity.getPositionSide(),
-                    tradingEntity.getPositionStatus()
+                    tradingEntity.getOpenPrice()
             );
         });
 
