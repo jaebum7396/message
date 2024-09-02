@@ -103,24 +103,22 @@ public class MLModel {
 
             // 원시 예측값을 확률로 변환
             double[] probabilities = new double[3];
-            if (rawPrediction > 0.5) {
-                probabilities[2] = rawPrediction;
-                probabilities[1] = 1 - rawPrediction;
-                probabilities[0] = 0;
-            } else if (rawPrediction < -0.5) {
-                probabilities[0] = -rawPrediction;
-                probabilities[1] = 1 + rawPrediction;
-                probabilities[2] = 0;
-            } else {
-                probabilities[1] = 1 - Math.abs(rawPrediction);
-                probabilities[0] = probabilities[2] = Math.abs(rawPrediction) / 2;
-            }
+
+            // Softmax 함수를 사용하여 확률 분포 생성
+            double expNeg = Math.exp(-rawPrediction);
+            double expZero = Math.exp(0);
+            double expPos = Math.exp(rawPrediction);
+            double sum = expNeg + expZero + expPos;
+
+            probabilities[0] = expNeg / sum;  // 하락 확률
+            probabilities[1] = expZero / sum; // 유지 확률
+            probabilities[2] = expPos / sum;  // 상승 확률
 
             return probabilities;
         } catch (Exception e) {
             logger.severe("확률 예측 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
-            return new double[]{0, 100, 0};  // 오류 시 기본값 반환
+            return new double[]{1.0/3, 1.0/3, 1.0/3};  // 오류 시 균등 확률 반환
         }
     }
 

@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.Rule;
 import org.ta4j.core.TradingRecord;
+import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.num.Num;
 import trade.future.ml.MLModel;
@@ -19,27 +20,39 @@ public class MLShortRule implements Rule {
     private double volatilityThreshold;
     private int relativeATRIndex;
     private int adxIndex;
+    private int smaShortIndex;
+    private int smaLongIndex;
 
     public MLShortRule(MLModel model, List<Indicator<Num>> indicators, double baseThreshold,
-                      double volatilityThreshold) {
+                       double volatilityThreshold) {
         this.model = model;
         this.indicators = indicators;
         this.baseThreshold = baseThreshold;
         this.volatilityThreshold = volatilityThreshold;
 
-        // Find the index of RelativeATRIndicator and ADXIndicator in the indicators list
+        // Find the index of required indicators in the indicators list
         this.relativeATRIndex = findIndicatorIndex(RelativeATRIndicator.class);
         this.adxIndex = findIndicatorIndex(ADXIndicator.class);
+        this.smaShortIndex = findIndicatorIndex(SMAIndicator.class, 0);  // Assuming short SMA is added first
+        this.smaLongIndex = findIndicatorIndex(SMAIndicator.class, 1);   // Assuming long SMA is added second
 
-        if (relativeATRIndex == -1 || adxIndex == -1) {
-            throw new IllegalArgumentException("Required indicators (RelativeATR or ADX) not found in the indicators list");
+        if (relativeATRIndex == -1 || adxIndex == -1 || smaShortIndex == -1 || smaLongIndex == -1) {
+            throw new IllegalArgumentException("Required indicators not found in the indicators list");
         }
     }
 
     private int findIndicatorIndex(Class<?> indicatorClass) {
+        return findIndicatorIndex(indicatorClass, 0);
+    }
+
+    private int findIndicatorIndex(Class<?> indicatorClass, int occurrence) {
+        int count = 0;
         for (int i = 0; i < indicators.size(); i++) {
             if (indicatorClass.isInstance(indicators.get(i))) {
-                return i;
+                if (count == occurrence) {
+                    return i;
+                }
+                count++;
             }
         }
         return -1;
@@ -51,10 +64,11 @@ public class MLShortRule implements Rule {
         double currentThreshold = calculateDynamicThreshold(index);
 
         if (probabilities[0] > currentThreshold) {
-            log.info("하락시그널 - Index: {}, Probabilities: {}, Threshold: {}, RelativeATR: {}, ADX: {}",
+            log.info("하락시그널 - Index: {}, Probabilities: {}, Threshold: {}, RelativeATR: {}, ADX: {}, IsDowntrend: {}",
                     index, Arrays.toString(probabilities), currentThreshold,
                     indicators.get(relativeATRIndex).getValue(index).doubleValue(),
-                    indicators.get(adxIndex).getValue(index).doubleValue());
+                    indicators.get(adxIndex).getValue(index).doubleValue(),
+                    isDowntrend(index));
             return true;
         }
         return false;
@@ -64,18 +78,28 @@ public class MLShortRule implements Rule {
         double relativeATR = indicators.get(relativeATRIndex).getValue(index).doubleValue();
         double adx = indicators.get(adxIndex).getValue(index).doubleValue();
 
-        if (relativeATR > volatilityThreshold && adx > 25) {  // ADX > 25 indicates a strong trend
-            return baseThreshold + 0.1;  // Increase threshold in high volatility and strong trend
-        } else if (relativeATR > volatilityThreshold) {
-            return baseThreshold + 0.05;  // Slightly increase threshold in high volatility
-        } else {
-            return baseThreshold;
-        }
+        double threshold = baseThreshold;
+
+        //if (relativeATR > volatilityThreshold || adx > 30) {  // High volatility or strong trend
+        //    threshold += 0.05;  // Increase threshold slightly
+        //}
+
+        //if (isDowntrend(index)) {
+        //    threshold += 0.2;  // Decrease threshold (equivalent to adding weight) in downtrend
+        //}
+
+        return threshold;
+    }
+
+    private boolean isDowntrend(int index) {
+        Num shortSMA = indicators.get(smaShortIndex).getValue(index);
+        Num longSMA = indicators.get(smaLongIndex).getValue(index);
+        return shortSMA.isLessThan(longSMA);
     }
 
     @Override
     public String toString() {
-        return String.format("MLLongRule(model=%s, indicators=%d, baseThreshold=%.2f, volatilityThreshold=%.2f)",
+        return String.format("MLShortRule(model=%s, indicators=%d, baseThreshold=%.2f, volatilityThreshold=%.2f)",
                 model.getClass().getSimpleName(),
                 indicators.size(),
                 baseThreshold,
