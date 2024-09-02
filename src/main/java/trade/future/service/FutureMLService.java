@@ -392,6 +392,17 @@ public class FutureMLService {
                     BigDecimal currentROI;
                     BigDecimal currentPnl;
                     if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                        try {
+                            JSONObject currentPosition = getPosition(symbol, tradingEntity.getPositionSide())
+                                    .orElseThrow(() -> new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다."));
+                            if (currentPosition.get("positionAmt").equals("0")) {
+                                throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
+                            }
+                        } catch (Exception e) {
+                            closePosition.setPositionStatus("CLOSE");
+                            positionRepository.save(closePosition);
+                            restartTrading(tradingEntity);
+                        }
                         currentROI = TechnicalIndicatorCalculator.calculateROI(closePosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), closePosition.getPositionSide());
                         currentPnl = TechnicalIndicatorCalculator.calculatePnL(closePosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), closePosition.getPositionSide(), tradingEntity.getCollateral());
                     } else {
@@ -1224,10 +1235,10 @@ public class FutureMLService {
         double volatilityThreshold = 1;
         double entryThreshold = 0.5;
         double exitThreshold = 0.5;
-        Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold, volatilityThreshold);
-        Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold, volatilityThreshold);
-        Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold, volatilityThreshold);
-        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold, volatilityThreshold);
+        Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
+        Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
+        Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
+        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
         Rule mlExitRule = new MLExitRule(mlModel, indicators, 0.8);
 
         // 손익 규칙
