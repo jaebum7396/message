@@ -423,13 +423,13 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     boolean enterFlag = false;
                     if (openPosition.getPositionStatus().equals("OPEN")) {
-                        if(tradingEntity.getEntryCount()<3) { // 진입횟수가 3보다 작을때 추가 진입 고려
-                            if (openPosition.getPositionSide().equals("LONG")) {
-                                enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                            } else if (openPosition.getPositionSide().equals("SHORT")) {
-                                enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                            }
-                        }
+                        //if(tradingEntity.getEntryCount()<3) { // 진입횟수가 3보다 작을때 추가 진입 고려
+                        //    if (openPosition.getPositionSide().equals("LONG")) {
+                        //        enterFlag = longStrategy.shouldEnter(series.getEndIndex());
+                        //    } else if (openPosition.getPositionSide().equals("SHORT")) {
+                        //        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+                        //    }
+                        //}
                         if (openPosition.getPositionSide().equals("LONG")) {
                             exitFlag = longStrategy.shouldExit(series.getEndIndex());
                         } else if (openPosition.getPositionSide().equals("SHORT")) {
@@ -453,18 +453,18 @@ public class FutureMLService {
                     enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                     if (enterFlag) {
                         System.out.println("숏 포지션 오픈");
-                        if (TOTAL_POSITION_COUNT<5){
+                        //if (TOTAL_POSITION_COUNT<5){
                             makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
                             TOTAL_POSITION_COUNT++;
-                        }
+                        //}
                     } else{
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈");
-                            if (TOTAL_POSITION_COUNT<5){
+                            //if (TOTAL_POSITION_COUNT<5){
                                 makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                                 TOTAL_POSITION_COUNT++;
-                            }
+                            //}
                         }else{
                             if(!scanner.isLikelyToMove()){
                                 log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
