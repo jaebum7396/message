@@ -387,44 +387,44 @@ public class FutureMLService {
 
                 Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
                 openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
-                    PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
+                    PositionEntity openPosition = positionEvent.getKlineEntity().getPositionEntity();
 
                     BigDecimal currentROI;
                     BigDecimal currentPnl;
-                    if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                    if(openPosition.getPositionStatus()!=null && openPosition.getPositionStatus().equals("OPEN")){
                         try {
-                            JSONObject currentPosition = getPosition(symbol, tradingEntity.getPositionSide())
-                                    .orElseThrow(() -> new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다."));
+                            JSONObject currentPosition = getPosition(symbol.toUpperCase(), tradingEntity.getPositionSide())
+                                    .orElseThrow(() -> new AutoTradingDuplicateException(symbol.toUpperCase() + " 포지션을 찾을 수 없습니다."));
                             if (currentPosition.get("positionAmt").equals("0")) {
                                 throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
                             }
                         } catch (Exception e) {
-                            closePosition.setPositionStatus("CLOSE");
-                            positionRepository.save(closePosition);
+                            openPosition.setPositionStatus("CLOSE");
+                            positionRepository.save(openPosition);
                             restartTrading(tradingEntity);
                         }
-                        currentROI = TechnicalIndicatorCalculator.calculateROI(closePosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), closePosition.getPositionSide());
-                        currentPnl = TechnicalIndicatorCalculator.calculatePnL(closePosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), closePosition.getPositionSide(), tradingEntity.getCollateral());
+                        currentROI = TechnicalIndicatorCalculator.calculateROI(openPosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), openPosition.getPositionSide());
+                        currentPnl = TechnicalIndicatorCalculator.calculatePnL(openPosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), openPosition.getPositionSide(), tradingEntity.getCollateral());
                     } else {
                         currentROI = new BigDecimal("0");
                         currentPnl = new BigDecimal("0");
                     }
-                    closePosition.setRoi(currentROI);
-                    closePosition.setProfit(currentPnl);
+                    openPosition.setRoi(currentROI);
+                    openPosition.setProfit(currentPnl);
                     System.out.println("ROI : " + currentROI);
                     System.out.println("PNL : " + currentPnl);
 
                     boolean exitFlag = false;
-                    if (closePosition.getPositionStatus().equals("OPEN")) {
-                        if (closePosition.getPositionSide().equals("LONG")) {
+                    if (openPosition.getPositionStatus().equals("OPEN")) {
+                        if (openPosition.getPositionSide().equals("LONG")) {
                             exitFlag = longStrategy.shouldExit(series.getEndIndex());
-                        } else if (closePosition.getPositionSide().equals("SHORT")) {
+                        } else if (openPosition.getPositionSide().equals("SHORT")) {
                             exitFlag = shortStrategy.shouldExit(series.getEndIndex());
                         }
                     }
                     if (exitFlag) {
-                        closePosition.setPositionStatus("CLOSE");
-                        positionRepository.save(closePosition);
+                        openPosition.setPositionStatus("CLOSE");
+                        positionRepository.save(openPosition);
                         makeCloseOrder(eventEntity, positionEvent, "포지션 청산");
                         System.out.println("포지션 종료");
                     }
