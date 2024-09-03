@@ -454,16 +454,16 @@ public class FutureMLService {
                         System.out.println("숏 포지션 오픈");
                         if (TOTAL_POSITION_COUNT<5){
                             makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
+                            TOTAL_POSITION_COUNT++;
                         }
-                        TOTAL_POSITION_COUNT++;
                     } else{
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈");
                             if (TOTAL_POSITION_COUNT<5){
                                 makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                                TOTAL_POSITION_COUNT++;
                             }
-                            TOTAL_POSITION_COUNT++;
                         }else{
                             if(!scanner.isLikelyToMove()){
                                 log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
