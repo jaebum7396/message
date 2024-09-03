@@ -447,7 +447,7 @@ public class FutureMLService {
                             makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                         }else{
                             if(!scanner.isLikelyToMove()){
-                                log.info("스트림 종료 >>>>> " + tradingEntity);
+                                log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
                                 restartTrading(tradingEntity);
                             }
                         }
@@ -794,7 +794,7 @@ public class FutureMLService {
             throw new AutoTradingDuplicateException("이미 실행중입니다.");
         }
         autoTradingOpenFlag = true;
-        log.info("autoTradingOpen >>>>>");
+        //log.info("autoTradingOpen >>>>>");
 
         // *************************************************************************************************
         // 변수선언
@@ -942,7 +942,6 @@ public class FutureMLService {
 
     public TradingEntity autoTradeStreamOpen(TradingEntity tradingEntity) {
         //tradingRepository.save(tradingEntity);
-        log.info("klineStreamOpen >>>>> ");
         ArrayList<String> streams = new ArrayList<>();
 
         // 캔들데이터 소켓 스트림
@@ -1074,7 +1073,7 @@ public class FutureMLService {
         }
 
         for(Map<String, Object> item : overlappingData){
-            System.out.println("관심종목 : " + item);
+            System.out.println("관심종목 : " + item.get("symbol"));
         }
 
         //System.out.println("overlappingData : " + overlappingData);
@@ -1702,9 +1701,9 @@ public class FutureMLService {
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
                 .limit(limit)
                 .collect(Collectors.toList());
-        topLimitItems.forEach(item -> {
-            System.out.println(item.get("symbol") + " : " + item.get(sortBy));
-        });
+        //topLimitItems.forEach(item -> {
+        //    System.out.println(item.get("symbol") + " : " + item.get(sortBy));
+        //});
         return topLimitItems;
     }
 
