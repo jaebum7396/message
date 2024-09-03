@@ -377,7 +377,7 @@ public class FutureMLService {
                 boolean shortShouldExit = shortStrategy.shouldExit(series.getEndIndex());
 
                 System.out.println("listening : " + symbol);
-                printTradingSignals(symbol, series.getLastBar(), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
+                //printTradingSignals(symbol, series.getLastBar(), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
                 MLModel mlModel = mlModelMap.get(tradingCd);
                 List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
 
@@ -827,7 +827,7 @@ public class FutureMLService {
 
     boolean autoTradingOpenFlag = false;
     public Map<String, Object> autoTradingOpen(TradingEntity tradingEntity) {
-        MemoryUsageMonitor.printMemoryUsage();
+        //MemoryUsageMonitor.printMemoryUsage();
         if (autoTradingOpenFlag) {
             throw new AutoTradingDuplicateException("이미 실행중입니다.");
         }
@@ -1085,7 +1085,7 @@ public class FutureMLService {
                 double threshold = 0.5; // 시그널 임계값
                 double proximityThreshold = 0.3; // 근접 임계값
                 SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
-                scanner.printSignalProximity(symbol);
+                //scanner.printSignalProximity(symbol);
 
                 //if (expectationProfitOpt.isPresent()){
                 //    BigDecimal expectationProfit = (BigDecimal) expectationProfitOpt.get();
