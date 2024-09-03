@@ -157,6 +157,8 @@ public class TradingEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "PRICE_CHANGE_THRESHOLD")
     double priceChangeThreshold; // 가격 변동 임계값
 
+    int entryCount; // 최대 진입 횟수
+
     int totalTradeCount; // 총 거래 횟수
     int winTradeCount; // 이긴 횟수
     int loseTradeCount; // 진 횟수

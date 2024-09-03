@@ -333,6 +333,7 @@ public class FutureMLService {
         autoTradingOpen(tradingEntity);
     }
 
+    int TOTAL_POSITION_COUNT = 0;
     private void klineProcess(String event){
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
@@ -419,7 +420,15 @@ public class FutureMLService {
                     System.out.println("PNL : " + currentPnl);
 
                     boolean exitFlag = false;
+                    boolean enterFlag = false;
                     if (openPosition.getPositionStatus().equals("OPEN")) {
+                        if(tradingEntity.getEntryCount()<3) { // 진입횟수가 3보다 작을때 추가 진입 고려
+                            if (openPosition.getPositionSide().equals("LONG")) {
+                                enterFlag = longStrategy.shouldEnter(series.getEndIndex());
+                            } else if (openPosition.getPositionSide().equals("SHORT")) {
+                                enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+                            }
+                        }
                         if (openPosition.getPositionSide().equals("LONG")) {
                             exitFlag = longStrategy.shouldExit(series.getEndIndex());
                         } else if (openPosition.getPositionSide().equals("SHORT")) {
@@ -430,21 +439,31 @@ public class FutureMLService {
                         openPosition.setPositionStatus("CLOSE");
                         positionRepository.save(openPosition);
                         makeCloseOrder(eventEntity, positionEvent, "포지션 청산");
+                        TOTAL_POSITION_COUNT--;
                         System.out.println("포지션 종료");
+                    } else {
+                        if (enterFlag) {
+                            makeOpenOrder(eventEntity, openPosition.getPositionSide(), "추가 포지션 오픈");
+                        }
                     }
-
                 }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
                     //scanner.printSignalProximity(symbol);
                     boolean enterFlag = false;
                     enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                     if (enterFlag) {
                         System.out.println("숏 포지션 오픈");
-                        makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
+                        if (TOTAL_POSITION_COUNT<5){
+                            makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
+                        }
+                        TOTAL_POSITION_COUNT++;
                     } else{
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈");
-                            makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                            if (TOTAL_POSITION_COUNT<5){
+                                makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                            }
+                            TOTAL_POSITION_COUNT++;
                         }else{
                             if(!scanner.isLikelyToMove()){
                                 log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
@@ -511,6 +530,7 @@ public class FutureMLService {
             //throw new TradingException(tradingEntity);
         } finally {
             eventRepository.save(currentEvent);
+            tradingEntity.setEntryCount(tradingEntity.getEntryCount() + 1); // 진입횟수 증가
             System.out.println("openTradingEntity >>>>> " + tradingEntity);
             tradingRepository.save(tradingEntity);
         }
