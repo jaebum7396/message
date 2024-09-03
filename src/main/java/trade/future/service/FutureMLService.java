@@ -406,6 +406,7 @@ public class FutureMLService {
                         } catch (Exception e) {
                             openPosition.setPositionStatus("CLOSE");
                             positionRepository.save(openPosition);
+                            TOTAL_POSITION_COUNT--;
                             restartTrading(tradingEntity);
                         }
                         currentROI = TechnicalIndicatorCalculator.calculateROI(openPosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), openPosition.getPositionSide());
