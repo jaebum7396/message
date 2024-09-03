@@ -391,12 +391,16 @@ public class FutureMLService {
 
                     BigDecimal currentROI;
                     BigDecimal currentPnl;
-                    if(openPosition.getPositionStatus()!=null && openPosition.getPositionStatus().equals("OPEN")){
+                    if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
                         try {
-                            JSONObject currentPosition = getPosition(symbol.toUpperCase(), tradingEntity.getPositionSide())
-                                    .orElseThrow(() -> new AutoTradingDuplicateException(symbol.toUpperCase() + " 포지션을 찾을 수 없습니다."));
-                            if (currentPosition.get("positionAmt").equals("0")) {
+                            Optional<JSONObject> currentPositionOpt = getPosition(symbol.toUpperCase(), tradingEntity.getPositionSide());
+                            if(currentPositionOpt.isEmpty()){
                                 throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
+                            } else {
+                                JSONObject currentPosition = currentPositionOpt.get();
+                                if (String.valueOf(currentPosition.get("positionAmt")).equals("0")) {
+                                    throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
+                                }
                             }
                         } catch (Exception e) {
                             openPosition.setPositionStatus("CLOSE");
