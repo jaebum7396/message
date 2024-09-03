@@ -497,6 +497,11 @@ public class FutureMLService {
                 LinkedHashMap<String, Object> stopLossOrderParams = (LinkedHashMap<String, Object>) orderParams.get("stopLossOrder");
                 orderSubmit(stopLossOrderParams);
             }
+            // 테이크프로핏 주문 제출
+            if (orderParams.containsKey("takeProfitOrder")) {
+                LinkedHashMap<String, Object> takeProfitOrderParams = (LinkedHashMap<String, Object>) orderParams.get("takeProfitOrder");
+                orderSubmit(takeProfitOrderParams);
+            }
 
             System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_GREEN+"*********************[진입 - 진입사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
 
@@ -552,16 +557,27 @@ public class FutureMLService {
                 quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
                 paramMap.put("quantity", quantity);
 
-                // 레버리지를 반영하여 스탑로스 가격 계산
+                // 스탑로스 가격 계산 (기초자산의 -3%)
                 BigDecimal stopLossPrice;
                 if (positionSide.equals("LONG")) {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.30).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.03)));
                 } else {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.30).divide(new BigDecimal(tradingEntity.getLeverage()), 10, RoundingMode.HALF_UP)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.03)));
                 }
                 stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
-                LinkedHashMap<String, Object> stopLossOrder = makeStopLossOrder(tradingEntity, stopLossPrice, quantity);
+                LinkedHashMap<String, Object> stopLossOrder = makeStopOrder(tradingEntity, "STOP_MARKET", stopLossPrice, quantity);
                 paramMap.put("stopLossOrder", stopLossOrder);
+
+                // 테이크프로핏 가격 계산 (기초자산의 10%)
+                BigDecimal takeProfitPrice;
+                if (positionSide.equals("LONG")) {
+                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10)));
+                } else {
+                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10)));
+                }
+                takeProfitPrice = takeProfitPrice.setScale(getPricePrecision(symbol), RoundingMode.UP);
+                LinkedHashMap<String, Object> takeProfitOrder = makeStopOrder(tradingEntity, "TAKE_PROFIT_MARKET", takeProfitPrice, quantity);
+                paramMap.put("takeProfitOrder", takeProfitOrder);
             } else {
                 System.out.println("명목가치(" + notional + ")가 최소주문가능금액보다 작습니다.");
                 // throw new TradingException(tradingEntity);
@@ -594,18 +610,19 @@ public class FutureMLService {
         return resultMap;
     }
 
-    public LinkedHashMap<String, Object> makeStopLossOrder(TradingEntity tradingEntity, BigDecimal stopLossPrice, BigDecimal quantity) {
-        LinkedHashMap<String, Object> stopLossParamMap = new LinkedHashMap<>();
+    public LinkedHashMap<String, Object> makeStopOrder(TradingEntity tradingEntity, String type, BigDecimal stopPrice, BigDecimal quantity) {
+        LinkedHashMap<String, Object> takeProfitParamMap = new LinkedHashMap<>();
         String symbol = tradingEntity.getSymbol();
         String positionSide = tradingEntity.getPositionSide();
-        stopLossParamMap.put("symbol", symbol);
-        stopLossParamMap.put("positionSide", positionSide);
-        stopLossParamMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
-        stopLossParamMap.put("type", "STOP_MARKET");
-        stopLossParamMap.put("quantity", quantity);
-        stopLossParamMap.put("stopPrice", stopLossPrice);
-        return stopLossParamMap;
+        takeProfitParamMap.put("symbol", symbol);
+        takeProfitParamMap.put("positionSide", positionSide);
+        takeProfitParamMap.put("side", positionSide.equals("LONG") ? "SELL" : "BUY");
+        takeProfitParamMap.put("type", type);
+        takeProfitParamMap.put("quantity", quantity);
+        takeProfitParamMap.put("stopPrice", stopPrice);
+        return takeProfitParamMap;
     }
+
 
     public Map<String, Object> leverageChange(LinkedHashMap<String, Object> requestParam) throws Exception {
         Map<String, Object> resultMap = new LinkedHashMap<String, Object>();
