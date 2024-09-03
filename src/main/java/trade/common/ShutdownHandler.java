@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.stereotype.Component;
+import trade.future.service.FutureMLService;
 import trade.future.service.FutureService;
 
 import javax.annotation.PostConstruct;
@@ -14,7 +15,7 @@ import javax.annotation.PostConstruct;
 public class ShutdownHandler implements ApplicationListener<ContextClosedEvent> {
 
     @Autowired
-    FutureService futureService;
+    FutureMLService futureService;
 
     @Override
     public void onApplicationEvent(ContextClosedEvent event) {
