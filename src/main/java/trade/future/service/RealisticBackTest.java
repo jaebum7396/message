@@ -30,8 +30,24 @@ public class RealisticBackTest {
     // 승률 계산을 위한 변수들
     private int longTrades = 0;
     private int longWins = 0;
+    private double longWinRate = 0;
+    public int getLongWins() {
+        return longWins;
+    }
+    public double getLongWinRate() {
+        return longWinRate;
+    }
+
     private int shortTrades = 0;
     private int shortWins = 0;
+    private double shortWinRate = 0;
+    public int getShortWins() {
+        return shortTrades;
+    }
+    public double getShortWinRate() {
+        return shortWinRate;
+    }
+    private static final int TREND_PERIOD = 5;  // 트렌드를 판단할 기간
 
     public RealisticBackTest(BarSeries series, Strategy longStrategy, Strategy shortStrategy,
                              Duration executionDelay, double slippagePercent) {
@@ -48,6 +64,7 @@ public class RealisticBackTest {
 
         for (int i = 0; i < series.getBarCount(); i++) {
             Bar currentBar = series.getBar(i);
+            String currentTrend = getTrend(i);
 
             // Check for exit signals first
             Position currentPosition = tradingRecord.getCurrentPosition();
@@ -66,10 +83,10 @@ public class RealisticBackTest {
 
             // Check for entry signals
             if (tradingRecord.getCurrentPosition() == null || !tradingRecord.getCurrentPosition().isOpened()) {
-                if (longStrategy.shouldEnter(i)) {
+                if (currentTrend.equals("UP") && longStrategy.shouldEnter(i)) {
                     String entryRule = getRuleDescription(longStrategy.getEntryRule());
                     simulateTrade(tradingRecord, Trade.TradeType.BUY, currentBar, i, false, entryRule);
-                } else if (shortStrategy.shouldEnter(i)) {
+                } else if (currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i)) {
                     String entryRule = getRuleDescription(shortStrategy.getEntryRule());
                     simulateTrade(tradingRecord, Trade.TradeType.SELL, currentBar, i, false, entryRule);
                 }
@@ -78,6 +95,30 @@ public class RealisticBackTest {
 
         printWinRates();
         return tradingRecord;
+    }
+
+    private String getTrend(int currentIndex) {
+        if (currentIndex < TREND_PERIOD) {
+            return "NEUTRAL";  // 데이터가 충분하지 않으면 중립 반환
+        }
+
+        double sumClose = 0;
+        double firstClose = series.getBar(currentIndex - TREND_PERIOD + 1).getClosePrice().doubleValue();
+        double lastClose = series.getBar(currentIndex).getClosePrice().doubleValue();
+
+        for (int i = currentIndex - TREND_PERIOD + 1; i <= currentIndex; i++) {
+            sumClose += series.getBar(i).getClosePrice().doubleValue();
+        }
+
+        double avgClose = sumClose / TREND_PERIOD;
+
+        if (lastClose > avgClose && lastClose > firstClose) {
+            return "UP";
+        } else if (lastClose < avgClose && lastClose < firstClose) {
+            return "DOWN";
+        } else {
+            return "NEUTRAL";
+        }
     }
 
     private void simulateTrade(TradingRecord tradingRecord, Trade.TradeType tradeType, Bar bar, int index, boolean isExit, String rule) {
@@ -103,17 +144,18 @@ public class RealisticBackTest {
             lastEntryType = tradeType;
             entryIndex = executionIndex;
             entryTime = timeStr;
-            entryRule = rule;
+            String trend = getTrend(index);
+            entryRule = rule + " | Trend: " + trend;  // 트렌드 정보 추가
         } else {
             Num roi = calculateROI(executionPrice);
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
 
-            /*System.out.printf("%sENTER %s[%d/%.5f/%s] => EXIT %s[%d/%.5f/%s]%s | ROI: %s%.2f%%%s | Entry: %s | Exit: %s%n",
-                    tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(), entryTime,
-                    lastEntryType, executionIndex, executionPrice.doubleValue(), timeStr, ANSI_RESET,
-                    roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
-                    entryRule, rule);*/
+            //System.out.printf("%sENTER %s[%d/%.5f/%s] => EXIT %s[%d/%.5f/%s]%s | ROI: %s%.2f%%%s | Entry: %s | Exit: %s%n",
+            //        tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(), entryTime,
+            //        lastEntryType, executionIndex, executionPrice.doubleValue(), timeStr, ANSI_RESET,
+            //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
+            //        entryRule, rule);
 
             // 승률 계산을 위한 정보 업데이트
             if (lastEntryType == Trade.TradeType.BUY) {
@@ -135,8 +177,8 @@ public class RealisticBackTest {
     }
 
     private void printWinRates() {
-        double longWinRate = longTrades > 0 ? (double) longWins / longTrades * 100 : 0;
-        double shortWinRate = shortTrades > 0 ? (double) shortWins / shortTrades * 100 : 0;
+        longWinRate = longTrades > 0 ? (double) longWins / longTrades * 100 : 0;
+        shortWinRate = shortTrades > 0 ? (double) shortWins / shortTrades * 100 : 0;
 
         System.out.println("\n===== 백테스트 결과 =====");
         System.out.printf("롱 포지션 승률: %.2f%% (%d/%d)%n", longWinRate, longWins, longTrades);

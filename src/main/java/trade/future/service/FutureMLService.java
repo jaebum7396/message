@@ -449,23 +449,42 @@ public class FutureMLService {
                     }
                 }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
                     //scanner.printSignalProximity(symbol);
+                    RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy,
+                            Duration.ofSeconds(5), 0.1);
+                    TradingRecord record = backtest.run();
+
+                    // 백테스트 결과에서 승률 가져오기
+                    double longWinRate = backtest.getLongWinRate();
+                    double shortWinRate = backtest.getShortWinRate();
+
                     String currentTrend = getTrend(series);  // 현재 트렌드 확인
                     System.out.println("Current Trend: " + currentTrend);
+                    System.out.printf("Long Win Rate: %.2f%%, Short Win Rate: %.2f%%\n", longWinRate, shortWinRate);
+
                     boolean enterFlag = false;
-                    if (currentTrend.equals("DOWN")) {
-                        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                        if (enterFlag) {
-                            System.out.println("숏 포지션 오픈");
-                            makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
-                            TOTAL_POSITION_COUNT++;
-                        }
-                    } else if (currentTrend.equals("UP")) {
+                    if (longWinRate > shortWinRate) {
+                        // 롱 포지션의 승률이 더 높은 경우
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                        if (enterFlag) {
-                            System.out.println("롱 포지션 오픈");
+                        if (enterFlag && currentTrend.equals("UP")) {
+                            System.out.println("롱 포지션 오픈 (높은 승률: " + longWinRate + "%)");
                             makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                             TOTAL_POSITION_COUNT++;
+                        } else {
+                            System.out.println("롱 진입 조건 충족되지 않음 (트렌드 불일치 또는 진입 시그널 없음)");
                         }
+                    } else if (shortWinRate > longWinRate) {
+                        // 숏 포지션의 승률이 더 높은 경우
+                        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+                        if (enterFlag && currentTrend.equals("DOWN")) {
+                            System.out.println("숏 포지션 오픈 (높은 승률: " + shortWinRate + "%)");
+                            makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
+                            TOTAL_POSITION_COUNT++;
+                        } else {
+                            System.out.println("숏 진입 조건 충족되지 않음 (트렌드 불일치 또는 진입 시그널 없음)");
+                        }
+                    } else {
+                        // 승률이 동일한 경우 (이 경우 진입하지 않음)
+                        System.out.println("롱과 숏의 승률이 동일함. 포지션 진입 보류.");
                     }
 
                     if (!enterFlag) {
@@ -1558,10 +1577,8 @@ public class FutureMLService {
     public HashMap<String, Object> backTestResult(TradingRecord tradingRecord, BaseBarSeries series, String symbol, int leverage, String positionSide, BigDecimal collateral, boolean logFlag) {
         HashMap<String, Object> resultMap = new HashMap<>();
 
-        // 트렌드
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator shortSMA = new SMAIndicator(closePrice, 20); // 10일 단기 이동평균선
-        SMAIndicator longSMA = new SMAIndicator(closePrice, 40); // 30일 장기 이동평균선
+        // 트렌드 계산을 위한 상수
+        final int TREND_PERIOD = 5;
 
         // 거래 기록 출력
         List<Position> positions = tradingRecord.getPositions();
@@ -1577,7 +1594,6 @@ public class FutureMLService {
         ADXIndicator adxIndicator = new ADXIndicator(series, adxPeriod);
 
         for (Position position : positions) {
-            //System.out.println(" "+position);
             Trade entry = position.getEntry();
             Trade exit = position.getExit();
 
@@ -1605,14 +1621,7 @@ public class FutureMLService {
             String ROIExpression = "ROI:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(ROI)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(ROI)+CONSOLE_COLORS.RESET);
             String PNLExpression = "PNL:" + (PNL.compareTo(BigDecimal.ZERO) > 0 ? CONSOLE_COLORS.BRIGHT_GREEN+String.valueOf(PNL)+CONSOLE_COLORS.RESET : CONSOLE_COLORS.BRIGHT_RED + String.valueOf(PNL)+CONSOLE_COLORS.RESET);
 
-            String trendExpression;
-            if (shortSMA.getValue(entry.getIndex()).isGreaterThan(longSMA.getValue(entry.getIndex()))) {
-                trendExpression = "Trend: " + CONSOLE_COLORS.BRIGHT_GREEN + "상승" + CONSOLE_COLORS.RESET;
-            } else if (shortSMA.getValue(entry.getIndex()).isLessThan(longSMA.getValue(entry.getIndex()))) {
-                trendExpression = "Trend: " + CONSOLE_COLORS.BRIGHT_RED + "하락" + CONSOLE_COLORS.RESET;
-            } else {
-                trendExpression = "Trend: 중립";
-            }
+            String trendExpression = getTrendExpression(series, entry.getIndex(), TREND_PERIOD);
 
             // 특정 인덱스에서의 Relative ATR 값을 얻습니다
             Num atrValue = relativeATR.getValue(entry.getIndex());
@@ -1623,14 +1632,14 @@ public class FutureMLService {
             String adxExpression = "ADX: " + adxValue.doubleValue();
 
             // 진입 시 거래량 정보 가져오기
-            double  entryVolume = getRelativeVolume(series, entry.getIndex(), 20);
+            double entryVolume = getRelativeVolume(series, entry.getIndex(), 20);
             String volumeExpression = "Volume: " + entryVolume;
 
             String slash = "/";
 
             StringBuilder entryRuleExpression = new StringBuilder("[진입규칙]");
             StringBuilder stopRuleExpression = new StringBuilder("[청산규칙]");
-            int i = 1;
+
             if (logFlag){
                 System.out.println("  "+entryExpression
                         + slash + exitExpression
@@ -1659,6 +1668,32 @@ public class FutureMLService {
         resultMap.put("expectationProfit", totalProfit);
         return resultMap;
     }
+
+    // 트렌드를 계산하고 표현을 반환하는 메서드
+    private String getTrendExpression(BaseBarSeries series, int currentIndex, int trendPeriod) {
+        if (currentIndex < trendPeriod) {
+            return "Trend: 중립";
+        }
+
+        double sumClose = 0;
+        double firstClose = series.getBar(currentIndex - trendPeriod + 1).getClosePrice().doubleValue();
+        double lastClose = series.getBar(currentIndex).getClosePrice().doubleValue();
+
+        for (int i = currentIndex - trendPeriod + 1; i <= currentIndex; i++) {
+            sumClose += series.getBar(i).getClosePrice().doubleValue();
+        }
+
+        double avgClose = sumClose / trendPeriod;
+
+        if (lastClose > avgClose && lastClose > firstClose) {
+            return "Trend: " + CONSOLE_COLORS.BRIGHT_GREEN + "상승" + CONSOLE_COLORS.RESET;
+        } else if (lastClose < avgClose && lastClose < firstClose) {
+            return "Trend: " + CONSOLE_COLORS.BRIGHT_RED + "하락" + CONSOLE_COLORS.RESET;
+        } else {
+            return "Trend: 중립";
+        }
+    }
+
 
     private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
         List<Indicator<Num>> indicators = new ArrayList<>();
