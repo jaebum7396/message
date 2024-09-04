@@ -592,9 +592,9 @@ public class FutureMLService {
                 // 테이크프로핏 가격 계산 (기초자산의 10%)
                 BigDecimal takeProfitPrice;
                 if (positionSide.equals("LONG")) {
-                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.05)));
+                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.01)));
                 } else {
-                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.05)));
+                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01)));
                 }
                 takeProfitPrice = takeProfitPrice.setScale(getPricePrecision(symbol), RoundingMode.UP);
                 LinkedHashMap<String, Object> takeProfitOrder = makeStopOrder(tradingEntity, "TAKE_PROFIT_MARKET", takeProfitPrice, quantity);
