@@ -578,12 +578,12 @@ public class FutureMLService {
                 quantity = quantity.divide(stepSize, 0, RoundingMode.DOWN).multiply(stepSize);
                 paramMap.put("quantity", quantity);
 
-                // 스탑로스 가격 계산 (기초자산의 -3%)
+                // 스탑로스 가격 계산 (기초자산의 -N%)
                 BigDecimal stopLossPrice;
                 if (positionSide.equals("LONG")) {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.03)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01)));
                 } else {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.03)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.01)));
                 }
                 stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
                 LinkedHashMap<String, Object> stopLossOrder = makeStopOrder(tradingEntity, "STOP_MARKET", stopLossPrice, quantity);
@@ -592,9 +592,9 @@ public class FutureMLService {
                 // 테이크프로핏 가격 계산 (기초자산의 10%)
                 BigDecimal takeProfitPrice;
                 if (positionSide.equals("LONG")) {
-                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.10)));
+                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.05)));
                 } else {
-                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.10)));
+                    takeProfitPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.05)));
                 }
                 takeProfitPrice = takeProfitPrice.setScale(getPricePrecision(symbol), RoundingMode.UP);
                 LinkedHashMap<String, Object> takeProfitOrder = makeStopOrder(tradingEntity, "TAKE_PROFIT_MARKET", takeProfitPrice, quantity);
