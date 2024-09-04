@@ -31,22 +31,16 @@ public class RealisticBackTest {
     private int longTrades = 0;
     private int longWins = 0;
     private double longWinRate = 0;
-    public int getLongWins() {
-        return longWins;
-    }
-    public double getLongWinRate() {
-        return longWinRate;
-    }
-
     private int shortTrades = 0;
     private int shortWins = 0;
     private double shortWinRate = 0;
-    public int getShortWins() {
-        return shortTrades;
-    }
-    public double getShortWinRate() {
-        return shortWinRate;
-    }
+
+    // 기대수익 계산을 위한 변수들
+    private double longTotalReturn = 0;
+    private double shortTotalReturn = 0;
+    private double longExpectedReturn = 0;
+    private double shortExpectedReturn = 0;
+
     private static final int TREND_PERIOD = 5;  // 트렌드를 판단할 기간
 
     public RealisticBackTest(BarSeries series, Strategy longStrategy, Strategy shortStrategy,
@@ -157,13 +151,16 @@ public class RealisticBackTest {
             //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
             //        entryRule, rule);
 
-            // 승률 계산을 위한 정보 업데이트
+            // 승률과 기대수익 계산을 위한 정보 업데이트
+            double roiValue = roi.doubleValue();
             if (lastEntryType == Trade.TradeType.BUY) {
                 longTrades++;
                 if (roi.isPositive()) longWins++;
+                longTotalReturn += roiValue;
             } else {
                 shortTrades++;
                 if (roi.isPositive()) shortWins++;
+                shortTotalReturn += roiValue;
             }
         }
     }
@@ -180,9 +177,15 @@ public class RealisticBackTest {
         longWinRate = longTrades > 0 ? (double) longWins / longTrades * 100 : 0;
         shortWinRate = shortTrades > 0 ? (double) shortWins / shortTrades * 100 : 0;
 
+        // 기대수익 계산
+        longExpectedReturn = longTrades > 0 ? longTotalReturn / longTrades * 100 : 0;
+        shortExpectedReturn = shortTrades > 0 ? shortTotalReturn / shortTrades * 100 : 0;
+
         System.out.println("\n===== 백테스트 결과 =====");
         System.out.printf("롱 포지션 승률: %.2f%% (%d/%d)%n", longWinRate, longWins, longTrades);
+        System.out.printf("롱 포지션 기대수익: %.2f%%%n", longExpectedReturn);
         System.out.printf("숏 포지션 승률: %.2f%% (%d/%d)%n", shortWinRate, shortWins, shortTrades);
+        System.out.printf("숏 포지션 기대수익: %.2f%%%n", shortExpectedReturn);
         System.out.println("=======================");
     }
 
@@ -198,6 +201,43 @@ public class RealisticBackTest {
         } else {
             // Rule의 toString() 메서드 호출
             return rule.toString();
+        }
+    }
+
+    public int getLongWins() {
+        return longWins;
+    }
+
+    public double getLongWinRate() {
+        return longWinRate;
+    }
+
+    public int getShortWins() {
+        return shortWins;
+    }
+
+    public double getShortWinRate() {
+        return shortWinRate;
+    }
+
+    public double getLongExpectedReturn() {
+        return longExpectedReturn;
+    }
+
+    public double getShortExpectedReturn() {
+        return shortExpectedReturn;
+    }
+
+    public String getBestPosition() {
+        double longScore = longWinRate * longExpectedReturn;
+        double shortScore = shortWinRate * shortExpectedReturn;
+
+        if (longScore > shortScore) {
+            return "LONG";
+        } else if (shortScore > longScore) {
+            return "SHORT";
+        } else {
+            return "NEUTRAL";
         }
     }
 }

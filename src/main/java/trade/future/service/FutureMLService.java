@@ -453,38 +453,33 @@ public class FutureMLService {
                             Duration.ofSeconds(5), 0.1);
                     TradingRecord record = backtest.run();
 
-                    // 백테스트 결과에서 승률 가져오기
-                    double longWinRate = backtest.getLongWinRate();
-                    double shortWinRate = backtest.getShortWinRate();
-
+                    String bestPosition = backtest.getBestPosition();
                     String currentTrend = getTrend(series);  // 현재 트렌드 확인
+
                     System.out.println("Current Trend: " + currentTrend);
-                    System.out.printf("Long Win Rate: %.2f%%, Short Win Rate: %.2f%%\n", longWinRate, shortWinRate);
+                    System.out.println("Best Position: " + bestPosition);
 
                     boolean enterFlag = false;
-                    if (longWinRate > shortWinRate) {
-                        // 롱 포지션의 승률이 더 높은 경우
+                    if (bestPosition.equals("LONG") && currentTrend.equals("UP")) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                        if (enterFlag && currentTrend.equals("UP")) {
-                            System.out.println("롱 포지션 오픈 (높은 승률: " + longWinRate + "%)");
+                        if (enterFlag) {
+                            System.out.println("롱 포지션 오픈 (최적 포지션: LONG)");
                             makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                             TOTAL_POSITION_COUNT++;
                         } else {
-                            System.out.println("롱 진입 조건 충족되지 않음 (트렌드 불일치 또는 진입 시그널 없음)");
+                            System.out.println("롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
-                    } else if (shortWinRate > longWinRate) {
-                        // 숏 포지션의 승률이 더 높은 경우
+                    } else if (bestPosition.equals("SHORT") && currentTrend.equals("DOWN")) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                        if (enterFlag && currentTrend.equals("DOWN")) {
-                            System.out.println("숏 포지션 오픈 (높은 승률: " + shortWinRate + "%)");
+                        if (enterFlag) {
+                            System.out.println("숏 포지션 오픈 (최적 포지션: SHORT)");
                             makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
                             TOTAL_POSITION_COUNT++;
                         } else {
-                            System.out.println("숏 진입 조건 충족되지 않음 (트렌드 불일치 또는 진입 시그널 없음)");
+                            System.out.println("숏 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
                     } else {
-                        // 승률이 동일한 경우 (이 경우 진입하지 않음)
-                        System.out.println("롱과 숏의 승률이 동일함. 포지션 진입 보류.");
+                        System.out.println("최적 포지션과 현재 트렌드 불일치. 포지션 진입 보류.");
                     }
 
                     if (!enterFlag) {
