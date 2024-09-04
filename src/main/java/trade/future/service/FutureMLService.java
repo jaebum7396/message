@@ -581,9 +581,9 @@ public class FutureMLService {
                 // 스탑로스 가격 계산 (기초자산의 -N%)
                 BigDecimal stopLossPrice;
                 if (positionSide.equals("LONG")) {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.005)));
                 } else {
-                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.01)));
+                    stopLossPrice = openPrice.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(0.005)));
                 }
                 stopLossPrice = stopLossPrice.setScale(getPricePrecision(symbol), RoundingMode.DOWN);
                 LinkedHashMap<String, Object> stopLossOrder = makeStopOrder(tradingEntity, "STOP_MARKET", stopLossPrice, quantity);
