@@ -460,7 +460,7 @@ public class FutureMLService {
                     System.out.println("Best Position: " + bestPosition);
 
                     boolean enterFlag = false;
-                    if (bestPosition.equals("LONG") && currentTrend.equals("UP")) {
+                    //if (bestPosition.equals("LONG") && currentTrend.equals("UP")) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈 (최적 포지션: LONG)");
@@ -469,7 +469,7 @@ public class FutureMLService {
                         } else {
                             System.out.println("롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
-                    } else if (bestPosition.equals("SHORT") && currentTrend.equals("DOWN")) {
+                    //} else if (bestPosition.equals("SHORT") && currentTrend.equals("DOWN")) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("숏 포지션 오픈 (최적 포지션: SHORT)");
@@ -478,16 +478,16 @@ public class FutureMLService {
                         } else {
                             System.out.println("숏 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
-                    } else {
-                        System.out.println("최적 포지션과 현재 트렌드 불일치. 포지션 진입 보류.");
-                    }
+                    //} else {
+                    //    System.out.println("최적 포지션과 현재 트렌드 불일치. 포지션 진입 보류.");
+                    //}
 
                     if (!enterFlag) {
                         if(
                             false
-                            //||!scanner.isLikelyToMove()
-                            || (bestPosition.equals("LONG") && currentTrend.equals("DOWN"))
-                            || (bestPosition.equals("SHORT") && currentTrend.equals("UP"))
+                            ||!scanner.isLikelyToMove()
+                            //|| (bestPosition.equals("LONG") && currentTrend.equals("DOWN"))
+                            //|| (bestPosition.equals("SHORT") && currentTrend.equals("UP"))
                         ){
                             log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
                             restartTrading(tradingEntity);
@@ -1154,9 +1154,9 @@ public class FutureMLService {
                     if (
                         true
                         //&& scanner.isNearSignal() // 시그널 근접 여부
-                        //&& scanner.isLikelyToMove() // 움직일 가능성 여부
+                        && scanner.isLikelyToMove() // 움직일 가능성 여부
                         && series.getBarCount() == 1500
-                        && ((bestPosition.equals("LONG") && currentTrend.equals("UP"))||(bestPosition.equals("SHORT") && currentTrend.equals("DOWN")))
+                        //&& ((bestPosition.equals("LONG") && currentTrend.equals("UP"))||(bestPosition.equals("SHORT") && currentTrend.equals("DOWN")))
                         //&& (longEntrySignal || shortEntrySignal)
                         //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
                         //&& (winTradeCount.compareTo(loseTradeCount) > 0)
