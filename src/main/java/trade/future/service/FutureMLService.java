@@ -449,31 +449,61 @@ public class FutureMLService {
                     }
                 }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
                     //scanner.printSignalProximity(symbol);
+                    String currentTrend = getTrend(series);  // 현재 트렌드 확인
+                    System.out.println("Current Trend: " + currentTrend);
                     boolean enterFlag = false;
-                    enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                    if (enterFlag) {
-                        System.out.println("숏 포지션 오픈");
-                        //if (TOTAL_POSITION_COUNT<5){
+                    if (currentTrend.equals("DOWN")) {
+                        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+                        if (enterFlag) {
+                            System.out.println("숏 포지션 오픈");
                             makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
                             TOTAL_POSITION_COUNT++;
-                        //}
-                    } else{
+                        }
+                    } else if (currentTrend.equals("UP")) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈");
-                            //if (TOTAL_POSITION_COUNT<5){
-                                makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
-                                TOTAL_POSITION_COUNT++;
-                            //}
-                        }else{
-                            if(!scanner.isLikelyToMove()){
-                                log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
-                                restartTrading(tradingEntity);
-                            }
+                            makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
+                            TOTAL_POSITION_COUNT++;
+                        }
+                    }
+
+                    if (!enterFlag) {
+                        if(!scanner.isLikelyToMove()){
+                            log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
+                            restartTrading(tradingEntity);
                         }
                     }
                 });
             }
+        }
+    }
+
+    // 트렌드를 확인하는 메서드
+    private String getTrend(BaseBarSeries series) {
+        int endIndex = series.getEndIndex();
+        int lookbackPeriod = 5;  // 최근 5개 봉을 기준으로 트렌드 판단
+
+        if (endIndex < lookbackPeriod) {
+            return "NEUTRAL";  // 데이터가 충분하지 않으면 중립 반환
+        }
+
+        double sumClose = 0;
+        double firstClose = series.getBar(endIndex - lookbackPeriod + 1).getClosePrice().doubleValue();
+        double lastClose = series.getLastBar().getClosePrice().doubleValue();
+
+        for (int i = endIndex - lookbackPeriod + 1; i <= endIndex; i++) {
+            sumClose += series.getBar(i).getClosePrice().doubleValue();
+        }
+
+        double avgClose = sumClose / lookbackPeriod;
+
+        if (lastClose > avgClose && lastClose > firstClose) {
+            return "UP";
+        } else if (lastClose < avgClose && lastClose < firstClose) {
+            return "DOWN";
+        } else {
+            return "NEUTRAL";
         }
     }
 
