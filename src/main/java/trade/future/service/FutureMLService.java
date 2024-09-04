@@ -484,7 +484,8 @@ public class FutureMLService {
 
                     if (!enterFlag) {
                         if(
-                            !scanner.isLikelyToMove()
+                            false
+                            //||!scanner.isLikelyToMove()
                             || (bestPosition.equals("LONG") && currentTrend.equals("DOWN"))
                             || (bestPosition.equals("SHORT") && currentTrend.equals("UP"))
                         ){
@@ -1153,7 +1154,7 @@ public class FutureMLService {
                     if (
                         true
                         //&& scanner.isNearSignal() // 시그널 근접 여부
-                        && scanner.isLikelyToMove() // 움직일 가능성 여부
+                        //&& scanner.isLikelyToMove() // 움직일 가능성 여부
                         && series.getBarCount() == 1500
                         && ((bestPosition.equals("LONG") && currentTrend.equals("UP"))||(bestPosition.equals("SHORT") && currentTrend.equals("DOWN")))
                         //&& (longEntrySignal || shortEntrySignal)
