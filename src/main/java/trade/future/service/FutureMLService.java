@@ -483,7 +483,11 @@ public class FutureMLService {
                     }
 
                     if (!enterFlag) {
-                        if(!scanner.isLikelyToMove()){
+                        if(
+                            !scanner.isLikelyToMove()
+                            || (bestPosition.equals("LONG") && currentTrend.equals("DOWN"))
+                            || (bestPosition.equals("SHORT") && currentTrend.equals("UP"))
+                        ){
                             log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
                             restartTrading(tradingEntity);
                         }
@@ -1129,6 +1133,17 @@ public class FutureMLService {
                 double threshold = 0.5; // 시그널 임계값
                 double proximityThreshold = 0.3; // 근접 임계값
                 SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
+
+                RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy,
+                        Duration.ofSeconds(5), 0.1);
+                TradingRecord record = backtest.run();
+
+                String bestPosition = backtest.getBestPosition();
+                String currentTrend = getTrend(series);  // 현재 트렌드 확인
+
+                System.out.println("Current Trend: " + currentTrend);
+                System.out.println("Best Position: " + bestPosition);
+
                 //scanner.printSignalProximity(symbol);
 
                 //if (expectationProfitOpt.isPresent()){
@@ -1140,6 +1155,7 @@ public class FutureMLService {
                         //&& scanner.isNearSignal() // 시그널 근접 여부
                         && scanner.isLikelyToMove() // 움직일 가능성 여부
                         && series.getBarCount() == 1500
+                        && ((bestPosition.equals("LONG") && currentTrend.equals("UP"))||(bestPosition.equals("SHORT") && currentTrend.equals("DOWN")))
                         //&& (longEntrySignal || shortEntrySignal)
                         //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
                         //&& (winTradeCount.compareTo(loseTradeCount) > 0)
