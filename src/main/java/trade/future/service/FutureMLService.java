@@ -570,15 +570,15 @@ public class FutureMLService {
             Map<String, Object> resultMap = orderSubmit(orderParams);
 
             // 스탑로스 주문 제출
-            if (orderParams.containsKey("stopLossOrder")) {
-                LinkedHashMap<String, Object> stopLossOrderParams = (LinkedHashMap<String, Object>) orderParams.get("stopLossOrder");
-                orderSubmit(stopLossOrderParams);
-            }
+            //if (orderParams.containsKey("stopLossOrder")) {
+            //    LinkedHashMap<String, Object> stopLossOrderParams = (LinkedHashMap<String, Object>) orderParams.get("stopLossOrder");
+            //    orderSubmit(stopLossOrderParams);
+            //}
             // 테이크프로핏 주문 제출
-            if (orderParams.containsKey("takeProfitOrder")) {
-                LinkedHashMap<String, Object> takeProfitOrderParams = (LinkedHashMap<String, Object>) orderParams.get("takeProfitOrder");
-                orderSubmit(takeProfitOrderParams);
-            }
+            //if (orderParams.containsKey("takeProfitOrder")) {
+            //    LinkedHashMap<String, Object> takeProfitOrderParams = (LinkedHashMap<String, Object>) orderParams.get("takeProfitOrder");
+            //    orderSubmit(takeProfitOrderParams);
+            //}
 
             System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_GREEN+"*********************[진입 - 진입사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
 
