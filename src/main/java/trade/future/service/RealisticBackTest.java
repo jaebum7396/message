@@ -43,8 +43,9 @@ public class RealisticBackTest {
     private double shortTotalReturn = 0;
     private double longExpectedReturn = 0;
     private double shortExpectedReturn = 0;
-
     private static final int TREND_PERIOD = 5;  // 트렌드를 판단할 기간
+    private final int leverage = 1;
+    private final double feeRate = 0.0004; // 바이낸스 선물 거래 수수료율 (예: 0.0004 for 0.04%)
 
     public RealisticBackTest(BarSeries series, Strategy longStrategy, Strategy shortStrategy,
                              Duration executionDelay, double slippagePercent) {
@@ -54,6 +55,7 @@ public class RealisticBackTest {
         this.executionDelay = executionDelay;
         this.slippagePercent = slippagePercent;
         this.random = new Random();
+
 
         System.out.println("===== 백테스트 시작 =====");
         System.out.println("longStrategy Entry Rule: " + getRuleDescription(longStrategy.getEntryRule()));
@@ -160,14 +162,7 @@ public class RealisticBackTest {
 
         String timeStr = executionBar.getEndTime().format(timeFormatter);
 
-        if (!isExit) {
-            entryPrice = executionPrice;
-            lastEntryType = tradeType;
-            entryIndex = executionIndex;
-            entryTime = timeStr;
-            String trend = getTrend(index);
-            entryRule = rule + " | Trend: " + trend;  // 트렌드 정보 추가
-        } else {
+        if (isExit) {
             Num roi = calculateROI(executionPrice);
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
@@ -180,7 +175,6 @@ public class RealisticBackTest {
 
             // 승률과 기대수익 계산을 위한 정보 업데이트
             double roiValue = roi.doubleValue();
-            //System.out.println("lastEntryType: " + lastEntryType);
             if (lastEntryType == Trade.TradeType.BUY) {
                 longTrades++;
                 if (roi.isPositive()) longWins++;
@@ -194,10 +188,16 @@ public class RealisticBackTest {
     }
 
     private Num calculateROI(Num exitPrice) {
+        double entryFee = entryPrice.doubleValue() * feeRate;
+        double exitFee = exitPrice.doubleValue() * feeRate;
+        double totalFee = entryFee + exitFee;
+
         if (lastEntryType == Trade.TradeType.BUY) {
-            return exitPrice.minus(entryPrice).dividedBy(entryPrice);
+            double profit = (exitPrice.doubleValue() - entryPrice.doubleValue()) * leverage;
+            return series.numOf((profit - totalFee) / entryPrice.doubleValue());
         } else {
-            return entryPrice.minus(exitPrice).dividedBy(entryPrice);
+            double profit = (entryPrice.doubleValue() - exitPrice.doubleValue()) * leverage;
+            return series.numOf((profit - totalFee) / entryPrice.doubleValue());
         }
     }
 
@@ -205,11 +205,12 @@ public class RealisticBackTest {
         longWinRate = longTrades > 0 ? (double) longWins / longTrades * 100 : 0;
         shortWinRate = shortTrades > 0 ? (double) shortWins / shortTrades * 100 : 0;
 
-        // 기대수익 계산
+        // 기대수익 계산 (이미 레버리지와 수수료가 반영된 값)
         longExpectedReturn = longTrades > 0 ? longTotalReturn / longTrades * 100 : 0;
         shortExpectedReturn = shortTrades > 0 ? shortTotalReturn / shortTrades * 100 : 0;
 
         System.out.println("\n===== 백테스트 결과 =====");
+        System.out.printf("레버리지: %dx, 수수료율: %.2f%%%n", leverage, feeRate * 100);
         System.out.printf("롱 포지션 승률: %.2f%% (%d/%d)%n", longWinRate, longWins, longTrades);
         System.out.printf("롱 포지션 기대수익: %.2f%%%n", longExpectedReturn);
         System.out.printf("숏 포지션 승률: %.2f%% (%d/%d)%n", shortWinRate, shortWins, shortTrades);
