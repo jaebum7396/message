@@ -173,11 +173,11 @@ public class RealisticBackTest {
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
 
-            log.info("{}ENTER {}[{}/{}] => EXIT {}[{}/{}]{} | ROI: {}{}%{} | Entry: {} | Exit: {}",
-                    tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(),
-                    lastEntryType, executionIndex, executionPrice.doubleValue(), ANSI_RESET,
-                    roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
-                    entryRule, rule);
+            //log.info("{}ENTER {}[{}/{}] => EXIT {}[{}/{}]{} | ROI: {}{}%{} | Entry: {} | Exit: {}",
+            //        tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(),
+            //        lastEntryType, executionIndex, executionPrice.doubleValue(), ANSI_RESET,
+            //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
+            //        entryRule, rule);
 
             double roiValue = roi.doubleValue();
             if (lastEntryType == Trade.TradeType.BUY) {
