@@ -27,7 +27,7 @@ public class MLExitRule implements Rule {
         double[] probabilities = model.predictProbabilities(indicators, index);
 
         if (probabilities[1] > threshold) {
-            log.info("횡보시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
+            //log.info("횡보시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
             return true;
         }
         return false;

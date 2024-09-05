@@ -79,12 +79,12 @@ public class RealisticBackTest {
                 if (currentType.equals(Trade.TradeType.BUY)) {
                     shouldExit = longStrategy.shouldExit(i) || shortStrategy.shouldEnter(i);
                     if (shouldExit) {
-                        log.info("롱 포지션 청산 시그널 - Index: {}", i);
+                        //log.info("롱 포지션 청산 시그널 - Index: {}", i);
                     }
                 } else if (currentType.equals(Trade.TradeType.SELL)) {
                     shouldExit = shortStrategy.shouldExit(i) || longStrategy.shouldEnter(i);
                     if (shouldExit) {
-                        log.info("숏 포지션 청산 시그널 - Index: {}", i);
+                        //log.info("숏 포지션 청산 시그널 - Index: {}", i);
                     }
                 }
 
@@ -104,11 +104,11 @@ public class RealisticBackTest {
 
                 if (shouldEnterLong) {
                     String entryRule = getRuleDescription(longStrategy.getEntryRule());
-                    log.info("롱 포지션 진입 시그널 - Index: {}", i);
+                    //log.info("롱 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.BUY, currentBar, i, false, entryRule);
                 } else if (shouldEnterShort) {
                     String entryRule = getRuleDescription(shortStrategy.getEntryRule());
-                    log.info("숏 포지션 진입 시그널 - Index: {}", i);
+                    //log.info("숏 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.SELL, currentBar, i, false, entryRule);
                 }
             }
@@ -172,11 +172,11 @@ public class RealisticBackTest {
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
 
-            System.out.printf("%sENTER %s[%d/%.5f/%s] => EXIT %s[%d/%.5f/%s]%s | ROI: %s%.2f%%%s | Entry: %s | Exit: %s%n",
-                    tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(), entryTime,
-                    lastEntryType, executionIndex, executionPrice.doubleValue(), timeStr, ANSI_RESET,
-                    roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
-                    entryRule, rule);
+            //System.out.printf("%sENTER %s[%d/%.5f/%s] => EXIT %s[%d/%.5f/%s]%s | ROI: %s%.2f%%%s | Entry: %s | Exit: %s%n",
+            //        tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(), entryTime,
+            //        lastEntryType, executionIndex, executionPrice.doubleValue(), timeStr, ANSI_RESET,
+            //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
+            //        entryRule, rule);
 
             // 승률과 기대수익 계산을 위한 정보 업데이트
             double roiValue = roi.doubleValue();
