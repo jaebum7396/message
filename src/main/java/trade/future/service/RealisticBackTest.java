@@ -8,7 +8,6 @@ import org.ta4j.core.rules.OrRule;
 
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.Random;
 
 @Slf4j
@@ -30,7 +29,6 @@ public class RealisticBackTest {
     private String entryRule;
     private DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    // 승률 계산을 위한 변수들
     private int longTrades = 0;
     private int longWins = 0;
     private double longWinRate = 0;
@@ -38,14 +36,14 @@ public class RealisticBackTest {
     private int shortWins = 0;
     private double shortWinRate = 0;
 
-    // 기대수익 계산을 위한 변수들
     private double longTotalReturn = 0;
     private double shortTotalReturn = 0;
     private double longExpectedReturn = 0;
     private double shortExpectedReturn = 0;
-    private static final int TREND_PERIOD = 5;  // 트렌드를 판단할 기간
-    private final int leverage = 1;
-    private final double feeRate = 0.0004; // 바이낸스 선물 거래 수수료율 (예: 0.0004 for 0.04%)
+
+    private static final int TREND_PERIOD = 5;
+    private final int leverage;
+    private final double feeRate;
 
     public RealisticBackTest(BarSeries series, Strategy longStrategy, Strategy shortStrategy,
                              Duration executionDelay, double slippagePercent) {
@@ -55,13 +53,16 @@ public class RealisticBackTest {
         this.executionDelay = executionDelay;
         this.slippagePercent = slippagePercent;
         this.random = new Random();
+        this.leverage = 1;
+        this.feeRate = 0.0004;
+        this.entryPrice = series.numOf(0);
+        this.lastEntryType = null;
 
-
-        System.out.println("===== 백테스트 시작 =====");
-        System.out.println("longStrategy Entry Rule: " + getRuleDescription(longStrategy.getEntryRule()));
-        System.out.println("longStrategy Exit Rule: " + getRuleDescription(longStrategy.getExitRule()));
-        System.out.println("shortStrategy Entry Rule: " + getRuleDescription(shortStrategy.getEntryRule()));
-        System.out.println("shortStrategy Exit Rule: " + getRuleDescription(shortStrategy.getExitRule()));
+        log.info("===== 백테스트 시작 =====");
+        log.info("longStrategy Entry Rule: {}", getRuleDescription(longStrategy.getEntryRule()));
+        log.info("longStrategy Exit Rule: {}", getRuleDescription(longStrategy.getExitRule()));
+        log.info("shortStrategy Entry Rule: {}", getRuleDescription(shortStrategy.getEntryRule()));
+        log.info("shortStrategy Exit Rule: {}", getRuleDescription(shortStrategy.getExitRule()));
     }
 
     public TradingRecord run() {
@@ -71,7 +72,6 @@ public class RealisticBackTest {
             Bar currentBar = series.getBar(i);
             String currentTrend = getTrend(i);
 
-            // Check for exit signals first
             Position currentPosition = tradingRecord.getCurrentPosition();
             if (currentPosition != null && currentPosition.isOpened()) {
                 Trade.TradeType currentType = currentPosition.getEntry().getAmount().doubleValue() > 0 ?
@@ -81,12 +81,12 @@ public class RealisticBackTest {
                 if (currentType.equals(Trade.TradeType.BUY)) {
                     shouldExit = longStrategy.shouldExit(i) || shortStrategy.shouldEnter(i);
                     if (shouldExit) {
-                        //log.info("롱 포지션 청산 시그널 - Index: {}", i);
+                        log.info("롱 포지션 청산 시그널 - Index: {}", i);
                     }
                 } else if (currentType.equals(Trade.TradeType.SELL)) {
                     shouldExit = shortStrategy.shouldExit(i) || longStrategy.shouldEnter(i);
                     if (shouldExit) {
-                        //log.info("숏 포지션 청산 시그널 - Index: {}", i);
+                        log.info("숏 포지션 청산 시그널 - Index: {}", i);
                     }
                 }
 
@@ -99,18 +99,17 @@ public class RealisticBackTest {
                 }
             }
 
-            // Check for entry signals
             if (tradingRecord.getCurrentPosition() == null || !tradingRecord.getCurrentPosition().isOpened()) {
                 boolean shouldEnterLong = currentTrend.equals("UP") && longStrategy.shouldEnter(i);
                 boolean shouldEnterShort = currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i);
 
                 if (shouldEnterLong) {
                     String entryRule = getRuleDescription(longStrategy.getEntryRule());
-                    //log.info("롱 포지션 진입 시그널 - Index: {}", i);
+                    log.info("롱 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.BUY, currentBar, i, false, entryRule);
                 } else if (shouldEnterShort) {
                     String entryRule = getRuleDescription(shortStrategy.getEntryRule());
-                    //log.info("숏 포지션 진입 시그널 - Index: {}", i);
+                    log.info("숏 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.SELL, currentBar, i, false, entryRule);
                 }
             }
@@ -122,7 +121,7 @@ public class RealisticBackTest {
 
     private String getTrend(int currentIndex) {
         if (currentIndex < TREND_PERIOD) {
-            return "NEUTRAL";  // 데이터가 충분하지 않으면 중립 반환
+            return "NEUTRAL";
         }
 
         double sumClose = 0;
@@ -162,18 +161,24 @@ public class RealisticBackTest {
 
         String timeStr = executionBar.getEndTime().format(timeFormatter);
 
-        if (isExit) {
+        if (!isExit) {
+            entryPrice = executionPrice;
+            lastEntryType = tradeType;
+            entryIndex = executionIndex;
+            entryTime = timeStr;
+            String trend = getTrend(index);
+            entryRule = rule + " | Trend: " + trend;
+        } else {
             Num roi = calculateROI(executionPrice);
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
 
-            //System.out.printf("%sENTER %s[%d/%.5f/%s] => EXIT %s[%d/%.5f/%s]%s | ROI: %s%.2f%%%s | Entry: %s | Exit: %s%n",
-            //        tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(), entryTime,
-            //        lastEntryType, executionIndex, executionPrice.doubleValue(), timeStr, ANSI_RESET,
-            //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
-            //        entryRule, rule);
+            log.info("{}ENTER {}[{}/{}] => EXIT {}[{}/{}]{} | ROI: {}{}%{} | Entry: {} | Exit: {}",
+                    tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(),
+                    lastEntryType, executionIndex, executionPrice.doubleValue(), ANSI_RESET,
+                    roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
+                    entryRule, rule);
 
-            // 승률과 기대수익 계산을 위한 정보 업데이트
             double roiValue = roi.doubleValue();
             if (lastEntryType == Trade.TradeType.BUY) {
                 longTrades++;
@@ -188,16 +193,26 @@ public class RealisticBackTest {
     }
 
     private Num calculateROI(Num exitPrice) {
-        double entryFee = entryPrice.doubleValue() * feeRate;
-        double exitFee = exitPrice.doubleValue() * feeRate;
-        double totalFee = entryFee + exitFee;
+        if (entryPrice == null || exitPrice == null) {
+            log.error("Entry price or exit price is null. Entry price: {}, Exit price: {}", entryPrice, exitPrice);
+            return series.numOf(0);
+        }
 
-        if (lastEntryType == Trade.TradeType.BUY) {
-            double profit = (exitPrice.doubleValue() - entryPrice.doubleValue()) * leverage;
-            return series.numOf((profit - totalFee) / entryPrice.doubleValue());
-        } else {
-            double profit = (entryPrice.doubleValue() - exitPrice.doubleValue()) * leverage;
-            return series.numOf((profit - totalFee) / entryPrice.doubleValue());
+        try {
+            double entryFee = entryPrice.doubleValue() * feeRate;
+            double exitFee = exitPrice.doubleValue() * feeRate;
+            double totalFee = entryFee + exitFee;
+
+            if (lastEntryType == Trade.TradeType.BUY) {
+                double profit = (exitPrice.doubleValue() - entryPrice.doubleValue()) * leverage;
+                return series.numOf((profit - totalFee) / entryPrice.doubleValue());
+            } else {
+                double profit = (entryPrice.doubleValue() - exitPrice.doubleValue()) * leverage;
+                return series.numOf((profit - totalFee) / entryPrice.doubleValue());
+            }
+        } catch (Exception e) {
+            log.error("Error calculating ROI: {}", e.getMessage(), e);
+            return series.numOf(0);
         }
     }
 
@@ -205,17 +220,16 @@ public class RealisticBackTest {
         longWinRate = longTrades > 0 ? (double) longWins / longTrades * 100 : 0;
         shortWinRate = shortTrades > 0 ? (double) shortWins / shortTrades * 100 : 0;
 
-        // 기대수익 계산 (이미 레버리지와 수수료가 반영된 값)
         longExpectedReturn = longTrades > 0 ? longTotalReturn / longTrades * 100 : 0;
         shortExpectedReturn = shortTrades > 0 ? shortTotalReturn / shortTrades * 100 : 0;
 
-        System.out.println("\n===== 백테스트 결과 =====");
-        System.out.printf("레버리지: %dx, 수수료율: %.2f%%%n", leverage, feeRate * 100);
-        System.out.printf("롱 포지션 승률: %.2f%% (%d/%d)%n", longWinRate, longWins, longTrades);
-        System.out.printf("롱 포지션 기대수익: %.2f%%%n", longExpectedReturn);
-        System.out.printf("숏 포지션 승률: %.2f%% (%d/%d)%n", shortWinRate, shortWins, shortTrades);
-        System.out.printf("숏 포지션 기대수익: %.2f%%%n", shortExpectedReturn);
-        System.out.println("=======================");
+        log.info("\n===== 백테스트 결과 =====");
+        log.info("레버리지: {}x, 수수료율: {}%", leverage, feeRate * 100);
+        log.info("롱 포지션 승률: {}% ({}/{})", String.format("%.2f", longWinRate), longWins, longTrades);
+        log.info("롱 포지션 기대수익: {}%", String.format("%.2f", longExpectedReturn));
+        log.info("숏 포지션 승률: {}% ({}/{})", String.format("%.2f", shortWinRate), shortWins, shortTrades);
+        log.info("숏 포지션 기대수익: {}%", String.format("%.2f", shortExpectedReturn));
+        log.info("=======================");
     }
 
     private String getRuleDescription(Rule rule) {
@@ -228,34 +242,11 @@ public class RealisticBackTest {
             return "OR(" + getRuleDescription(orRule.getRule1()) + "," +
                     getRuleDescription(orRule.getRule2()) + ")";
         } else {
-            // Rule의 toString() 메서드 호출
             return rule.toString();
         }
     }
 
-    public int getLongWins() {
-        return longWins;
-    }
-
-    public double getLongWinRate() {
-        return longWinRate;
-    }
-
-    public int getShortWins() {
-        return shortWins;
-    }
-
-    public double getShortWinRate() {
-        return shortWinRate;
-    }
-
-    public double getLongExpectedReturn() {
-        return longExpectedReturn;
-    }
-
-    public double getShortExpectedReturn() {
-        return shortExpectedReturn;
-    }
+    // Getter methods...
 
     public String getBestPosition() {
         double longScore = longWinRate * longExpectedReturn;
