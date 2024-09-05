@@ -417,8 +417,8 @@ public class FutureMLService {
                     }
                     openPosition.setRoi(currentROI);
                     openPosition.setProfit(currentPnl);
-                    System.out.println("ROI : " + currentROI);
-                    System.out.println("PNL : " + currentPnl);
+                    System.out.println(symbol + " ROI : " + currentROI);
+                    System.out.println(symbol + " PNL : " + currentPnl);
 
                     boolean exitFlag = false;
                     boolean enterFlag = false;
@@ -441,7 +441,7 @@ public class FutureMLService {
                         positionRepository.save(openPosition);
                         makeCloseOrder(eventEntity, positionEvent, "포지션 청산");
                         TOTAL_POSITION_COUNT--;
-                        System.out.println("포지션 종료");
+                        System.out.println(symbol + "포지션 종료");
                     } else {
                         if (enterFlag) {
                             makeOpenOrder(eventEntity, openPosition.getPositionSide(), "추가 포지션 오픈");
@@ -456,8 +456,8 @@ public class FutureMLService {
                     String bestPosition = backtest.getBestPosition();
                     String currentTrend = getTrend(series);  // 현재 트렌드 확인
 
-                    System.out.println("Current Trend: " + currentTrend);
-                    System.out.println("Best Position: " + bestPosition);
+                    System.out.println(symbol + "Current Trend: " + currentTrend);
+                    System.out.println(symbol + "Best Position: " + bestPosition);
 
                     boolean enterFlag = false;
                     //if (
@@ -467,11 +467,11 @@ public class FutureMLService {
                     //) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
-                            System.out.println("롱 포지션 오픈 (최적 포지션: LONG)");
+                            System.out.println(symbol + "롱 포지션 오픈 (최적 포지션: LONG)");
                             makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
                             TOTAL_POSITION_COUNT++;
                         } else {
-                            System.out.println("롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
+                            System.out.println(symbol + "롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
                     //} else if (
                     //    true
@@ -480,11 +480,11 @@ public class FutureMLService {
                     //) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
-                            System.out.println("숏 포지션 오픈 (최적 포지션: SHORT)");
+                            System.out.println(symbol + "숏 포지션 오픈 (최적 포지션: SHORT)");
                             makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
                             TOTAL_POSITION_COUNT++;
                         } else {
-                            System.out.println("숏 진입 조건 충족되지 않음 (진입 시그널 없음)");
+                            System.out.println(symbol + "숏 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
                     //} else {
                     //    System.out.println("현재 트렌드 불일치. 포지션 진입 보류.");
@@ -497,7 +497,7 @@ public class FutureMLService {
                             //|| (bestPosition.equals("LONG") && currentTrend.equals("DOWN"))
                             //|| (bestPosition.equals("SHORT") && currentTrend.equals("UP"))
                         ){
-                            log.info("스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
+                            log.info(symbol + "스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
                             restartTrading(tradingEntity);
                         }
                     }
