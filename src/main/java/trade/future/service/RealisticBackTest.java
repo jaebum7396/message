@@ -81,12 +81,12 @@ public class RealisticBackTest {
                 if (currentType.equals(Trade.TradeType.BUY)) {
                     shouldExit = longStrategy.shouldExit(i) || shortStrategy.shouldEnter(i);
                     if (shouldExit) {
-                        log.info("롱 포지션 청산 시그널 - Index: {}", i);
+                        //log.info("롱 포지션 청산 시그널 - Index: {}", i);
                     }
                 } else if (currentType.equals(Trade.TradeType.SELL)) {
                     shouldExit = shortStrategy.shouldExit(i) || longStrategy.shouldEnter(i);
                     if (shouldExit) {
-                        log.info("숏 포지션 청산 시그널 - Index: {}", i);
+                        //log.info("숏 포지션 청산 시그널 - Index: {}", i);
                     }
                 }
 
@@ -105,11 +105,11 @@ public class RealisticBackTest {
 
                 if (shouldEnterLong) {
                     String entryRule = getRuleDescription(longStrategy.getEntryRule());
-                    log.info("롱 포지션 진입 시그널 - Index: {}", i);
+                    //log.info("롱 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.BUY, currentBar, i, false, entryRule);
                 } else if (shouldEnterShort) {
                     String entryRule = getRuleDescription(shortStrategy.getEntryRule());
-                    log.info("숏 포지션 진입 시그널 - Index: {}", i);
+                    //log.info("숏 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.SELL, currentBar, i, false, entryRule);
                 }
             }
