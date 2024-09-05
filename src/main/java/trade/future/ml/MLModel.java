@@ -8,8 +8,9 @@ import smile.data.formula.Formula;
 import smile.data.vector.IntVector;
 import smile.regression.RandomForest;
 
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class MLModel {
@@ -17,6 +18,9 @@ public class MLModel {
     private RandomForest model;
     private final double priceChangeThreshold;
     private static final int MINIMUM_DATA_POINTS = 50; // 최소 필요 데이터 포인트 수
+
+    // 추가: 특성 중요도를 저장할 필드
+    private double[] featureImportance;
 
     public MLModel(double priceChangeThreshold) {
         this.priceChangeThreshold = priceChangeThreshold;
@@ -77,7 +81,11 @@ public class MLModel {
 
             Formula formula = Formula.lhs("y");
             this.model = RandomForest.fit(formula, df);
+
+            // 추가: 특성 중요도 계산
+            this.featureImportance = model.importance();
             logger.info("모델 학습이 성공적으로 완료되었습니다.");
+            logger.info("특성 중요도: " + Arrays.toString(featureImportance));
         } catch (Exception e) {
             logger.severe("모델 학습 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
@@ -87,6 +95,8 @@ public class MLModel {
     // 예측 메서드
     public int predict(List<Indicator<Num>> indicators, int index) {
         double prediction = predictRaw(indicators, index);
+        // 추가: 상위 5개 중요 특성 로깅
+        logTopFeatures(indicators, 5);
         if (prediction > 0.5) {
             return 1;  // 상승
         } else if (prediction < -0.5) {
@@ -103,24 +113,22 @@ public class MLModel {
 
             // 원시 예측값을 확률로 변환
             double[] probabilities = new double[3];
-            if (rawPrediction > 0.5) {
-                probabilities[2] = rawPrediction;
-                probabilities[1] = 1 - rawPrediction;
-                probabilities[0] = 0;
-            } else if (rawPrediction < -0.5) {
-                probabilities[0] = -rawPrediction;
-                probabilities[1] = 1 + rawPrediction;
-                probabilities[2] = 0;
-            } else {
-                probabilities[1] = 1 - Math.abs(rawPrediction);
-                probabilities[0] = probabilities[2] = Math.abs(rawPrediction) / 2;
-            }
+
+            // Softmax 함수를 사용하여 확률 분포 생성
+            double expNeg = Math.exp(-rawPrediction);
+            double expZero = Math.exp(0);
+            double expPos = Math.exp(rawPrediction);
+            double sum = expNeg + expZero + expPos;
+
+            probabilities[0] = expNeg / sum;  // 하락 확률
+            probabilities[1] = expZero / sum; // 유지 확률
+            probabilities[2] = expPos / sum;  // 상승 확률
 
             return probabilities;
         } catch (Exception e) {
             logger.severe("확률 예측 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
-            return new double[]{0, 100, 0};  // 오류 시 기본값 반환
+            return new double[]{0, 1, 0};  // 오류 시 균등 확률 반환
         }
     }
 
@@ -142,5 +150,35 @@ public class MLModel {
         DataFrame df = DataFrame.of(featuresArray, featureNames);
 
         return model.predict(df)[0];
+    }
+
+    // 추가: 특성 중요도를 반환하는 메서드
+    public double[] getFeatureImportance() {
+        return featureImportance;
+    }
+
+    // 추가: 특성 이름과 중요도를 매핑하여 반환하는 메서드
+    public Map<String, Double> getFeatureImportanceMap(List<Indicator<Num>> indicators) {
+        Map<String, Double> importanceMap = new HashMap<>();
+        for (int i = 0; i < indicators.size(); i++) {
+            importanceMap.put(indicators.get(i).getClass().getSimpleName(), featureImportance[i]);
+        }
+        return importanceMap;
+    }
+
+    // 추가: 상위 N개의 중요한 특성을 로깅하는 메서드
+    public void logTopFeatures(List<Indicator<Num>> indicators, int topN) {
+        Map<String, Double> importanceMap = getFeatureImportanceMap(indicators);
+        List<Map.Entry<String, Double>> sortedFeatures = importanceMap.entrySet()
+                .stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(topN)
+                .collect(Collectors.toList());
+
+        StringBuilder sb = new StringBuilder("Top " + topN + " important features:\n");
+        for (Map.Entry<String, Double> entry : sortedFeatures) {
+            sb.append(entry.getKey()).append(": ").append(String.format("%.4f", entry.getValue())).append("\n");
+        }
+        logger.info(sb.toString());
     }
 }

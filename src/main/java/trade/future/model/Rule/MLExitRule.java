@@ -7,6 +7,7 @@ import org.ta4j.core.TradingRecord;
 import org.ta4j.core.num.Num;
 import trade.future.ml.MLModel;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -26,7 +27,7 @@ public class MLExitRule implements Rule {
         double[] probabilities = model.predictProbabilities(indicators, index);
 
         if (probabilities[1] > threshold) {
-            //log.info("상승시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
+            log.info("횡보시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
             return true;
         }
         return false;

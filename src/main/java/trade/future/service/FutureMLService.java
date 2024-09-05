@@ -473,7 +473,8 @@ public class FutureMLService {
                         } else {
                             System.out.println("롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
-                    } else if (true
+                    } else if (
+                        true
                         && bestPosition.equals("SHORT")
                         //&& currentTrend.equals("DOWN")
                     ) {
@@ -1348,7 +1349,7 @@ public class FutureMLService {
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
         Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
         Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
-        Rule mlExitRule = new MLExitRule(mlModel, indicators, 0.8);
+        Rule mlExitRule = new MLExitRule(mlModel, indicators, 0.5);
 
         // 손익 규칙
         int takeProfitRate = tradingEntity.getTakeProfitRate();
@@ -1429,13 +1430,17 @@ public class FutureMLService {
         Rule finalCombinedShortEntryRule = tradingEntity.getReverseTradeChecker() == 1 ? combinedLongEntryRule : combinedShortEntryRule;
 
         // 전략 생성 및 저장
-        Strategy combinedLongStrategy = new BaseStrategy(finalCombinedLongEntryRule, combinedLongExitRule);
-        Strategy combinedShortStrategy = new BaseStrategy(finalCombinedShortEntryRule, combinedShortExitRule);
+        //Strategy combinedLongStrategy = new BaseStrategy(finalCombinedLongEntryRule, combinedLongExitRule);
+        //Strategy combinedShortStrategy = new BaseStrategy(finalCombinedShortEntryRule, combinedShortExitRule);
+
+        Strategy combinedLongStrategy = new BaseStrategy(mlLongEntryRule, new OrRule(mlLongExitRule, mlExitRule));
+        Strategy combinedShortStrategy = new BaseStrategy(mlShortEntryRule, new OrRule(mlShortExitRule, mlExitRule));
+
         strategyMap.put(tradingCd + "_" + interval + "_long_strategy", combinedLongStrategy);
         strategyMap.put(tradingCd + "_" + interval + "_short_strategy", combinedShortStrategy);
 
         // 전략 구성 출력
-        if (false) {
+        if (true) {
             System.out.println("\n===== " + tradingCd + " " + interval + " 전략 구성 =====");
             System.out.println("Long 전략:");
             System.out.println("  진입 규칙: " + describeRule(finalCombinedLongEntryRule));

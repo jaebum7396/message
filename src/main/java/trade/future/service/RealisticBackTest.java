@@ -1,5 +1,6 @@
 package trade.future.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.ta4j.core.*;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.AndRule;
@@ -7,8 +8,10 @@ import org.ta4j.core.rules.OrRule;
 
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Random;
 
+@Slf4j
 public class RealisticBackTest {
     private static final String ANSI_RESET = "\u001B[0m";
     private static final String ANSI_RED = "\u001B[31m";
@@ -51,6 +54,12 @@ public class RealisticBackTest {
         this.executionDelay = executionDelay;
         this.slippagePercent = slippagePercent;
         this.random = new Random();
+
+        System.out.println("===== 백테스트 시작 =====");
+        System.out.println("longStrategy Entry Rule: " + getRuleDescription(longStrategy.getEntryRule()));
+        System.out.println("longStrategy Exit Rule: " + getRuleDescription(longStrategy.getExitRule()));
+        System.out.println("shortStrategy Entry Rule: " + getRuleDescription(shortStrategy.getEntryRule()));
+        System.out.println("shortStrategy Exit Rule: " + getRuleDescription(shortStrategy.getExitRule()));
     }
 
     public TradingRecord run() {
@@ -63,9 +72,22 @@ public class RealisticBackTest {
             // Check for exit signals first
             Position currentPosition = tradingRecord.getCurrentPosition();
             if (currentPosition != null && currentPosition.isOpened()) {
-                Trade.TradeType currentType = currentPosition.getEntry().getType();
-                boolean shouldExit = (currentType.equals(Trade.TradeType.BUY) && longStrategy.shouldExit(i)) ||
-                        (currentType.equals(Trade.TradeType.SELL) && shortStrategy.shouldExit(i));
+                Trade.TradeType currentType = currentPosition.getEntry().getAmount().doubleValue() > 0 ?
+                        Trade.TradeType.BUY : Trade.TradeType.SELL;
+                boolean shouldExit = false;
+
+                if (currentType.equals(Trade.TradeType.BUY)) {
+                    shouldExit = longStrategy.shouldExit(i) || shortStrategy.shouldEnter(i);
+                    if (shouldExit) {
+                        log.info("롱 포지션 청산 시그널 - Index: {}", i);
+                    }
+                } else if (currentType.equals(Trade.TradeType.SELL)) {
+                    shouldExit = shortStrategy.shouldExit(i) || longStrategy.shouldEnter(i);
+                    if (shouldExit) {
+                        log.info("숏 포지션 청산 시그널 - Index: {}", i);
+                    }
+                }
+
                 if (shouldExit) {
                     String exitRule = currentType.equals(Trade.TradeType.BUY) ?
                             getRuleDescription(longStrategy.getExitRule()) :
@@ -77,11 +99,16 @@ public class RealisticBackTest {
 
             // Check for entry signals
             if (tradingRecord.getCurrentPosition() == null || !tradingRecord.getCurrentPosition().isOpened()) {
-                if (currentTrend.equals("UP") && longStrategy.shouldEnter(i)) {
+                boolean shouldEnterLong = currentTrend.equals("UP") && longStrategy.shouldEnter(i);
+                boolean shouldEnterShort = currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i);
+
+                if (shouldEnterLong) {
                     String entryRule = getRuleDescription(longStrategy.getEntryRule());
+                    log.info("롱 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.BUY, currentBar, i, false, entryRule);
-                } else if (currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i)) {
+                } else if (shouldEnterShort) {
                     String entryRule = getRuleDescription(shortStrategy.getEntryRule());
+                    log.info("숏 포지션 진입 시그널 - Index: {}", i);
                     simulateTrade(tradingRecord, Trade.TradeType.SELL, currentBar, i, false, entryRule);
                 }
             }
@@ -145,14 +172,15 @@ public class RealisticBackTest {
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
 
-            //System.out.printf("%sENTER %s[%d/%.5f/%s] => EXIT %s[%d/%.5f/%s]%s | ROI: %s%.2f%%%s | Entry: %s | Exit: %s%n",
-            //        tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(), entryTime,
-            //        lastEntryType, executionIndex, executionPrice.doubleValue(), timeStr, ANSI_RESET,
-            //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
-            //        entryRule, rule);
+            System.out.printf("%sENTER %s[%d/%.5f/%s] => EXIT %s[%d/%.5f/%s]%s | ROI: %s%.2f%%%s | Entry: %s | Exit: %s%n",
+                    tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(), entryTime,
+                    lastEntryType, executionIndex, executionPrice.doubleValue(), timeStr, ANSI_RESET,
+                    roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
+                    entryRule, rule);
 
             // 승률과 기대수익 계산을 위한 정보 업데이트
             double roiValue = roi.doubleValue();
+            System.out.println("lastEntryType: " + lastEntryType);
             if (lastEntryType == Trade.TradeType.BUY) {
                 longTrades++;
                 if (roi.isPositive()) longWins++;
