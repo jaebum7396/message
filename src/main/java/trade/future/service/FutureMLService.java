@@ -460,11 +460,11 @@ public class FutureMLService {
                     System.out.println("Best Position: " + bestPosition);
 
                     boolean enterFlag = false;
-                    if (
-                        true
-                        && bestPosition.equals("LONG")
-                        //&& currentTrend.equals("UP")
-                    ) {
+                    //if (
+                    //    true
+                    //    //&& bestPosition.equals("LONG")
+                    //    //&& currentTrend.equals("UP")
+                    //) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("롱 포지션 오픈 (최적 포지션: LONG)");
@@ -473,11 +473,11 @@ public class FutureMLService {
                         } else {
                             System.out.println("롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
-                    } else if (
-                        true
-                        && bestPosition.equals("SHORT")
-                        //&& currentTrend.equals("DOWN")
-                    ) {
+                    //} else if (
+                    //    true
+                    //    //&& bestPosition.equals("SHORT")
+                    //    //&& currentTrend.equals("DOWN")
+                    //) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
                             System.out.println("숏 포지션 오픈 (최적 포지션: SHORT)");
@@ -486,9 +486,9 @@ public class FutureMLService {
                         } else {
                             System.out.println("숏 진입 조건 충족되지 않음 (진입 시그널 없음)");
                         }
-                    } else {
-                        System.out.println("현재 트렌드 불일치. 포지션 진입 보류.");
-                    }
+                    //} else {
+                    //    System.out.println("현재 트렌드 불일치. 포지션 진입 보류.");
+                    //}
 
                     if (!enterFlag) {
                         if(
