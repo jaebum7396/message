@@ -180,7 +180,7 @@ public class RealisticBackTest {
 
             // 승률과 기대수익 계산을 위한 정보 업데이트
             double roiValue = roi.doubleValue();
-            System.out.println("lastEntryType: " + lastEntryType);
+            //System.out.println("lastEntryType: " + lastEntryType);
             if (lastEntryType == Trade.TradeType.BUY) {
                 longTrades++;
                 if (roi.isPositive()) longWins++;
