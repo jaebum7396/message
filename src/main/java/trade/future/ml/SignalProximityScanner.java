@@ -55,7 +55,7 @@ public class SignalProximityScanner {
         double[] probabilities = model.predictProbabilities(indicators, currentIndex);
 
         // probabilities[1]은 횡보(중립) 확률
-        return probabilities[1] > 0.4;
+        return probabilities[1] < 0.4;
     }
 
     public void printSignalProximity(String symbol) {
