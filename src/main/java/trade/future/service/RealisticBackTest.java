@@ -53,16 +53,16 @@ public class RealisticBackTest {
         this.executionDelay = executionDelay;
         this.slippagePercent = slippagePercent;
         this.random = new Random();
-        this.leverage = 1;
+        this.leverage = 5;
         this.feeRate = 0.0004;
         this.entryPrice = series.numOf(0);
         this.lastEntryType = null;
 
-        log.info("===== 백테스트 시작 =====");
-        log.info("longStrategy Entry Rule: {}", getRuleDescription(longStrategy.getEntryRule()));
-        log.info("longStrategy Exit Rule: {}", getRuleDescription(longStrategy.getExitRule()));
-        log.info("shortStrategy Entry Rule: {}", getRuleDescription(shortStrategy.getEntryRule()));
-        log.info("shortStrategy Exit Rule: {}", getRuleDescription(shortStrategy.getExitRule()));
+        log.info("======= 백테스트 =======");
+        //log.info("longStrategy Entry Rule: {}", getRuleDescription(longStrategy.getEntryRule()));
+        //log.info("longStrategy Exit Rule: {}", getRuleDescription(longStrategy.getExitRule()));
+        //log.info("shortStrategy Entry Rule: {}", getRuleDescription(shortStrategy.getEntryRule()));
+        //log.info("shortStrategy Exit Rule: {}", getRuleDescription(shortStrategy.getExitRule()));
     }
 
     public TradingRecord run() {
@@ -222,8 +222,6 @@ public class RealisticBackTest {
 
         longExpectedReturn = longTrades > 0 ? longTotalReturn / longTrades * 100 : 0;
         shortExpectedReturn = shortTrades > 0 ? shortTotalReturn / shortTrades * 100 : 0;
-
-        log.info("\n===== 백테스트 결과 =====");
         log.info("레버리지: {}x, 수수료율: {}%", leverage, feeRate * 100);
         log.info("롱 포지션 승률: {}% ({}/{})", String.format("%.2f", longWinRate), longWins, longTrades);
         log.info("롱 포지션 기대수익: {}%", String.format("%.2f", longExpectedReturn));

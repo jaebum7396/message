@@ -31,6 +31,7 @@ import trade.common.CommonUtils;
 import trade.common.MemoryUsageMonitor;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.AutoTradingDuplicateException;
+import trade.future.ml.GeneticMLModel;
 import trade.future.ml.MLModel;
 import trade.future.ml.SignalProximityScanner;
 import trade.future.model.Rule.*;
@@ -353,11 +354,11 @@ public class FutureMLService {
                 throw new AutoTradingDuplicateException(symbol+" 트레이딩이 존재하지 않습니다.");
             }
             if(tradingEntitys.size() > 1){
-                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어있습니다.");
+                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어 있습니다.");
             }
         } catch (Exception e) {
             nextFlag = false;
-            for(TradingEntity tradingEntity:tradingEntitys){
+            for(TradingEntity tradingEntity : tradingEntitys){
                 restartTrading(tradingEntity);
             }
         }
@@ -367,17 +368,12 @@ public class FutureMLService {
             if(isFinal){
                 // klineEvent를 데이터베이스에 저장
                 EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
+
                 BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
-                boolean longShouldEnter = longStrategy.shouldEnter(series.getEndIndex());
-                boolean longShouldExit = longStrategy.shouldExit(series.getEndIndex());
-                boolean shortShouldEnter = shortStrategy.shouldEnter(series.getEndIndex());
-                boolean shortShouldExit = shortStrategy.shouldExit(series.getEndIndex());
-
                 System.out.println("listening : " + symbol);
-                //printTradingSignals(symbol, series.getLastBar(), longShouldEnter, longShouldExit, shortShouldEnter, shortShouldExit);
                 MLModel mlModel = mlModelMap.get(tradingCd);
                 List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
 
@@ -387,42 +383,33 @@ public class FutureMLService {
                 scanner.printSignalProximity(symbol);
 
                 Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
-                openPositionEntityOpt.ifPresentOrElse(positionEvent -> { // 오픈된 포지션이 있다면
-                    PositionEntity openPosition = positionEvent.getKlineEntity().getPositionEntity();
-
-                    BigDecimal currentROI;
-                    BigDecimal currentPnl;
-                    if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
-                        try {
-                            Optional<JSONObject> currentPositionOpt = getPosition(symbol.toUpperCase(), tradingEntity.getPositionSide());
-                            if(currentPositionOpt.isEmpty()){
+                BigDecimal currentROI;
+                BigDecimal currentPnl;
+                if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                    try {
+                        Optional<JSONObject> currentPositionOpt = getPosition(symbol.toUpperCase(), tradingEntity.getPositionSide());
+                        if(currentPositionOpt.isEmpty()){
+                            throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
+                        } else {
+                            JSONObject currentPosition = currentPositionOpt.get();
+                            if (String.valueOf(currentPosition.get("positionAmt")).equals("0")) {
                                 throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
-                            } else {
-                                JSONObject currentPosition = currentPositionOpt.get();
-                                if (String.valueOf(currentPosition.get("positionAmt")).equals("0")) {
-                                    throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
-                                }
                             }
-                        } catch (Exception e) {
-                            openPosition.setPositionStatus("CLOSE");
-                            positionRepository.save(openPosition);
-                            TOTAL_POSITION_COUNT--;
-                            restartTrading(tradingEntity);
                         }
-                        currentROI = TechnicalIndicatorCalculator.calculateROI(openPosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), openPosition.getPositionSide());
-                        currentPnl = TechnicalIndicatorCalculator.calculatePnL(openPosition.getEntryPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), openPosition.getPositionSide(), tradingEntity.getCollateral());
-                    } else {
-                        currentROI = new BigDecimal("0");
-                        currentPnl = new BigDecimal("0");
+                    } catch (Exception e) {
+                        TOTAL_POSITION_COUNT--;
+                        restartTrading(tradingEntity);
                     }
-                    openPosition.setRoi(currentROI);
-                    openPosition.setProfit(currentPnl);
+
+                    currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity.getOpenPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide());
+                    currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity.getOpenPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral());
+
                     System.out.println(symbol + " ROI : " + currentROI);
                     System.out.println(symbol + " PNL : " + currentPnl);
 
                     boolean exitFlag = false;
                     boolean enterFlag = false;
-                    if (openPosition.getPositionStatus().equals("OPEN")) {
+                    if (tradingEntity.getPositionStatus().equals("OPEN")) {
                         //if(tradingEntity.getEntryCount()<3) { // 진입횟수가 3보다 작을때 추가 진입 고려
                         //    if (openPosition.getPositionSide().equals("LONG")) {
                         //        enterFlag = longStrategy.shouldEnter(series.getEndIndex());
@@ -430,27 +417,24 @@ public class FutureMLService {
                         //        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                         //    }
                         //}
-                        if (openPosition.getPositionSide().equals("LONG")) {
+                        if (tradingEntity.getPositionSide().equals("LONG")) {
                             exitFlag = longStrategy.shouldExit(series.getEndIndex());
-                        } else if (openPosition.getPositionSide().equals("SHORT")) {
+                        } else if (tradingEntity.getPositionSide().equals("SHORT")) {
                             exitFlag = shortStrategy.shouldExit(series.getEndIndex());
                         }
                     }
                     if (exitFlag) {
-                        openPosition.setPositionStatus("CLOSE");
-                        positionRepository.save(openPosition);
-                        makeCloseOrder(eventEntity, positionEvent, "포지션 청산");
+                        makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), "포지션 청산");
                         TOTAL_POSITION_COUNT--;
                         System.out.println(symbol + " 포지션 종료");
                     } else {
                         if (enterFlag) {
-                            makeOpenOrder(eventEntity, openPosition.getPositionSide(), "추가 포지션 오픈");
+                            makeOpenOrder(tradingEntity, tradingEntity.getPositionSide(), eventEntity.getKlineEntity().getClosePrice());
                         }
                     }
-                }, () -> { // 없다면 전략에 따른 포지션 오픈 검증
+                } else {
                     //scanner.printSignalProximity(symbol);
-                    RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy,
-                            Duration.ofSeconds(5), 0.1);
+                    RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
                     TradingRecord record = backtest.run();
 
                     String bestPosition = backtest.getBestPosition();
@@ -501,7 +485,7 @@ public class FutureMLService {
                             restartTrading(tradingEntity);
                         }
                     }
-                });
+                }
             }
         }
     }
@@ -534,19 +518,79 @@ public class FutureMLService {
         }
     }
 
+    public void makeOpenOrder(TradingEntity tradingEntity, String positionSide, BigDecimal openPrice){
+        tradingEntity.setPositionStatus("OPEN");
+        tradingEntity.setPositionSide(positionSide);
+        tradingEntity.setOpenPrice(openPrice);
+        try {
+            //레버리지 변경
+            LinkedHashMap<String,Object> leverageParamMap = new LinkedHashMap<>();
+            leverageParamMap.put("symbol", tradingEntity.getSymbol());
+            leverageParamMap.put("leverage", tradingEntity.getLeverage());
+            leverageChange(leverageParamMap);
+
+            //마진타입 변경(교차)
+            LinkedHashMap<String,Object> marginTypeParamMap = new LinkedHashMap<>();
+            marginTypeParamMap.put("symbol", tradingEntity.getSymbol());
+            marginTypeParamMap.put("marginType", "CROSSED");
+            try{
+                marginTypeChange(marginTypeParamMap);
+            } catch (Exception e){
+                System.out.println("이미 교차 마진입니다.");
+            }
+            // 메인 주문과 스탑로스 주문 제출
+            LinkedHashMap<String, Object> orderParams = makeOrder(tradingEntity, "OPEN");
+            Map<String, Object> resultMap = orderSubmit(orderParams);
+
+            // 스탑로스 주문 제출
+            //if (orderParams.containsKey("stopLossOrder")) {
+            //    LinkedHashMap<String, Object> stopLossOrderParams = (LinkedHashMap<String, Object>) orderParams.get("stopLossOrder");
+            //    orderSubmit(stopLossOrderParams);
+            //}
+
+            // 테이크프로핏 주문 제출
+            //if (orderParams.containsKey("takeProfitOrder")) {
+            //    LinkedHashMap<String, Object> takeProfitOrderParams = (LinkedHashMap<String, Object>) orderParams.get("takeProfitOrder");
+            //    orderSubmit(takeProfitOrderParams);
+            //}
+
+            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_GREEN+"*********************[진입] "+tradingEntity.getSymbol()+"*********************"+CONSOLE_COLORS.RESET);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            tradingEntity.setEntryCount(tradingEntity.getEntryCount() + 1); // 진입횟수 증가
+            System.out.println("openTradingEntity >>>>> " + tradingEntity);
+            tradingRepository.save(tradingEntity);
+        }
+    }
+
+    public void makeCloseOrder(TradingEntity tradingEntity, BigDecimal closePrice, String remark){
+        tradingEntity.setClosePrice(closePrice);
+        try { //마켓가로 클로즈 주문을 제출한다.
+            Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
+            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_RED+"*********************[청산/"+tradingEntity.getSymbol()+" - 청산사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            restartTrading(tradingEntity);
+            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+            log.info("스트림 종료");
+        }
+    }
+
     public void makeOpenOrder(EventEntity currentEvent, String positionSide, String remark){
         System.out.println(remark);
-        PositionEntity openPosition = currentEvent.getKlineEntity().getPositionEntity();
+        //PositionEntity openPosition = currentEvent.getKlineEntity().getPositionEntity();
         TradingEntity tradingEntity = currentEvent.getTradingEntity();
 
         tradingEntity.setPositionStatus("OPEN");
         tradingEntity.setPositionSide(positionSide);
         tradingEntity.setOpenPrice(currentEvent.getKlineEntity().getClosePrice());
         try {
-            openPosition.setPositionStatus("OPEN");
-            openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
-            openPosition.setPositionSide(positionSide);
-            openPosition.setOpenRemark(remark);
+            //openPosition.setPositionStatus("OPEN");
+            //openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
+            //openPosition.setPositionSide(positionSide);
+            //openPosition.setOpenRemark(remark);
 
             //레버리지 변경
             LinkedHashMap<String,Object> leverageParamMap = new LinkedHashMap<>();
@@ -587,7 +631,7 @@ public class FutureMLService {
             e.printStackTrace();
             //throw new TradingException(tradingEntity);
         } finally {
-            eventRepository.save(currentEvent);
+            //eventRepository.save(currentEvent);
             tradingEntity.setEntryCount(tradingEntity.getEntryCount() + 1); // 진입횟수 증가
             System.out.println("openTradingEntity >>>>> " + tradingEntity);
             tradingRepository.save(tradingEntity);
@@ -820,9 +864,8 @@ public class FutureMLService {
         klineEvent = CommonUtils.convertKlineEventDTO(event).toEntity();
         klineEvent.setTradingEntity(tradingEntity);
 
-        //System.out.println("tradingEntity.getTradingCd() : " + tradingEntity.getTradingCd());
         // 캔들데이터 분석을 위한 bar 세팅
-        settingBar(tradingEntity.getTradingCd(), event);
+        settingBarSeries(tradingEntity.getTradingCd(), event);
         //strategyMaker(tradingEntity, false);
 
         // 포지션 엔티티 생성
@@ -832,15 +875,10 @@ public class FutureMLService {
                 .build();
         klineEvent.getKlineEntity().setPositionEntity(positionEntity);
         klineEvent = eventRepository.save(klineEvent);
-
-        Optional<EventEntity> eventEntity = eventRepository.findEventBySymbolAndPositionStatus(tradingEntity.getSymbol(), "OPEN");
-        if(!eventEntity.isEmpty()){
-            //System.out.println("포지션 오픈중 : " +  eventEntity.get().getKlineEntity().getPositionEntity());
-        }
         return klineEvent;
     }
 
-    private void settingBar(String tradingCd, String event) {
+    private void settingBarSeries(String tradingCd, String event) {
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
         JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
@@ -1341,15 +1379,17 @@ public class FutureMLService {
         // ML 모델 설정
         MLModel mlModel = setupMLModel(series, tradingEntity, testFlag, shortMovingPeriod, longMovingPeriod);
         List<Indicator<Num>> indicators = initializeIndicators(series, shortMovingPeriod, longMovingPeriod);
+        //GeneticMLModel geModel = new GeneticMLModel(0);
+        //geModel.trainWithGeneticAlgorithm(series, indicators, series.getBarCount());
 
         double volatilityThreshold = 1;
-        double entryThreshold = 0.5;
-        double exitThreshold = 0.5;
+        double entryThreshold = 0.4;
+        double exitThreshold = 0.4;
         Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
         Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
         Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
-        Rule mlExitRule = new MLExitRule(mlModel, indicators, 0.5);
+        Rule mlExitRule = new MLExitRule(mlModel, indicators, exitThreshold);
 
         // 손익 규칙
         int takeProfitRate = tradingEntity.getTakeProfitRate();
