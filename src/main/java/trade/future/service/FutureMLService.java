@@ -335,6 +335,126 @@ public class FutureMLService {
         autoTradingOpen(tradingEntity);
     }
 
+    private String getKlines(String symbol, String interval, int limit){
+        LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
+        paramMap.put("symbol", symbol); // BTCUSDT
+        paramMap.put("interval", interval); // 1m, 5m, 15m, 1h, 4h, 1d
+        paramMap.put("limit", limit); // 최대 1500개까지 가져올수 있음.
+
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
+        String resultStr = client.market().klines(paramMap); // 바이낸스에서 캔들데이터를 제이슨으로 반환함.
+        return resultStr;
+    }
+
+    private BaseBarSeries klineJsonToSeries(String jsonStr){
+        String weight = new JSONObject(jsonStr).getString("x-mbx-used-weight-1m");
+        System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
+        JSONArray jsonArray = new JSONArray(new JSONObject(jsonStr).get("data").toString());
+        BaseBarSeries series = new BaseBarSeries();
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONArray klineArray = jsonArray.getJSONArray(i);
+            KlineEntity klineEntity = parseKlineEntity(klineArray);
+            Num open = series.numOf(klineEntity.getOpenPrice());
+            Num high = series.numOf(klineEntity.getHighPrice());
+            Num low = series.numOf(klineEntity.getLowPrice());
+            Num close = series.numOf(klineEntity.getClosePrice());
+            Num volume = series.numOf(klineEntity.getVolume());
+            series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
+        }
+        return series;
+    }
+
+    private HashMap<String, Object> trendMonitoring(String symbol, int limit) {
+        HashMap<String, Object> returnMap = new HashMap<>();
+
+        String kline4H = getKlines(symbol, "4h", limit);
+        BaseBarSeries series4H = klineJsonToSeries(kline4H);
+        String kline1H = getKlines(symbol, "1h", limit);
+        BaseBarSeries series1H = klineJsonToSeries(kline1H);
+        String kline15M = getKlines(symbol, "15m", limit);
+        BaseBarSeries series15M = klineJsonToSeries(kline15M);
+        String kline5M = getKlines(symbol, "5m", limit);
+        BaseBarSeries series5M = klineJsonToSeries(kline5M);
+
+        // 각 시간대별 추세 판단 및 저장
+        String trend4H = determineTrend(series4H);
+        String trend1H = determineTrend(series1H);
+        String trend15M = determineTrend(series15M);
+        String trend5M = determineTrend(series5M);
+
+        returnMap.put("4H", trend4H);
+        returnMap.put("1H", trend1H);
+        returnMap.put("15M", trend15M);
+        returnMap.put("5M", trend5M);
+
+        // 종합적인 추세 판단
+        int upTrendCount = 0;
+        int downTrendCount = 0;
+
+        if (trend4H.equals("LONG")) upTrendCount++; else if (trend4H.equals("SHORT")) downTrendCount++;
+        if (trend1H.equals("LONG")) upTrendCount++; else if (trend1H.equals("SHORT")) downTrendCount++;
+        if (trend15M.equals("LONG")) upTrendCount++; else if (trend15M.equals("SHORT")) downTrendCount++;
+        if (trend5M.equals("LONG")) upTrendCount++; else if (trend5M.equals("SHORT")) downTrendCount++;
+
+        String overallTrend;
+        if (upTrendCount > downTrendCount) {
+            overallTrend = "LONG";
+        } else if (downTrendCount > upTrendCount) {
+            overallTrend = "SHORT";
+        } else {
+            overallTrend = "NEUTRAL";
+        }
+
+        returnMap.put("OVERALL", overallTrend);
+
+        // 트렌드 그리드 생성
+        StringBuilder gridBuilder = new StringBuilder();
+        gridBuilder.append(String.format("Symbol: %s\n", symbol));
+        gridBuilder.append("+------+--------+\n");
+        gridBuilder.append("| Time | Trend  |\n");
+        gridBuilder.append("+------+--------+\n");
+        gridBuilder.append(String.format("| 4H   | %-6s |\n", formatTrend(trend4H)));
+        gridBuilder.append(String.format("| 1H   | %-6s |\n", formatTrend(trend1H)));
+        gridBuilder.append(String.format("| 15M  | %-6s |\n", formatTrend(trend15M)));
+        gridBuilder.append(String.format("| 5M   | %-6s |\n", formatTrend(trend5M)));
+        gridBuilder.append("+------+--------+\n");
+        gridBuilder.append(String.format("Overall Trend: %s\n", overallTrend));
+
+        returnMap.put("GRID", gridBuilder.toString());
+
+        System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
+
+        return returnMap;
+    }
+
+    private String formatTrend(String trend) {
+        switch (trend) {
+            case "LONG":
+                return "↑UP";
+            case "SHORT":
+                return "↓DN";
+            default:
+                return "-NT";
+        }
+    }
+
+    // 추세 판단 및 출력 함수
+    private String determineTrend(BaseBarSeries series) {
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        SMAIndicator shortSMA = new SMAIndicator(closePrice, 10);
+        SMAIndicator longSMA = new SMAIndicator(closePrice, 20);
+
+        int lastIndex = series.getEndIndex();
+
+        if (shortSMA.getValue(lastIndex).isGreaterThan(longSMA.getValue(lastIndex))) {
+            return "LONG";
+        } else if (shortSMA.getValue(lastIndex).isLessThan(longSMA.getValue(lastIndex))) {
+            return "SHORT";
+        } else {
+            return "NEUTRAL";
+        }
+    }
+
     int TOTAL_POSITION_COUNT = 0;
     private void klineProcess(String event){
         JSONObject eventObj = new JSONObject(event);
@@ -372,6 +492,9 @@ public class FutureMLService {
                 BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
+
+                int limit = 50;
+                HashMap<String,Object> trendMap = trendMonitoring(symbol, limit);
 
                 System.out.println("listening : " + symbol);
                 MLModel mlModel = mlModelMap.get(tradingCd);
