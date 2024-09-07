@@ -570,7 +570,8 @@ public class FutureMLService {
                     if (
                         true
                         //&& bestPosition.equals("LONG")
-                        && currentTrend.equals("UP")
+                        //&& currentTrend.equals("UP")
+                        &&String.valueOf(trendMap.get("5M")).equals("LONG")
                     ) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
@@ -583,7 +584,8 @@ public class FutureMLService {
                     } else if (
                         true
                         //&& bestPosition.equals("SHORT")
-                        && currentTrend.equals("DOWN")
+                        //&& currentTrend.equals("DOWN")
+                        &&String.valueOf(trendMap.get("5M")).equals("SHORT")
                     ) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
