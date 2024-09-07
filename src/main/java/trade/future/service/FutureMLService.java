@@ -571,7 +571,7 @@ public class FutureMLService {
                         true
                         //&& bestPosition.equals("LONG")
                         //&& currentTrend.equals("UP")
-                        &&String.valueOf(trendMap.get("5M")).equals("LONG")
+                        &&String.valueOf(trendMap.get("15M")).equals("LONG")
                     ) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
@@ -585,7 +585,7 @@ public class FutureMLService {
                         true
                         //&& bestPosition.equals("SHORT")
                         //&& currentTrend.equals("DOWN")
-                        &&String.valueOf(trendMap.get("5M")).equals("SHORT")
+                        &&String.valueOf(trendMap.get("15M")).equals("SHORT")
                     ) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
@@ -1512,8 +1512,10 @@ public class FutureMLService {
         double exitThreshold = 0.4;
         Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
-        Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
-        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
+        //Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
+        //Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
+        Rule mlLongExitRule = new MLLongExitRule(mlModel, indicators, exitThreshold);
+        Rule mlShortExitRule = new MLShortExitRule(mlModel, indicators, exitThreshold);
         Rule mlExitRule = new MLExitRule(mlModel, indicators, exitThreshold);
 
         // 손익 규칙
