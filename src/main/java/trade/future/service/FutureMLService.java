@@ -441,8 +441,8 @@ public class FutureMLService {
     // 추세 판단 및 출력 함수
     private String determineTrend(BaseBarSeries series) {
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator shortSMA = new SMAIndicator(closePrice, 10);
-        SMAIndicator longSMA = new SMAIndicator(closePrice, 20);
+        SMAIndicator shortSMA = new SMAIndicator(closePrice, 3);
+        SMAIndicator longSMA = new SMAIndicator(closePrice, 10);
 
         int lastIndex = series.getEndIndex();
 
