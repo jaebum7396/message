@@ -488,8 +488,8 @@ public class FutureMLService {
             if(isFinal){
                 // klineEvent를 데이터베이스에 저장
                 EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
-
                 BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
+                strategyMaker(tradingEntity, false, false);
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
