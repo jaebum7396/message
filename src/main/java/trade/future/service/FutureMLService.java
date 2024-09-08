@@ -489,7 +489,7 @@ public class FutureMLService {
                 // klineEvent를 데이터베이스에 저장
                 EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
                 BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
-                strategyMaker(tradingEntity, false, false);
+                //strategyMaker(tradingEntity, false, false);
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
@@ -1529,7 +1529,7 @@ public class FutureMLService {
 
         double volatilityThreshold = 1;
         double entryThreshold = 0.4;
-        double exitThreshold = 0.45;
+        double exitThreshold = 0.4;
         Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
         Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
