@@ -546,6 +546,7 @@ public class FutureMLService {
                                 false
                                 //||!String.valueOf(trendMap.get("5M")).equals("LONG")
                                 ||!String.valueOf(trendMap.get("15M")).equals("LONG")
+                                ||!String.valueOf(trendMap.get("1H")).equals("LONG")
                             ){
                                 exitFlag = true;
                             }
@@ -555,6 +556,7 @@ public class FutureMLService {
                                 false
                                 //||!String.valueOf(trendMap.get("5M")).equals("SHORT")
                                 ||!String.valueOf(trendMap.get("15M")).equals("SHORT")
+                                ||!String.valueOf(trendMap.get("1H")).equals("SHORT")
                             ){
                                 exitFlag = true;
                             }
@@ -587,6 +589,7 @@ public class FutureMLService {
                         //&& currentTrend.equals("UP")
                         //&&String.valueOf(trendMap.get("5M")).equals("LONG")
                         &&String.valueOf(trendMap.get("15M")).equals("LONG")
+                        &&String.valueOf(trendMap.get("1H")).equals("LONG")
                     ) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
@@ -602,6 +605,7 @@ public class FutureMLService {
                         //&& currentTrend.equals("DOWN")
                         //&&String.valueOf(trendMap.get("5M")).equals("SHORT")
                         &&String.valueOf(trendMap.get("15M")).equals("SHORT")
+                        &&String.valueOf(trendMap.get("1H")).equals("SHORT")
                     ) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
                         if (enterFlag) {
