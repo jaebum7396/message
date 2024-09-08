@@ -1528,8 +1528,8 @@ public class FutureMLService {
         //geModel.trainWithGeneticAlgorithm(series, indicators, series.getBarCount());
 
         double volatilityThreshold = 1;
-        double entryThreshold = 0.5;
-        double exitThreshold = 0.4;
+        double entryThreshold = 0.4;
+        double exitThreshold = 0.45;
         Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
         Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
         Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
