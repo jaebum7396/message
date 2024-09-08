@@ -543,7 +543,8 @@ public class FutureMLService {
                         if (tradingEntity.getPositionSide().equals("LONG")) {
                             exitFlag = longStrategy.shouldExit(series.getEndIndex());
                             if(
-                                !String.valueOf(trendMap.get("5M")).equals("LONG")
+                                false
+                                //||!String.valueOf(trendMap.get("5M")).equals("LONG")
                                 ||!String.valueOf(trendMap.get("15M")).equals("LONG")
                             ){
                                 exitFlag = true;
@@ -551,7 +552,8 @@ public class FutureMLService {
                         } else if (tradingEntity.getPositionSide().equals("SHORT")) {
                             exitFlag = shortStrategy.shouldExit(series.getEndIndex());
                             if(
-                                !String.valueOf(trendMap.get("5M")).equals("SHORT")
+                                false
+                                //||!String.valueOf(trendMap.get("5M")).equals("SHORT")
                                 ||!String.valueOf(trendMap.get("15M")).equals("SHORT")
                             ){
                                 exitFlag = true;
@@ -583,7 +585,7 @@ public class FutureMLService {
                         true
                         //&& bestPosition.equals("LONG")
                         //&& currentTrend.equals("UP")
-                        &&String.valueOf(trendMap.get("5M")).equals("LONG")
+                        //&&String.valueOf(trendMap.get("5M")).equals("LONG")
                         &&String.valueOf(trendMap.get("15M")).equals("LONG")
                     ) {
                         enterFlag = longStrategy.shouldEnter(series.getEndIndex());
@@ -598,7 +600,7 @@ public class FutureMLService {
                         true
                         //&& bestPosition.equals("SHORT")
                         //&& currentTrend.equals("DOWN")
-                        &&String.valueOf(trendMap.get("5M")).equals("SHORT")
+                        //&&String.valueOf(trendMap.get("5M")).equals("SHORT")
                         &&String.valueOf(trendMap.get("15M")).equals("SHORT")
                     ) {
                         enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
