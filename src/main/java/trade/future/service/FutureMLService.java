@@ -519,13 +519,7 @@ public class FutureMLService {
                 HashMap<String, Object> trendMap = trendMonitoring(symbol, limit);
 
                 if (tradingEntity.getPositionStatus() != null && tradingEntity.getPositionStatus().equals("OPEN")) {
-                    System.out.println("실제 거래 포지션 (" + symbol + "):");
-                    System.out.println("  진입 가격: " + tradingEntity.getOpenPrice());
-                    System.out.println("  포지션 타입: " + tradingEntity.getPositionSide());
-                    System.out.println("  현재 가격: " + series.getLastBar().getClosePrice());
-
                     checkPositionMismatch(backTestPosition, tradingEntity);
-
                     // 포지션이 열려있는 경우
                     try {
                         validateOpenPosition(tradingEntity);
