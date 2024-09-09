@@ -514,7 +514,6 @@ public class FutureMLService {
                 System.out.println("백테스팅 포지션 (" + symbol + "):");
                 printPosition(backTestPosition, series);
 
-
                 int limit = 50;
                 HashMap<String, Object> trendMap = trendMonitoring(symbol, limit);
 
@@ -541,7 +540,7 @@ public class FutureMLService {
                             break;
                     }
 
-                    exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
+                    //exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
 
                     if (exitFlag) {
                         makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), "포지션 청산");
