@@ -429,7 +429,7 @@ public class FutureMLService {
         gridBuilder.append(String.format("| 15M  | %-6s |\n", formatTrend(trend15M)));
         gridBuilder.append(String.format("| 5M   | %-6s |\n", formatTrend(trend5M)));
         gridBuilder.append("+------+--------+\n");
-        gridBuilder.append(String.format("Overall Trend: %s\n", overallTrend));
+        //gridBuilder.append(String.format("Overall Trend: %s\n", overallTrend));
 
         returnMap.put("GRID", gridBuilder.toString());
 
@@ -488,6 +488,7 @@ public class FutureMLService {
                 throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어 있습니다.");
             }
         } catch (Exception e) {
+            e.printStackTrace();
             nextFlag = false;
             for(TradingEntity tradingEntity : tradingEntitys){
                 restartTrading(tradingEntity);
@@ -507,6 +508,7 @@ public class FutureMLService {
                 TradingRecord tradingRecord = currentBackTest.getTradingRecord();
 
                 System.out.println("현재 백테스팅 이벤트 (" + symbol + "): " + barEvent);
+
 
                 int limit = 50;
                 HashMap<String, Object> trendMap = trendMonitoring(symbol, limit);

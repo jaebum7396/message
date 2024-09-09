@@ -85,7 +85,7 @@ public class RealisticBackTest {
         //log.info("shortStrategy Exit Rule: {}", getRuleDescription(shortStrategy.getExitRule()));
     }
 
-    private BarEvent processBar(int i) {
+    private BarEvent processBar(int i) throws Exception {
         Bar currentBar = series.getBar(i);
         String currentTrend = getTrend(i);
 
@@ -110,9 +110,7 @@ public class RealisticBackTest {
                     return BarEvent.SHORT_EXIT;
                 }
             }
-        }
-
-        if (tradingRecord.getCurrentPosition() == null || !tradingRecord.getCurrentPosition().isOpened()) {
+        } else {
             boolean shouldEnterLong = currentTrend.equals("UP") && longStrategy.shouldEnter(i);
             boolean shouldEnterShort = currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i);
 
@@ -131,18 +129,43 @@ public class RealisticBackTest {
     }
 
     public TradingRecord run() {
-        for (int i = 0; i < series.getBarCount(); i++) {
-            BarEvent barEvent = processBar(i);
-            //System.out.println("index("+i+") : "+barEvent);
+        try {
+            for (int i = 0; i < series.getBarCount(); i++) {
+                BarEvent barEvent = processBar(i);
+                //System.out.println("index("+i+") : "+barEvent);
+            }
+        } catch (Exception e){
+            log.error("run Error : "+e.getMessage());
         }
         printWinRates();
         return tradingRecord;
     }
 
     public BarEvent addBar(Bar newBar) {
-        series.addBar(newBar);
-        int newIndex = series.getBarCount() - 1;
-        return processBar(newIndex);
+        BarEvent barEvent = BarEvent.NO_EVENT;
+        try {
+            int lastIndex = series.getEndIndex();
+            if (lastIndex >= 0) {
+                Bar lastBar = series.getBar(lastIndex);
+                if (lastBar.getEndTime().equals(newBar.getEndTime())) {
+                    // 시간이 같으면 마지막 캔들을 대체
+                    series.addBar(newBar, true);  // true는 기존 바를 대체한다는 의미
+                    barEvent = processBar(lastIndex);
+                } else {
+                    // 시간이 다르면 새로운 캔들로 추가
+                    series.addBar(newBar);
+                    int newIndex = series.getEndIndex();
+                    barEvent = processBar(newIndex);
+                }
+            } else {
+                // 시리즈가 비어있는 경우
+                series.addBar(newBar);
+                barEvent = processBar(0);
+            }
+        } catch (Exception e) {
+            log.error("addBar Error : " + e.getMessage(), e);
+        }
+        return barEvent;
     }
 
     public SignalType checkSignal(int index) {
@@ -152,11 +175,12 @@ public class RealisticBackTest {
 
         String currentTrend = getTrend(index);
 
-        // 현재 포지션 확인
-        boolean isInPosition = (lastEntryType != null);
-        Trade.TradeType currentType = lastEntryType;
+        Position currentPosition = tradingRecord.getCurrentPosition();
+        boolean isInPosition = (currentPosition != null && currentPosition.isOpened());
+        Trade.TradeType currentType = isInPosition ?
+                (currentPosition.getEntry().getAmount().doubleValue() > 0 ? Trade.TradeType.BUY : Trade.TradeType.SELL)
+                : null;
 
-        // 포지션이 열려있는 경우
         if (isInPosition) {
             if (currentType == Trade.TradeType.BUY) {
                 if (longStrategy.shouldExit(index) || shortStrategy.shouldEnter(index)) {
@@ -167,9 +191,7 @@ public class RealisticBackTest {
                     return SignalType.SHORT_EXIT;
                 }
             }
-        }
-        // 포지션이 열려있지 않은 경우
-        else {
+        } else {
             if (currentTrend.equals("UP") && longStrategy.shouldEnter(index)) {
                 return SignalType.LONG_ENTRY;
             } else if (currentTrend.equals("DOWN") && shortStrategy.shouldEnter(index)) {
