@@ -1,5 +1,6 @@
 package trade.future.service;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.ta4j.core.*;
 import org.ta4j.core.num.Num;
@@ -44,6 +45,24 @@ public class RealisticBackTest {
     private static final int TREND_PERIOD = 5;
     private final int leverage;
     private final double feeRate;
+    @Getter
+    private TradingRecord tradingRecord;
+
+    public enum BarEvent {
+        LONG_ENTRY,
+        LONG_EXIT,
+        SHORT_ENTRY,
+        SHORT_EXIT,
+        NO_EVENT
+    }
+
+    public enum SignalType {
+        LONG_ENTRY,
+        LONG_EXIT,
+        SHORT_ENTRY,
+        SHORT_EXIT,
+        NO_SIGNAL
+    }
 
     public RealisticBackTest(BarSeries series, Strategy longStrategy, Strategy shortStrategy,
                              Duration executionDelay, double slippagePercent) {
@@ -57,6 +76,7 @@ public class RealisticBackTest {
         this.feeRate = 0.0004;
         this.entryPrice = series.numOf(0);
         this.lastEntryType = null;
+        this.tradingRecord = new BaseTradingRecord();
 
         log.info("======= 백테스트 =======");
         //log.info("longStrategy Entry Rule: {}", getRuleDescription(longStrategy.getEntryRule()));
@@ -65,58 +85,99 @@ public class RealisticBackTest {
         //log.info("shortStrategy Exit Rule: {}", getRuleDescription(shortStrategy.getExitRule()));
     }
 
-    public TradingRecord run() {
-        TradingRecord tradingRecord = new BaseTradingRecord();
+    private BarEvent processBar(int i) {
+        Bar currentBar = series.getBar(i);
+        String currentTrend = getTrend(i);
 
-        for (int i = 0; i < series.getBarCount(); i++) {
-            Bar currentBar = series.getBar(i);
-            String currentTrend = getTrend(i);
+        Position currentPosition = tradingRecord.getCurrentPosition();
+        if (currentPosition != null && currentPosition.isOpened()) {
+            Trade.TradeType currentType = currentPosition.getEntry().getAmount().doubleValue() > 0 ?
+                    Trade.TradeType.BUY : Trade.TradeType.SELL;
+            boolean shouldExit = false;
 
-            Position currentPosition = tradingRecord.getCurrentPosition();
-            if (currentPosition != null && currentPosition.isOpened()) {
-                Trade.TradeType currentType = currentPosition.getEntry().getAmount().doubleValue() > 0 ?
-                        Trade.TradeType.BUY : Trade.TradeType.SELL;
-                boolean shouldExit = false;
-
-                if (currentType.equals(Trade.TradeType.BUY)) {
-                    shouldExit = longStrategy.shouldExit(i) || shortStrategy.shouldEnter(i);
-                    if (shouldExit) {
-                        //log.info("롱 포지션 청산 시그널 - Index: {}", i);
-                    }
-                } else if (currentType.equals(Trade.TradeType.SELL)) {
-                    shouldExit = shortStrategy.shouldExit(i) || longStrategy.shouldEnter(i);
-                    if (shouldExit) {
-                        //log.info("숏 포지션 청산 시그널 - Index: {}", i);
-                    }
-                }
-
+            if (currentType.equals(Trade.TradeType.BUY)) {
+                shouldExit = longStrategy.shouldExit(i) || shortStrategy.shouldEnter(i);
                 if (shouldExit) {
-                    String exitRule = currentType.equals(Trade.TradeType.BUY) ?
-                            getRuleDescription(longStrategy.getExitRule()) :
-                            getRuleDescription(shortStrategy.getExitRule());
+                    String exitRule = getRuleDescription(longStrategy.getExitRule());
                     simulateTrade(tradingRecord, currentType, currentBar, i, true, exitRule);
-                    continue;
+                    return BarEvent.LONG_EXIT;
                 }
-            }
-
-            if (tradingRecord.getCurrentPosition() == null || !tradingRecord.getCurrentPosition().isOpened()) {
-                boolean shouldEnterLong = currentTrend.equals("UP") && longStrategy.shouldEnter(i);
-                boolean shouldEnterShort = currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i);
-
-                if (shouldEnterLong) {
-                    String entryRule = getRuleDescription(longStrategy.getEntryRule());
-                    //log.info("롱 포지션 진입 시그널 - Index: {}", i);
-                    simulateTrade(tradingRecord, Trade.TradeType.BUY, currentBar, i, false, entryRule);
-                } else if (shouldEnterShort) {
-                    String entryRule = getRuleDescription(shortStrategy.getEntryRule());
-                    //log.info("숏 포지션 진입 시그널 - Index: {}", i);
-                    simulateTrade(tradingRecord, Trade.TradeType.SELL, currentBar, i, false, entryRule);
+            } else if (currentType.equals(Trade.TradeType.SELL)) {
+                shouldExit = shortStrategy.shouldExit(i) || longStrategy.shouldEnter(i);
+                if (shouldExit) {
+                    String exitRule = getRuleDescription(shortStrategy.getExitRule());
+                    simulateTrade(tradingRecord, currentType, currentBar, i, true, exitRule);
+                    return BarEvent.SHORT_EXIT;
                 }
             }
         }
 
+        if (tradingRecord.getCurrentPosition() == null || !tradingRecord.getCurrentPosition().isOpened()) {
+            boolean shouldEnterLong = currentTrend.equals("UP") && longStrategy.shouldEnter(i);
+            boolean shouldEnterShort = currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i);
+
+            if (shouldEnterLong) {
+                String entryRule = getRuleDescription(longStrategy.getEntryRule());
+                simulateTrade(tradingRecord, Trade.TradeType.BUY, currentBar, i, false, entryRule);
+                return BarEvent.LONG_ENTRY;
+            } else if (shouldEnterShort) {
+                String entryRule = getRuleDescription(shortStrategy.getEntryRule());
+                simulateTrade(tradingRecord, Trade.TradeType.SELL, currentBar, i, false, entryRule);
+                return BarEvent.SHORT_ENTRY;
+            }
+        }
+
+        return BarEvent.NO_EVENT;
+    }
+
+    public TradingRecord run() {
+        for (int i = 0; i < series.getBarCount(); i++) {
+            BarEvent barEvent = processBar(i);
+            //System.out.println("index("+i+") : "+barEvent);
+        }
         printWinRates();
         return tradingRecord;
+    }
+
+    public BarEvent addBar(Bar newBar) {
+        series.addBar(newBar);
+        int newIndex = series.getBarCount() - 1;
+        return processBar(newIndex);
+    }
+
+    public SignalType checkSignal(int index) {
+        if (index < 0 || index >= series.getBarCount()) {
+            return SignalType.NO_SIGNAL;
+        }
+
+        String currentTrend = getTrend(index);
+
+        // 현재 포지션 확인
+        boolean isInPosition = (lastEntryType != null);
+        Trade.TradeType currentType = lastEntryType;
+
+        // 포지션이 열려있는 경우
+        if (isInPosition) {
+            if (currentType == Trade.TradeType.BUY) {
+                if (longStrategy.shouldExit(index) || shortStrategy.shouldEnter(index)) {
+                    return SignalType.LONG_EXIT;
+                }
+            } else if (currentType == Trade.TradeType.SELL) {
+                if (shortStrategy.shouldExit(index) || longStrategy.shouldEnter(index)) {
+                    return SignalType.SHORT_EXIT;
+                }
+            }
+        }
+        // 포지션이 열려있지 않은 경우
+        else {
+            if (currentTrend.equals("UP") && longStrategy.shouldEnter(index)) {
+                return SignalType.LONG_ENTRY;
+            } else if (currentTrend.equals("DOWN") && shortStrategy.shouldEnter(index)) {
+                return SignalType.SHORT_ENTRY;
+            }
+        }
+
+        return SignalType.NO_SIGNAL;
     }
 
     private String getTrend(int currentIndex) {
@@ -258,4 +319,5 @@ public class RealisticBackTest {
             return "NEUTRAL";
         }
     }
+
 }
