@@ -545,8 +545,13 @@ public class FutureMLService {
                     if (exitFlag) {
                         makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), "포지션 청산");
                         TOTAL_POSITION_COUNT--;
-                        backTestResult(tradingRecord, series, symbol, tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral(), true);
-                        System.out.println(symbol+ " : " +tradingRecord.getLastPosition().getEntry().getNetPrice()+"/"+tradingRecord.getLastPosition().getExit().getNetPrice());
+                        //backTestResult(tradingRecord, series, symbol, tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral(), true);
+                        Trade entry = tradingRecord.getCurrentPosition().getEntry();
+                        Trade exit = tradingRecord.getCurrentPosition().getExit();
+                        System.out.println(symbol+ " : " +entry.getNetPrice()+"("+tradingRecord.getCurrentPosition().isOpened()+")/"+exit.getNetPrice());
+                        tradingRecord.getPositions().forEach(position -> {
+                            System.out.println("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
+                        });
                         System.out.println(symbol + " 포지션 종료");
                     }
                 } else {
