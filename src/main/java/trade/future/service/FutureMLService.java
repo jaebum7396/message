@@ -558,16 +558,16 @@ public class FutureMLService {
 
                     switch (barEvent) {
                         case LONG_ENTRY:
-                            if (currentTrend.equals("UP") && checkTrendConsistency("LONG", trendMap)) {
+                            //if (currentTrend.equals("UP") && checkTrendConsistency("LONG", trendMap)) {
                                 enterFlag = true;
                                 positionSide = "LONG";
-                            }
+                            //}
                             break;
                         case SHORT_ENTRY:
-                            if (currentTrend.equals("DOWN") && checkTrendConsistency("SHORT", trendMap)) {
+                            //if (currentTrend.equals("DOWN") && checkTrendConsistency("SHORT", trendMap)) {
                                 enterFlag = true;
                                 positionSide = "SHORT";
-                            }
+                            //}
                             break;
                     }
 

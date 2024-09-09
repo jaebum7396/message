@@ -147,6 +147,7 @@ public class RealisticBackTest {
             int lastIndex = series.getEndIndex();
             if (lastIndex >= 0) {
                 Bar lastBar = series.getBar(lastIndex);
+                System.out.println("lastBar : "+lastBar.getEndTime().format(timeFormatter)+" / newBar : "+newBar.getEndTime().format(timeFormatter));
                 if (lastBar.getEndTime().equals(newBar.getEndTime())) {
                     // 시간이 같으면 마지막 캔들을 대체
                     series.addBar(newBar, true);  // true는 기존 바를 대체한다는 의미
