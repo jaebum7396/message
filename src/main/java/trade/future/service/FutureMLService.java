@@ -509,11 +509,23 @@ public class FutureMLService {
 
                 System.out.println("현재 백테스팅 이벤트 (" + symbol + "): " + barEvent);
 
+                // 백테스팅 포지션 출력
+                Position backTestPosition = tradingRecord.getCurrentPosition();
+                System.out.println("백테스팅 포지션 (" + symbol + "):");
+                printPosition(backTestPosition, series);
+
 
                 int limit = 50;
                 HashMap<String, Object> trendMap = trendMonitoring(symbol, limit);
 
                 if (tradingEntity.getPositionStatus() != null && tradingEntity.getPositionStatus().equals("OPEN")) {
+                    System.out.println("실제 거래 포지션 (" + symbol + "):");
+                    System.out.println("  진입 가격: " + tradingEntity.getOpenPrice());
+                    System.out.println("  포지션 타입: " + tradingEntity.getPositionSide());
+                    System.out.println("  현재 가격: " + series.getLastBar().getClosePrice());
+
+                    checkPositionMismatch(backTestPosition, tradingEntity);
+
                     // 포지션이 열려있는 경우
                     try {
                         validateOpenPosition(tradingEntity);
@@ -578,6 +590,55 @@ public class FutureMLService {
                     }
                 }
             }
+        }
+    }
+
+    private void printPosition(Position position, BaseBarSeries series) {
+        if (position != null && position.isOpened()) {
+            System.out.println("  진입 가격: " + position.getEntry().getNetPrice());
+            System.out.println("  진입 시간: " + series.getBar(position.getEntry().getIndex()).getEndTime());
+            System.out.println("  포지션 타입: " + (position.getEntry().getAmount().isPositive() ? "LONG" : "SHORT"));
+            System.out.println("  현재 가격: " + series.getLastBar().getClosePrice());
+            System.out.println("  현재 수익률: " + calculateCurrentROI(series, position, series.getLastBar().getClosePrice()) + "%");
+        } else {
+            System.out.println("  없음");
+        }
+    }
+
+    // ROI 계산 메서드 (이미 있다면 그것을 사용하세요)
+    private double calculateCurrentROI(BaseBarSeries series, Position position, Num currentPrice) {
+        Num entryPrice = position.getEntry().getNetPrice();
+        Num roi;
+        if (position.getEntry().getAmount().isPositive()) {  // LONG 포지션
+            roi = currentPrice.minus(entryPrice).dividedBy(entryPrice);
+        } else {  // SHORT 포지션
+            roi = entryPrice.minus(currentPrice).dividedBy(entryPrice);
+        }
+        return roi.multipliedBy(series.numOf(100)).doubleValue();  // 백분율로 변환
+    }
+
+    private void checkPositionMismatch(Position backTestPosition, TradingEntity tradingEntity) {
+        boolean backTestHasPosition = backTestPosition != null && backTestPosition.isOpened();
+        boolean realTradingHasPosition = tradingEntity.getPositionStatus() != null && tradingEntity.getPositionStatus().equals("OPEN");
+
+        String backTestPositionType = backTestHasPosition ?
+                (backTestPosition.getEntry().getAmount().isPositive() ? "LONG" : "SHORT") : "없음";
+        String realTradingPositionType = realTradingHasPosition ? tradingEntity.getPositionSide() : "없음";
+
+        System.out.println("┌─────────────────┬───────────────┬───────────────┐");
+        System.out.println("│     구분        │   백테스팅    │   실제 거래   │");
+        System.out.println("├─────────────────┼───────────────┼───────────────┤");
+        System.out.printf("│   포지션 여부   │ %-13s │ %-13s │%n",
+                backTestHasPosition ? "있음" : "없음",
+                realTradingHasPosition ? "있음" : "없음");
+        System.out.println("├─────────────────┼───────────────┼───────────────┤");
+        System.out.printf("│   포지션 타입   │ %-13s │ %-13s │%n",
+                backTestPositionType, realTradingPositionType);
+        System.out.println("└─────────────────┴───────────────┴───────────────┘");
+
+        if (backTestHasPosition != realTradingHasPosition ||
+                !backTestPositionType.equals(realTradingPositionType)) {
+            System.out.println("\n⚠️ 경고: 백테스팅 포지션과 실제 거래 포지션 불일치");
         }
     }
 
