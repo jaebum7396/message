@@ -111,8 +111,14 @@ public class RealisticBackTest {
                 }
             }
         } else {
-            boolean shouldEnterLong = currentTrend.equals("UP") && longStrategy.shouldEnter(i);
-            boolean shouldEnterShort = currentTrend.equals("DOWN") && shortStrategy.shouldEnter(i);
+            boolean shouldEnterLong = true
+                    //&& currentTrend.equals("UP")
+                    && longStrategy.shouldEnter(i)
+                    ;
+            boolean shouldEnterShort = true
+                    //&& currentTrend.equals("DOWN")
+                    && shortStrategy.shouldEnter(i)
+                    ;
 
             if (shouldEnterLong) {
                 String entryRule = getRuleDescription(longStrategy.getEntryRule());
