@@ -69,6 +69,8 @@ logging:
   level:
     root: info
     smile.math: WARN
+    com:
+      binance: WARN
     org:
       hibernate:
         SQL: warn
