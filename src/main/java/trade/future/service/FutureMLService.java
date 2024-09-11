@@ -160,9 +160,7 @@ public class FutureMLService {
 
         for (int retry = 0; retry < maxRetries; retry++) {
             try {
-                //System.out.println("event : " + event);
                 JSONObject eventData = new JSONObject(event);
-                //System.out.println("eventData : " + eventData);
                 JSONObject eventObj = new JSONObject(eventData.get("data").toString());
                 switch (String.valueOf(eventObj.get("e"))) {
                     case "kline":
@@ -332,7 +330,7 @@ public class FutureMLService {
                 streamClose(tradingEntity.getStreamId());
             }
         });
-        //umWebSocketStreamClient.closeAllConnections();
+        umWebSocketStreamClient.closeAllConnections();
     }
 
     //해당 트레이딩을 종료하고 다시 오픈하는 코드
@@ -577,7 +575,7 @@ public class FutureMLService {
 
                     if (enterFlag) {
                         System.out.println(symbol + " " + positionSide + " 포지션 오픈");
-                        makeOpenOrder(eventEntity, positionSide, positionSide + " 포지션 오픈");
+                        makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
                         TOTAL_POSITION_COUNT++;
                     } else {
                         System.out.println(symbol + " 진입 조건 충족되지 않음");
@@ -678,193 +676,6 @@ public class FutureMLService {
         System.out.println(symbol + " PNL : " + currentPnl);
     }
 
-    private void klineProcess_백업(String event){
-        JSONObject eventObj = new JSONObject(event);
-        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
-        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
-        boolean isFinal = klineObj.getBoolean("x");
-
-        String seriesNm = String.valueOf(eventObj.get("stream"));
-        String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
-        String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
-
-        boolean nextFlag = true;
-        List<TradingEntity> tradingEntitys = new ArrayList<>();
-        try{
-            tradingEntitys = getTradingEntity(symbol);
-            if(tradingEntitys.size() == 0){
-                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 존재하지 않습니다.");
-            }
-            if(tradingEntitys.size() > 1){
-                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어 있습니다.");
-            }
-        } catch (Exception e) {
-            nextFlag = false;
-            for(TradingEntity tradingEntity : tradingEntitys){
-                restartTrading(tradingEntity);
-            }
-        }
-        if (nextFlag) {
-            TradingEntity tradingEntity = tradingEntitys.get(0);
-            String tradingCd = tradingEntity.getTradingCd();
-            if(isFinal){
-                // klineEvent를 데이터베이스에 저장
-                EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
-                BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
-                //strategyMaker(tradingEntity, false, false);
-                Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
-                Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
-
-                RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
-                currentBackTest.addBar(series.getBar(series.getEndIndex()));
-                TradingRecord tradingRecord = currentBackTest.getTradingRecord();
-
-                //백테스팅으로 관리되는 포지션 객체
-                Position currentBackTestPosition = tradingRecord.getCurrentPosition();
-                System.out.println("현재 백테스팅 포지션 ("+symbol+"/"+currentBackTestPosition.getEntry().getAmount()+") : " + currentBackTestPosition.getEntry()+"/"+currentBackTestPosition.getExit());
-
-                int limit = 50;
-                HashMap<String,Object> trendMap = trendMonitoring(symbol, limit);
-
-                System.out.println("listening : " + symbol);
-                MLModel mlModel = mlModelMap.get(tradingCd);
-                List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
-
-                double threshold = 0.5; // 시그널 임계값
-                double proximityThreshold = 0.3; // 근접 임계값
-                SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
-                scanner.printSignalProximity(symbol);
-
-                Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
-                BigDecimal currentROI;
-                BigDecimal currentPnl;
-                if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
-                    try {
-                        Optional<JSONObject> currentPositionOpt = getPosition(symbol.toUpperCase(), tradingEntity.getPositionSide());
-                        if(currentPositionOpt.isEmpty()){
-                            throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
-                        } else {
-                            JSONObject currentPosition = currentPositionOpt.get();
-                            if (String.valueOf(currentPosition.get("positionAmt")).equals("0")) {
-                                throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
-                            }
-                        }
-                    } catch (Exception e) {
-                        TOTAL_POSITION_COUNT--;
-                        restartTrading(tradingEntity);
-                    }
-
-                    currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity.getOpenPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide());
-                    currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity.getOpenPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral());
-
-                    System.out.println(symbol + " ROI : " + currentROI);
-                    System.out.println(symbol + " PNL : " + currentPnl);
-
-                    boolean exitFlag = false;
-                    boolean enterFlag = false;
-                    if (tradingEntity.getPositionStatus().equals("OPEN")) {
-                        //if(tradingEntity.getEntryCount()<3) { // 진입횟수가 3보다 작을때 추가 진입 고려
-                        //    if (openPosition.getPositionSide().equals("LONG")) {
-                        //        enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                        //    } else if (openPosition.getPositionSide().equals("SHORT")) {
-                        //        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                        //    }
-                        //}
-                        if (tradingEntity.getPositionSide().equals("LONG")) {
-                            exitFlag = longStrategy.shouldExit(series.getEndIndex());
-                            if(
-                                    false
-                                            //||!String.valueOf(trendMap.get("5M")).equals("LONG")
-                                            ||!String.valueOf(trendMap.get("15M")).equals("LONG")
-                                            ||!String.valueOf(trendMap.get("1H")).equals("LONG")
-                            ){
-                                exitFlag = true;
-                            }
-                        } else if (tradingEntity.getPositionSide().equals("SHORT")) {
-                            exitFlag = shortStrategy.shouldExit(series.getEndIndex());
-                            if(
-                                    false
-                                            //||!String.valueOf(trendMap.get("5M")).equals("SHORT")
-                                            ||!String.valueOf(trendMap.get("15M")).equals("SHORT")
-                                            ||!String.valueOf(trendMap.get("1H")).equals("SHORT")
-                            ){
-                                exitFlag = true;
-                            }
-                        }
-                    }
-                    if (exitFlag) {
-                        makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), "포지션 청산");
-                        TOTAL_POSITION_COUNT--;
-                        System.out.println(symbol + " 포지션 종료");
-                    } else {
-                        if (enterFlag) {
-                            makeOpenOrder(tradingEntity, tradingEntity.getPositionSide(), eventEntity.getKlineEntity().getClosePrice());
-                        }
-                    }
-                } else {
-                    //scanner.printSignalProximity(symbol);
-                    //RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
-                    //TradingRecord record = backtest.run();
-
-                    //String bestPosition = backtest.getBestPosition();
-                    String currentTrend = getTrend(series);  // 현재 트렌드 확인
-
-                    //System.out.println(symbol + " Current Trend: " + currentTrend);
-                    //System.out.println(symbol + " Best Position: " + bestPosition);
-
-                    boolean enterFlag = false;
-                    if (
-                            true
-                                    //&& bestPosition.equals("LONG")
-                                    && currentTrend.equals("UP")
-                                    //&&String.valueOf(trendMap.get("5M")).equals("LONG")
-                                    &&String.valueOf(trendMap.get("15M")).equals("LONG")
-                                    &&String.valueOf(trendMap.get("1H")).equals("LONG")
-                    ) {
-                        enterFlag = longStrategy.shouldEnter(series.getEndIndex());
-                        if (enterFlag) {
-                            System.out.println(symbol + " 롱 포지션 오픈 (최적 포지션: LONG)");
-                            makeOpenOrder(eventEntity, "LONG", "롱 포지션 오픈");
-                            TOTAL_POSITION_COUNT++;
-                        } else {
-                            System.out.println(symbol + " 롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
-                        }
-                    } else if (
-                            true
-                                    //&& bestPosition.equals("SHORT")
-                                    && currentTrend.equals("DOWN")
-                                    //&&String.valueOf(trendMap.get("5M")).equals("SHORT")
-                                    &&String.valueOf(trendMap.get("15M")).equals("SHORT")
-                                    &&String.valueOf(trendMap.get("1H")).equals("SHORT")
-                    ) {
-                        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
-                        if (enterFlag) {
-                            System.out.println(symbol + " 숏 포지션 오픈 (최적 포지션: SHORT)");
-                            makeOpenOrder(eventEntity, "SHORT", "숏 포지션 오픈");
-                            TOTAL_POSITION_COUNT++;
-                        } else {
-                            System.out.println(symbol + " 숏 진입 조건 충족되지 않음 (진입 시그널 없음)");
-                        }
-                    } else {
-                        System.out.println("현재 트렌드 불일치. 포지션 진입 보류.");
-                    }
-
-                    if (!enterFlag) {
-                        if(
-                                false
-                                        ||!scanner.isLikelyToMove()
-                            //|| (bestPosition.equals("LONG") && currentTrend.equals("DOWN"))
-                            //|| (bestPosition.equals("SHORT") && currentTrend.equals("UP"))
-                        ){
-                            log.info(symbol + " 스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
-                            restartTrading(tradingEntity);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // 트렌드를 확인하는 메서드
     private String getTrend(BaseBarSeries series) {
         int endIndex = series.getEndIndex();
@@ -947,88 +758,6 @@ public class FutureMLService {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            restartTrading(tradingEntity);
-            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
-            log.info("스트림 종료");
-        }
-    }
-
-    public void makeOpenOrder(EventEntity currentEvent, String positionSide, String remark){
-        System.out.println(remark);
-        //PositionEntity openPosition = currentEvent.getKlineEntity().getPositionEntity();
-        TradingEntity tradingEntity = currentEvent.getTradingEntity();
-
-        tradingEntity.setPositionStatus("OPEN");
-        tradingEntity.setPositionSide(positionSide);
-        tradingEntity.setOpenPrice(currentEvent.getKlineEntity().getClosePrice());
-        try {
-            //openPosition.setPositionStatus("OPEN");
-            //openPosition.setEntryPrice(currentEvent.getKlineEntity().getClosePrice());
-            //openPosition.setPositionSide(positionSide);
-            //openPosition.setOpenRemark(remark);
-
-            //레버리지 변경
-            LinkedHashMap<String,Object> leverageParamMap = new LinkedHashMap<>();
-            leverageParamMap.put("symbol", tradingEntity.getSymbol());
-            leverageParamMap.put("leverage", tradingEntity.getLeverage());
-            leverageChange(leverageParamMap);
-
-            //마진타입 변경(교차)
-            LinkedHashMap<String,Object> marginTypeParamMap = new LinkedHashMap<>();
-            marginTypeParamMap.put("symbol", tradingEntity.getSymbol());
-            marginTypeParamMap.put("marginType", "CROSSED");
-
-            try{
-                marginTypeChange(marginTypeParamMap);
-            } catch (Exception e){
-                e.printStackTrace();
-            }
-
-            // 메인 주문과 스탑로스 주문 제출
-            LinkedHashMap<String, Object> orderParams = makeOrder(tradingEntity, "OPEN");
-            Map<String, Object> resultMap = orderSubmit(orderParams);
-
-            // 스탑로스 주문 제출
-            //if (orderParams.containsKey("stopLossOrder")) {
-            //    LinkedHashMap<String, Object> stopLossOrderParams = (LinkedHashMap<String, Object>) orderParams.get("stopLossOrder");
-            //    orderSubmit(stopLossOrderParams);
-            //}
-            // 테이크프로핏 주문 제출
-            //if (orderParams.containsKey("takeProfitOrder")) {
-            //    LinkedHashMap<String, Object> takeProfitOrderParams = (LinkedHashMap<String, Object>) orderParams.get("takeProfitOrder");
-            //    orderSubmit(takeProfitOrderParams);
-            //}
-
-            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_GREEN+"*********************[진입 - 진입사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
-
-            //tradingRepository.save(tradingEntity);
-        } catch (Exception e) {
-            e.printStackTrace();
-            //throw new TradingException(tradingEntity);
-        } finally {
-            //eventRepository.save(currentEvent);
-            tradingEntity.setEntryCount(tradingEntity.getEntryCount() + 1); // 진입횟수 증가
-            System.out.println("openTradingEntity >>>>> " + tradingEntity);
-            tradingRepository.save(tradingEntity);
-        }
-    }
-
-    public void makeCloseOrder(EventEntity currentEvent, EventEntity positionEvent, String remark){
-        System.out.println(remark);
-        TradingEntity tradingEntity = positionEvent.getTradingEntity();
-        PositionEntity closePosition = positionEvent.getKlineEntity().getPositionEntity();
-        tradingEntity.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
-        try { //마켓가로 클로즈 주문을 제출한다.
-            closePosition.setCloseRemark(remark);
-            closePosition.setPositionStatus("CLOSE");
-            closePosition.setClosePrice(currentEvent.getKlineEntity().getClosePrice());
-            Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
-            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_RED+"*********************[청산/"+closePosition.getRealizatioPnl()+" - 청산사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
-        } catch (Exception e) {
-            e.printStackTrace();
-            //throw new TradingException(tradingEntity);
-        } finally {
-            eventRepository.save(positionEvent);
             restartTrading(tradingEntity);
             System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
@@ -2227,15 +1956,15 @@ public class FutureMLService {
         List<Map<String, Object>> topLimitItems = sortedBy.stream()
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("busd"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("usdc"))
-                //제외 종목
+                // 무빙 없는 종목 제외
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("btc"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
-                //개새끼 코인들 다 제외
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("doge"))
+                // 개새끼 코인 && 검증된 쓰레기 코인들 다 제외
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("floki"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("shiba"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("eos"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("people"))
                 .limit(limit)
                 .collect(Collectors.toList());
         //topLimitItems.forEach(item -> {
