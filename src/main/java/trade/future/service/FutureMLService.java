@@ -19,11 +19,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
 import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.adx.ADXIndicator;
+import org.ta4j.core.indicators.adx.MinusDIIndicator;
+import org.ta4j.core.indicators.adx.PlusDIIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
+import org.ta4j.core.indicators.volume.AccumulationDistributionIndicator;
+import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
+import org.ta4j.core.indicators.volume.OnBalanceVolumeIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.*;
@@ -504,7 +509,9 @@ public class FutureMLService {
                 RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
                 RealisticBackTest.BarEvent barEvent = currentBackTest.addBar(series.getBar(series.getEndIndex()));
                 TradingRecord tradingRecord = currentBackTest.getTradingRecord();
-
+                MLModel mLmodel = mlModelMap.get(tradingCd);
+                List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+                mLmodel.explainPrediction(indicators, series.getEndIndex());
                 System.out.println("현재 백테스팅 이벤트 (" + symbol + "): " + barEvent);
 
                 // 백테스팅 포지션 출력
@@ -1863,57 +1870,49 @@ public class FutureMLService {
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
 
-        SMAIndicator sma = new SMAIndicator(closePrice, shortMovingPeriod); //단기 이동평균선
-        SMAIndicator ema = new SMAIndicator(closePrice, longMovingPeriod);  //장기 이동평균선
+        // EMA를 사용 (SMA 대신)
+        EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
+        EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
 
-        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(new ClosePriceIndicator(series), longMovingPeriod); //장기 이평선 기간 동안의 표준편차
-        BollingerBandsMiddleIndicator middleBBand    = new BollingerBandsMiddleIndicator(ema); //장기 이평선으로 중심선
-        BollingerBandsUpperIndicator upperBBand      = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
-        BollingerBandsLowerIndicator lowerBBand      = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(shortEMA);
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
 
         MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
-        //PlusDIIndicator plusDI = new PlusDIIndicator(series, longMovingPeriod);
-        //MinusDIIndicator minusDI = new MinusDIIndicator(series, longMovingPeriod);
 
-        indicators.add(new RelativeATRIndicator(series, 14, 100));
-        indicators.add(new ADXIndicator(series, 14));
+        indicators.add(new ATRIndicator(series, shortMovingPeriod));  // ATR 추가
         indicators.add(macdIndicator);
         indicators.add(lowerBBand);
         indicators.add(middleBBand);
         indicators.add(upperBBand);
-        indicators.add(sma);
-        indicators.add(ema);
-        //indicators.add(plusDI);
-        //indicators.add(minusDI);
-        indicators.add(new RSIIndicator(new ClosePriceIndicator(series), longMovingPeriod));
-        indicators.add(new RSIIndicator(new ClosePriceIndicator(series), shortMovingPeriod));
-        indicators.add(new StochasticOscillatorKIndicator(series, longMovingPeriod));
-        indicators.add(new CCIIndicator(series, 20));
-        indicators.add(new ROCIndicator(new ClosePriceIndicator(series), longMovingPeriod));
-        indicators.add(new WilliamsRIndicator(series, longMovingPeriod));
-        indicators.add(new CMOIndicator(new ClosePriceIndicator(series), longMovingPeriod));
-        //indicators.add(new ParabolicSarIndicator(series));
+        indicators.add(shortEMA);
+        indicators.add(longEMA);
+        indicators.add(new RSIIndicator(closePrice, shortMovingPeriod));
+        indicators.add(new StochasticOscillatorKIndicator(series, shortMovingPeriod));
+        indicators.add(new CCIIndicator(series, shortMovingPeriod));
+        indicators.add(new ROCIndicator(closePrice, shortMovingPeriod));
+
+        // Volume 관련 지표 추가
+        indicators.add(new OnBalanceVolumeIndicator(series));
+        indicators.add(new AccumulationDistributionIndicator(series));
+        indicators.add(new ChaikinMoneyFlowIndicator(series, shortMovingPeriod));
+
+        // 추가적인 단기 모멘텀 지표
+        indicators.add(new WilliamsRIndicator(series, shortMovingPeriod));
+
+        // 주석 처리된 지표들 (필요시 주석 해제)
+        // indicators.add(new RelativeATRIndicator(series, 14, 100));
+        // indicators.add(new ADXIndicator(series, 14));
+        // indicators.add(new PlusDIIndicator(series, longMovingPeriod));
+        // indicators.add(new MinusDIIndicator(series, longMovingPeriod));
+        // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
+        // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
+        // indicators.add(new ParabolicSarIndicator(series));
+
         return indicators;
     }
 
-    /*private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
-        List<Indicator<Num>> indicators = new ArrayList<>();
-        indicators.add(new RSIIndicator(new ClosePriceIndicator(series), 14));
-        indicators.add(new RSIIndicator(new ClosePriceIndicator(series), 28));
-        indicators.add(new MACDIndicator(new ClosePriceIndicator(series)));
-        indicators.add(new EMAIndicator(new ClosePriceIndicator(series), 20));
-        indicators.add(new EMAIndicator(new ClosePriceIndicator(series), 50));
-        indicators.add(new BollingerBandsMiddleIndicator(new ClosePriceIndicator(series)));
-        indicators.add(new StochasticOscillatorKIndicator(series, 14));
-        indicators.add(new ATRIndicator(series, 14));
-        indicators.add(new ADXIndicator(series, 14));
-        indicators.add(new CCIIndicator(series, 20));
-        indicators.add(new ROCIndicator(new ClosePriceIndicator(series), 10));
-        indicators.add(new WilliamsRIndicator(series, 14));
-        indicators.add(new CMOIndicator(new ClosePriceIndicator(series), 14));
-        //indicators.add(new ParabolicSarIndicator(series));
-        return indicators;
-    }*/
     // 거래량 상대화 메서드 (예: 20일 평균 대비)
     private double getRelativeVolume(BarSeries series, int index, int period) {
         double sumVolume = 0;

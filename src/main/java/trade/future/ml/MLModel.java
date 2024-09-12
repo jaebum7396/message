@@ -1,7 +1,10 @@
 package trade.future.ml;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.num.Num;
 import smile.data.DataFrame;
 import smile.data.formula.Formula;
@@ -17,19 +20,35 @@ public class MLModel {
     private static final Logger logger = Logger.getLogger(MLModel.class.getName());
     private RandomForest model;
     private final double priceChangeThreshold;
-    private static final int MINIMUM_DATA_POINTS = 50; // 최소 필요 데이터 포인트 수
-
-    // 추가: 특성 중요도를 저장할 필드
+    private static final int MINIMUM_DATA_POINTS = 50;
     private double[] featureImportance;
+    private ObjectMapper mapper = new ObjectMapper();
 
     public MLModel(double priceChangeThreshold) {
         this.priceChangeThreshold = priceChangeThreshold;
-        //logger.info("MLModel 생성. 가격 변동 임계값: " + priceChangeThreshold);
+    }
+
+    // 특성 이름과 중요도를 함께 저장하기 위한 내부 클래스
+    private static class FeatureImportance {
+        private final String name;
+        private final double importance;
+
+        public FeatureImportance(String name, double importance) {
+            this.name = name;
+            this.importance = importance;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public double getImportance() {
+            return importance;
+        }
     }
 
     public void train(BarSeries series, List<Indicator<Num>> indicators, int trainSize) {
         try {
-            // 충분한 데이터가 있는지 확인
             if (series.getBarCount() < MINIMUM_DATA_POINTS) {
                 logger.warning("훈련에 필요한 데이터 포인트가 부족합니다. 필요: " + MINIMUM_DATA_POINTS + ", 가용: " + series.getBarCount());
                 return;
@@ -39,10 +58,12 @@ public class MLModel {
             double[][] X = new double[trainSize][indicators.size()];
             int[] y = new int[trainSize];
 
-            // 특성(X)과 레이블(y) 데이터 준비
             for (int i = 0; i < trainSize; i++) {
-                // 각 지표의 값을 특성으로 사용
                 for (int j = 0; j < indicators.size(); j++) {
+                    if (indicators.get(j).equals(ClosePriceIndicator.class)) {
+                        //logger.warning("ClosePriceIndicator는 지표로 사용할 수 없습니다.");
+                        continue;
+                    }
                     Num value = indicators.get(j).getValue(i);
                     if (value == null) {
                         logger.warning("지표 " + j + "의 " + i + "번째 인덱스에서 null 값 발견");
@@ -51,7 +72,6 @@ public class MLModel {
                     X[i][j] = value.doubleValue();
                 }
 
-                // 다음 봉의 가격 변화를 기반으로 레이블 생성
                 if (i + 1 < totalSize) {
                     double currentPrice = series.getBar(i).getClosePrice().doubleValue();
                     double nextPrice = series.getBar(i + 1).getClosePrice().doubleValue();
@@ -61,103 +81,116 @@ public class MLModel {
                     }
                     double priceChangePercent = (nextPrice - currentPrice) / currentPrice * 100;
 
-                    // 가격 변화에 따라 레이블 할당 (1: 상승, -1: 하락, 0: 유지)
                     if (priceChangePercent > priceChangeThreshold) y[i] = 1;
                     else if (priceChangePercent < -priceChangeThreshold) y[i] = -1;
                     else y[i] = 0;
                 } else {
-                    y[i] = 0; // 마지막 데이터 포인트
+                    y[i] = 0;
                 }
             }
 
-            // 특성 이름 생성
             String[] featureNames = IntStream.range(0, indicators.size())
                     .mapToObj(i -> "feature" + i)
                     .toArray(String[]::new);
 
-            // DataFrame 생성 및 모델 학습
             DataFrame df = DataFrame.of(X, featureNames);
             df = df.merge(IntVector.of("y", y));
 
             Formula formula = Formula.lhs("y");
             this.model = RandomForest.fit(formula, df);
 
-            // 추가: 특성 중요도 계산
             this.featureImportance = model.importance();
+
+            // 특성 이름과 중요도를 매핑하고 내림차순으로 정렬
+            String[] indicatorNames = indicators.stream()
+                    .map(indicator -> indicator.getClass().getSimpleName())
+                    .toArray(String[]::new);
+
+            FeatureImportance[] sortedImportance = IntStream.range(0, featureImportance.length)
+                    .mapToObj(i -> new FeatureImportance(indicatorNames[i], featureImportance[i]))
+                    .sorted(Comparator.comparingDouble(FeatureImportance::getImportance).reversed())
+                    .toArray(FeatureImportance[]::new);
+
+            // 정렬된 특성 중요도 로깅
+            StringBuilder sb = new StringBuilder("특성 중요도 (내림차순):\n");
+            for (FeatureImportance fi : sortedImportance) {
+                sb.append(String.format("%s: %.4f\n", fi.getName(), fi.getImportance()));
+            }
+            logger.info(sb.toString());
+
             logger.info("모델 학습이 성공적으로 완료되었습니다.");
-            logger.info("특성 중요도: " + Arrays.toString(featureImportance));
         } catch (Exception e) {
             logger.severe("모델 학습 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    // 예측 메서드
     public int predict(List<Indicator<Num>> indicators, int index) {
-        double prediction = predictRaw(indicators, index);
-        // 추가: 상위 5개 중요 특성 로깅
+        double rawPrediction = predictRaw(indicators, index);
+        double[] probabilities = predictProbabilities(indicators, index);
+
+        logger.info(String.format("Raw prediction: %.4f", rawPrediction));
+        logger.info(String.format("Probabilities - Down: %.4f, Neutral: %.4f, Up: %.4f",
+                probabilities[0], probabilities[1], probabilities[2]));
+
+        logCurrentFeatureValues(indicators, index);
         logTopFeatures(indicators, 5);
-        if (prediction > 0.5) {
-            return 1;  // 상승
-        } else if (prediction < -0.5) {
-            return -1;  // 하락
+
+        int finalPrediction;
+        if (rawPrediction > 0.5) {
+            finalPrediction = 1;
+        } else if (rawPrediction < -0.5) {
+            finalPrediction = -1;
         } else {
-            return 0;  // 유지
+            finalPrediction = 0;
         }
+
+        logger.info("Final prediction: " + finalPrediction);
+        return finalPrediction;
     }
 
-    // 확률 예측 메서드
     public double[] predictProbabilities(List<Indicator<Num>> indicators, int index) {
         try {
             double rawPrediction = predictRaw(indicators, index);
 
-            // 원시 예측값을 확률로 변환
             double[] probabilities = new double[3];
-
-            // Softmax 함수를 사용하여 확률 분포 생성
             double expNeg = Math.exp(-rawPrediction);
             double expZero = Math.exp(0);
             double expPos = Math.exp(rawPrediction);
             double sum = expNeg + expZero + expPos;
 
-            probabilities[0] = expNeg / sum;  // 하락 확률
-            probabilities[1] = expZero / sum; // 유지 확률
-            probabilities[2] = expPos / sum;  // 상승 확률
+            probabilities[0] = expNeg / sum;
+            probabilities[1] = expZero / sum;
+            probabilities[2] = expPos / sum;
 
             return probabilities;
         } catch (Exception e) {
             logger.severe("확률 예측 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
-            return new double[]{0, 1, 0};  // 오류 시 균등 확률 반환
+            return new double[]{0, 1, 0};
         }
     }
 
-    // 원시 예측 메서드
     private double predictRaw(List<Indicator<Num>> indicators, int index) {
-        // 특성 데이터 준비
         double[] features = new double[indicators.size()];
         for (int i = 0; i < indicators.size(); i++) {
             features[i] = indicators.get(i).getValue(index).doubleValue();
         }
 
-        // 특성 이름 생성
         String[] featureNames = IntStream.range(0, indicators.size())
                 .mapToObj(i -> "feature" + i)
                 .toArray(String[]::new);
 
-        // DataFrame 생성 및 예측
         double[][] featuresArray = new double[][]{features};
         DataFrame df = DataFrame.of(featuresArray, featureNames);
 
         return model.predict(df)[0];
     }
 
-    // 추가: 특성 중요도를 반환하는 메서드
     public double[] getFeatureImportance() {
         return featureImportance;
     }
 
-    // 추가: 특성 이름과 중요도를 매핑하여 반환하는 메서드
     public Map<String, Double> getFeatureImportanceMap(List<Indicator<Num>> indicators) {
         Map<String, Double> importanceMap = new HashMap<>();
         for (int i = 0; i < indicators.size(); i++) {
@@ -166,7 +199,6 @@ public class MLModel {
         return importanceMap;
     }
 
-    // 추가: 상위 N개의 중요한 특성을 로깅하는 메서드
     public void logTopFeatures(List<Indicator<Num>> indicators, int topN) {
         Map<String, Double> importanceMap = getFeatureImportanceMap(indicators);
         List<Map.Entry<String, Double>> sortedFeatures = importanceMap.entrySet()
@@ -181,4 +213,56 @@ public class MLModel {
         }
         logger.info(sb.toString());
     }
+
+    public void logCurrentFeatureValues(List<Indicator<Num>> indicators, int index) {
+        StringBuilder sb = new StringBuilder("Current feature values:\n");
+        for (int i = 0; i < indicators.size(); i++) {
+            String featureName = indicators.get(i).getClass().getSimpleName();
+            double value = indicators.get(i).getValue(index).doubleValue();
+            sb.append(String.format("%s: %.4f\n", featureName, value));
+        }
+        logger.info(sb.toString());
+    }
+
+    public String explainPrediction(List<Indicator<Num>> indicators, int index) {
+        try {
+            double rawPrediction = predictRaw(indicators, index);
+            double[] probabilities = predictProbabilities(indicators, index);
+            Map<String, Double> importanceMap = getFeatureImportanceMap(indicators);
+
+            List<Map.Entry<String, Double>> topFeatures = importanceMap.entrySet().stream()
+                    .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                    .limit(3)
+                    .collect(Collectors.toList());
+
+            Map<String, Object> explanation = new HashMap<>();
+            explanation.put("raw_prediction", roundToFourDecimals(rawPrediction));
+            explanation.put("probabilities", new HashMap<String, Double>() {{
+                put("down", roundToFourDecimals(probabilities[0]));
+                put("neutral", roundToFourDecimals(probabilities[1]));
+                put("up", roundToFourDecimals(probabilities[2]));
+            }});
+
+            List<Map<String, Object>> topFeaturesList = new ArrayList<>();
+            for (int i = 0; i < topFeatures.size(); i++) {
+                Map<String, Object> featureMap = new HashMap<>();
+                String featureName = topFeatures.get(i).getKey();
+                featureMap.put("name", featureName);
+                featureMap.put("importance", roundToFourDecimals(topFeatures.get(i).getValue()));
+                featureMap.put("value", roundToFourDecimals(indicators.get(i).getValue(index).doubleValue()));
+                topFeaturesList.add(featureMap);
+            }
+            explanation.put("top_features", topFeaturesList);
+
+            return mapper.writeValueAsString(explanation);
+        } catch (JsonProcessingException e) {
+            logger.severe("JSON 생성 중 오류 발생: " + e.getMessage());
+            return "{\"error\": \"JSON 생성 실패\"}";
+        }
+    }
+
+    private double roundToFourDecimals(double value) {
+        return Math.round(value * 10000.0) / 10000.0;
+    }
+
 }

@@ -25,8 +25,8 @@ public class MLLongRule implements Rule {
     @Override
     public boolean isSatisfied(int index, TradingRecord tradingRecord) {
         double[] probabilities = model.predictProbabilities(indicators, index);
-
         if (probabilities[2] > threshold) {
+            //System.out.println(model.explainPrediction(indicators, index));
             //log.info("상승시그널 - Index: " + index + ", Probabilities: " + Arrays.toString(probabilities));
             return true;
         }
