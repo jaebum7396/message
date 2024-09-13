@@ -1964,6 +1964,7 @@ public class FutureMLService {
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("eos"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("people"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("reef"))
                 .limit(limit)
                 .collect(Collectors.toList());
         //topLimitItems.forEach(item -> {
