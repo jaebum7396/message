@@ -511,7 +511,7 @@ public class FutureMLService {
                 TradingRecord tradingRecord = currentBackTest.getTradingRecord();
                 MLModel mLmodel = mlModelMap.get(tradingCd);
                 List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
-                mLmodel.explainPrediction(indicators, series.getEndIndex());
+                System.out.println(mLmodel.explainPrediction(indicators, series.getEndIndex()));
                 System.out.println("현재 백테스팅 이벤트 (" + symbol + "): " + barEvent);
 
                 // 백테스팅 포지션 출력
