@@ -470,7 +470,7 @@ public class FutureMLService {
     }
 
     int TOTAL_POSITION_COUNT = 0;
-    private void klineProcess_backup(String event){
+    private void klineProcess(String event){
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
         JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
@@ -683,7 +683,7 @@ public class FutureMLService {
         System.out.println(symbol + " PNL : " + currentPnl);
     }
 
-    private void klineProcess(String event){
+    private void klineProcess_backup(String event){
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
         JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
