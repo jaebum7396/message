@@ -470,7 +470,7 @@ public class FutureMLService {
     }
 
     int TOTAL_POSITION_COUNT = 0;
-    private void klineProcess(String event){
+    private void klineProcess_backup(String event){
         JSONObject eventObj = new JSONObject(event);
         JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
         JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
@@ -681,6 +681,157 @@ public class FutureMLService {
         );
         System.out.println(symbol + " ROI : " + currentROI);
         System.out.println(symbol + " PNL : " + currentPnl);
+    }
+
+    private void klineProcess(String event){
+        JSONObject eventObj = new JSONObject(event);
+        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+        JSONObject klineObj = new JSONObject(klineEventObj.get("k").toString());
+        boolean isFinal = klineObj.getBoolean("x");
+
+        String seriesNm = String.valueOf(eventObj.get("stream"));
+        String symbol = seriesNm.substring(0, seriesNm.indexOf("@"));
+        String interval = seriesNm.substring(seriesNm.indexOf("_") + 1);
+
+        boolean nextFlag = true;
+        List<TradingEntity> tradingEntitys = new ArrayList<>();
+        try{
+            tradingEntitys = getTradingEntity(symbol);
+            if(tradingEntitys.size() == 0){
+                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 존재하지 않습니다.");
+            }
+            if(tradingEntitys.size() > 1){
+                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어 있습니다.");
+            }
+        } catch (Exception e) {
+            nextFlag = false;
+            for(TradingEntity tradingEntity : tradingEntitys){
+                restartTrading(tradingEntity);
+            }
+        }
+        if (nextFlag) {
+            TradingEntity tradingEntity = tradingEntitys.get(0);
+            String tradingCd = tradingEntity.getTradingCd();
+            if(isFinal){
+                // klineEvent를 데이터베이스에 저장
+                EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
+                BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
+                strategyMaker(tradingEntity, false, false);
+                Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
+                Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
+
+                RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
+                currentBackTest.addBar(series.getBar(series.getEndIndex()));
+                TradingRecord tradingRecord = currentBackTest.getTradingRecord();
+
+                //백테스팅으로 관리되는 포지션 객체
+                Position currentBackTestPosition = tradingRecord.getCurrentPosition();
+                System.out.println("현재 백테스팅 포지션 ("+symbol+"/"+currentBackTestPosition.getEntry().getAmount()+") : " + currentBackTestPosition.getEntry()+"/"+currentBackTestPosition.getExit());
+
+                int limit = 50;
+                HashMap<String,Object> trendMap = trendMonitoring(symbol, limit);
+
+                System.out.println("listening : " + symbol);
+                MLModel mlModel = mlModelMap.get(tradingCd);
+                List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+
+                double threshold = 0.5; // 시그널 임계값
+                double proximityThreshold = 0.3; // 근접 임계값
+                SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
+                scanner.printSignalProximity(symbol);
+
+                Optional<EventEntity> openPositionEntityOpt = eventRepository.findEventBySymbolAndPositionStatus(symbol, "OPEN");
+                BigDecimal currentROI;
+                BigDecimal currentPnl;
+                if(tradingEntity.getPositionStatus()!=null && tradingEntity.getPositionStatus().equals("OPEN")){
+                    try {
+                        Optional<JSONObject> currentPositionOpt = getPosition(symbol.toUpperCase(), tradingEntity.getPositionSide());
+                        if(currentPositionOpt.isEmpty()){
+                            throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
+                        } else {
+                            JSONObject currentPosition = currentPositionOpt.get();
+                            if (String.valueOf(currentPosition.get("positionAmt")).equals("0")) {
+                                throw new AutoTradingDuplicateException(symbol + " 포지션을 찾을 수 없습니다.");
+                            }
+                        }
+                    } catch (Exception e) {
+                        TOTAL_POSITION_COUNT--;
+                        restartTrading(tradingEntity);
+                    }
+
+                    currentROI = TechnicalIndicatorCalculator.calculateROI(tradingEntity.getOpenPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide());
+                    currentPnl = TechnicalIndicatorCalculator.calculatePnL(tradingEntity.getOpenPrice(), eventEntity.getKlineEntity().getClosePrice(), tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral());
+
+                    System.out.println(symbol + " ROI : " + currentROI);
+                    System.out.println(symbol + " PNL : " + currentPnl);
+
+                    boolean exitFlag = false;
+                    boolean enterFlag = false;
+                    if (tradingEntity.getPositionStatus().equals("OPEN")) {
+                        //if(tradingEntity.getEntryCount()<3) { // 진입횟수가 3보다 작을때 추가 진입 고려
+                        //    if (openPosition.getPositionSide().equals("LONG")) {
+                        //        enterFlag = longStrategy.shouldEnter(series.getEndIndex());
+                        //    } else if (openPosition.getPositionSide().equals("SHORT")) {
+                        //        enterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+                        //    }
+                        //}
+                        if (tradingEntity.getPositionSide().equals("LONG")) {
+                            exitFlag = longStrategy.shouldExit(series.getEndIndex());
+                        } else if (tradingEntity.getPositionSide().equals("SHORT")) {
+                            exitFlag = shortStrategy.shouldExit(series.getEndIndex());
+                        }
+                    }
+                    if (exitFlag) {
+                        makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), "포지션 청산");
+                        TOTAL_POSITION_COUNT--;
+                        System.out.println(symbol + " 포지션 종료");
+                    } else {
+                        if (enterFlag) {
+                            makeOpenOrder(tradingEntity, tradingEntity.getPositionSide(), eventEntity.getKlineEntity().getClosePrice());
+                        }
+                    }
+                } else {
+                    //scanner.printSignalProximity(symbol);
+                    //RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
+                    //TradingRecord record = backtest.run();
+
+                    //String bestPosition = backtest.getBestPosition();
+                    String currentTrend = getTrend(series);  // 현재 트렌드 확인
+
+                    //System.out.println(symbol + " Current Trend: " + currentTrend);
+                    //System.out.println(symbol + " Best Position: " + bestPosition);
+
+                    boolean longEnterFlag = longStrategy.shouldEnter(series.getEndIndex());
+                    boolean shortEnterFlag = shortStrategy.shouldEnter(series.getEndIndex());
+
+                    if (longEnterFlag) {
+                        System.out.println(symbol + " 롱 포지션 오픈 (최적 포지션: LONG)");
+                        makeOpenOrder(tradingEntity, "LONG", eventEntity.getKlineEntity().getClosePrice());
+                        TOTAL_POSITION_COUNT++;
+                    } else {
+                        System.out.println(symbol + " 롱 진입 조건 충족되지 않음 (진입 시그널 없음)");
+                    }
+
+                    if (shortEnterFlag) {
+                        System.out.println(symbol + " 숏 포지션 오픈 (최적 포지션: SHORT)");
+                        makeOpenOrder(tradingEntity, "SHORT", eventEntity.getKlineEntity().getClosePrice());
+                        TOTAL_POSITION_COUNT++;
+                    } else {
+                        System.out.println(symbol + " 숏 진입 조건 충족되지 않음 (진입 시그널 없음)");
+                    }
+
+                    if (!longEnterFlag && !shortEnterFlag) {
+                        if(
+                            false
+                            ||!scanner.isLikelyToMove()
+                        ){
+                            log.info(symbol + " 스트림 종료 >>>>> " + tradingEntity.getSymbol() +" / "+tradingEntity.getStreamId());
+                            restartTrading(tradingEntity);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // 트렌드를 확인하는 메서드
@@ -1865,7 +2016,7 @@ public class FutureMLService {
     }
 
 
-    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+    /*private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
         List<Indicator<Num>> indicators = new ArrayList<>();
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -1909,6 +2060,141 @@ public class FutureMLService {
         // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
         // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
         // indicators.add(new ParabolicSarIndicator(series));
+
+        return indicators;
+    }*/
+
+    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+        List<Indicator<Num>> indicators = new ArrayList<>();
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+        // EMA 지표
+        EMAIndicator shortEMA = new EMAIndicator(closePrice, 5);
+        EMAIndicator mediumEMA = new EMAIndicator(closePrice, 20);
+        EMAIndicator longEMA = new EMAIndicator(closePrice, 50);
+
+        // 볼린저 밴드
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, 20);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(mediumEMA);
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+
+        // MACD
+        MACDIndicator macdIndicator = new MACDIndicator(closePrice, 12, 26);
+        EMAIndicator macdSignal = new EMAIndicator(macdIndicator, 9);
+
+        // RSI
+        RSIIndicator rsi = new RSIIndicator(closePrice, 14);
+
+        // ATR
+        ATRIndicator atr = new ATRIndicator(series, 14);
+
+        // ADX
+        ADXIndicator adx = new ADXIndicator(series, 14);
+
+        // OBV
+        OnBalanceVolumeIndicator obv = new OnBalanceVolumeIndicator(series);
+
+        // ROC
+        ROCIndicator roc = new ROCIndicator(closePrice, 10);
+
+        // 기본 지표 추가
+        indicators.add(shortEMA);
+        indicators.add(mediumEMA);
+        indicators.add(longEMA);
+        indicators.add(upperBBand);
+        indicators.add(middleBBand);
+        indicators.add(lowerBBand);
+        indicators.add(macdIndicator);
+        indicators.add(macdSignal);
+        indicators.add(rsi);
+        indicators.add(atr);
+        indicators.add(adx);
+        indicators.add(obv);
+        indicators.add(roc);
+
+        // 추가 커스텀 지표
+
+        // 현재 가격과 EMA의 상대적 위치
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                return closePrice.getValue(index).dividedBy(shortEMA.getValue(index)).minus(series.numOf(1));
+            }
+        });
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                return closePrice.getValue(index).dividedBy(mediumEMA.getValue(index)).minus(series.numOf(1));
+            }
+        });
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                return closePrice.getValue(index).dividedBy(longEMA.getValue(index)).minus(series.numOf(1));
+            }
+        });
+
+        // 최근 5일 추세 강도
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                if (index < 5) return series.numOf(0);
+                int upDays = 0;
+                for (int i = 0; i < 5; i++) {
+                    if (closePrice.getValue(index - i).isGreaterThan(closePrice.getValue(index - i - 1))) {
+                        upDays++;
+                    }
+                }
+                return series.numOf(upDays).dividedBy(series.numOf(5));
+            }
+        });
+
+        // MACD 히스토그램
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                return macdIndicator.getValue(index).minus(macdSignal.getValue(index));
+            }
+        });
+
+        // RSI 변화율
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                if (index < 1) return series.numOf(0);
+                return rsi.getValue(index).minus(rsi.getValue(index - 1));
+            }
+        });
+
+        // 볼린저 밴드 상대 위치
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                Num upper = upperBBand.getValue(index);
+                Num lower = lowerBBand.getValue(index);
+                Num middle = middleBBand.getValue(index);
+                return closePrice.getValue(index).minus(middle).dividedBy(upper.minus(lower));
+            }
+        });
+
+        // EMA 차이
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                return shortEMA.getValue(index).minus(mediumEMA.getValue(index));
+            }
+        });
+
+        // OBV 변화율
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                if (index < 1) return series.numOf(0);
+                return obv.getValue(index).minus(obv.getValue(index - 1));
+            }
+        });
 
         return indicators;
     }
@@ -1958,13 +2244,14 @@ public class FutureMLService {
                 // 무빙 없는 종목 제외
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("btc"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
                 // 개새끼 코인 && 검증된 쓰레기 코인들 다 제외
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("floki"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("eos"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("people"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("reef"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("super"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("sui"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("neiro"))
                 .limit(limit)
                 .collect(Collectors.toList());
         //topLimitItems.forEach(item -> {
