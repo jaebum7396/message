@@ -2064,7 +2064,7 @@ public class FutureMLService {
         return indicators;
     }*/
 
-    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+    /*private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
         List<Indicator<Num>> indicators = new ArrayList<>();
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -2193,6 +2193,85 @@ public class FutureMLService {
             protected Num calculate(int index) {
                 if (index < 1) return series.numOf(0);
                 return obv.getValue(index).minus(obv.getValue(index - 1));
+            }
+        });
+
+        return indicators;
+    }*/
+
+    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+        List<Indicator<Num>> indicators = new ArrayList<>();
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+        // 단기 EMA (빠른 반응)
+        EMAIndicator shortEMA = new EMAIndicator(closePrice, 5);
+        EMAIndicator mediumEMA = new EMAIndicator(closePrice, 10);
+
+        // 볼린저 밴드 (단기 변동성)
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, 10);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(mediumEMA);
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+
+        // RSI (과매수/과매도, 단기 설정)
+        RSIIndicator rsi = new RSIIndicator(closePrice, 7);
+
+        // ATR (단기 변동성)
+        ATRIndicator atr = new ATRIndicator(series, 7);
+
+        // 볼륨 지표
+        OnBalanceVolumeIndicator obv = new OnBalanceVolumeIndicator(series);
+
+        indicators.add(shortEMA);
+        indicators.add(mediumEMA);
+        indicators.add(upperBBand);
+        indicators.add(middleBBand);
+        indicators.add(lowerBBand);
+        indicators.add(rsi);
+        indicators.add(atr);
+        indicators.add(obv);
+
+        // 단기 추세 강도
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                if (index < 3) return series.numOf(0);
+                int upBars = 0;
+                for (int i = 0; i < 3; i++) {
+                    if (closePrice.getValue(index-i).isGreaterThan(closePrice.getValue(index-i-1))) {
+                        upBars++;
+                    }
+                }
+                return series.numOf(upBars).dividedBy(series.numOf(3));
+            }
+        });
+
+        // EMA 교차 지표
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                return shortEMA.getValue(index).minus(mediumEMA.getValue(index));
+            }
+        });
+
+        // 볼린저 밴드 상대 위치
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                Num upper = upperBBand.getValue(index);
+                Num lower = lowerBBand.getValue(index);
+                Num middle = middleBBand.getValue(index);
+                return closePrice.getValue(index).minus(middle).dividedBy(upper.minus(lower));
+            }
+        });
+
+        // RSI 변화율
+        indicators.add(new CachedIndicator<Num>(series) {
+            @Override
+            protected Num calculate(int index) {
+                if (index < 1) return series.numOf(0);
+                return rsi.getValue(index).minus(rsi.getValue(index - 1));
             }
         });
 
