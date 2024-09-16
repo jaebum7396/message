@@ -32,6 +32,12 @@ public class FutureMLController {
         return commonUtils.okResponsePackaging(futureMLService.backTest(request, tradingDTO));
     }
 
+    @PostMapping(value = "/future/ml/scraping/test")
+    @Operation(summary="스크래핑", description="스크래핑")
+    public void scrapingTest(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
+        futureMLService.scrapingTest(request, tradingDTO);
+    }
+
     @PostMapping(value = "/future/ml/open")
     @Operation(summary="자동매매를 시작합니다.", description="자동매매를 시작합니다.")
     public ResponseEntity autoTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {

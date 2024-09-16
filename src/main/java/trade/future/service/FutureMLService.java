@@ -40,6 +40,7 @@ import trade.exception.AutoTradingDuplicateException;
 import trade.future.ml.GeneticMLModel;
 import trade.future.ml.MLModel;
 import trade.future.ml.SignalProximityScanner;
+import trade.future.ml.TrendPredictionModel;
 import trade.future.model.Rule.*;
 import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
@@ -125,13 +126,23 @@ public class FutureMLService {
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
         // 시리즈 생성
-        seriesMaker(tradingEntity, false);
+        klineScraping(tradingEntity, null,  0, 4);
         BaseBarSeries series = seriesMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval());
-        strategyMaker(tradingEntity, false,true);
+
+        int totalSize = series.getBarCount();
+        int trainSize = (int) (totalSize * 0.75);
+        // 학습 시리즈
+        BaseBarSeries trainSeries = series.getSubSeries(0, trainSize);
+        // 테스트 시리즈
+        BaseBarSeries testSeries = series.getSubSeries(trainSize, totalSize);
+        System.out.println("testSeries count : " + testSeries.getBarCount());
+
+        strategyMaker(tradingEntity, series, true,true);
         Strategy longStrategy = strategyMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval() + "_long_strategy");
         Strategy shortStrategy = strategyMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval() + "_short_strategy");
+        MLModel mlModel = mlModelMap.get(tradingEntity.getTradingCd());
 
-        RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
+        RealisticBackTest backtest = new RealisticBackTest(testSeries, mlModel, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
         backtest.run();
         TRADING_RECORDS.put(tradingEntity.getTradingCd(), backtest);
 
@@ -215,7 +226,7 @@ public class FutureMLService {
         String candleInterval = tradingEntity.getCandleInterval();
 
         TRADING_ENTITYS.remove(symbol);
-        printTradingEntitys();
+        //printTradingEntitys();
         seriesMap.remove(tradingCd + "_" + candleInterval);
         strategyMap.remove(tradingCd + "_" + candleInterval + "_long_strategy");
         strategyMap.remove(tradingCd + "_" + candleInterval + "_short_strategy");
@@ -331,7 +342,7 @@ public class FutureMLService {
                 tradingEntity.setTradingStatus("CLOSE");
                 tradingRepository.save(tradingEntity);
                 TRADING_ENTITYS.remove(tradingEntity.getSymbol());
-                printTradingEntitys();
+                //printTradingEntitys();
                 streamClose(tradingEntity.getStreamId());
             }
         });
@@ -436,7 +447,7 @@ public class FutureMLService {
 
         returnMap.put("GRID", gridBuilder.toString());
 
-        System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
+        //System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
 
         return returnMap;
     }
@@ -506,27 +517,39 @@ public class FutureMLService {
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
+                System.out.println("series count : " + series.getBarCount());
+
                 RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
-                RealisticBackTest.BarEvent barEvent = currentBackTest.addBar(series.getBar(series.getEndIndex()));
+                //RealisticBackTest.BarEvent barEvent = currentBackTest.addBar(series.getBar(series.getEndIndex()));
                 TradingRecord tradingRecord = currentBackTest.getTradingRecord();
-                MLModel mLmodel = mlModelMap.get(tradingCd);
+                MLModel mlModel = mlModelMap.get(tradingCd);
                 List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
-                System.out.println(mLmodel.explainPrediction(indicators, series.getEndIndex()));
-                System.out.println("현재 백테스팅 이벤트 (" + symbol + "): " + barEvent);
+                mlModel.predictProbabilities(indicators, series.getEndIndex());
+
+                double[] predict = mlModel.predictProbabilities(indicators, series.getEndIndex());
+                double shortPredict = predict[0];
+                double neutralPredict = predict[1];
+                double longPredict = predict[2];
+
+                boolean shortSignal = shortPredict > 0.4;
+                boolean longSignal = longPredict > 0.4;
+                boolean neutralSignal = neutralPredict > longPredict && neutralPredict > shortPredict;
+
+                System.out.println(mlModel.explainPrediction(indicators, series.getEndIndex()));
 
                 // 백테스팅 포지션 출력
-                Position backTestPosition = tradingRecord.getCurrentPosition();
-                System.out.println("백테스팅 포지션 (" + symbol + "):");
-                printPosition(backTestPosition, series);
+                //Position backTestPosition = tradingRecord.getCurrentPosition();
+                //System.out.println("백테스팅 포지션 (" + symbol + "):");
+                //printPosition(backTestPosition, series);
 
                 int limit = 50;
                 HashMap<String, Object> trendMap = trendMonitoring(symbol, limit);
 
                 if (tradingEntity.getPositionStatus() != null && tradingEntity.getPositionStatus().equals("OPEN")) {
-                    checkPositionMismatch(backTestPosition, tradingEntity);
+                    //checkPositionMismatch(backTestPosition, tradingEntity);
                     // 포지션이 열려있는 경우
                     try {
-                        validateOpenPosition(tradingEntity);
+                        //validateOpenPosition(tradingEntity);
                     } catch (Exception e) {
                         TOTAL_POSITION_COUNT--;
                         restartTrading(tradingEntity);
@@ -536,14 +559,17 @@ public class FutureMLService {
                     printPositionInfo(tradingEntity, eventEntity);
 
                     boolean exitFlag = false;
-                    switch (barEvent) {
-                        case LONG_EXIT:
-                            if (tradingEntity.getPositionSide().equals("LONG")) exitFlag = true;
-                            break;
-                        case SHORT_EXIT:
-                            if (tradingEntity.getPositionSide().equals("SHORT")) exitFlag = true;
-                            break;
-                    }
+                    if (tradingEntity.getPositionSide().equals("LONG")&&(shortSignal||neutralSignal)) exitFlag = true;
+                    if (tradingEntity.getPositionSide().equals("SHORT")&&(longSignal||neutralSignal)) exitFlag = true;
+
+                    //switch (barEvent) {
+                    //    case LONG_EXIT:
+                    //        if (tradingEntity.getPositionSide().equals("LONG")) exitFlag = true;
+                    //        break;
+                    //    case SHORT_EXIT:
+                    //        if (tradingEntity.getPositionSide().equals("SHORT")) exitFlag = true;
+                    //        break;
+                    //}
 
                     //exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
 
@@ -555,7 +581,7 @@ public class FutureMLService {
                         Trade exit = tradingRecord.getCurrentPosition().getExit();
                         System.out.println(symbol+ " : " +entry.getNetPrice()+"("+tradingRecord.getCurrentPosition().isOpened()+")/"+exit.getNetPrice());
                         tradingRecord.getPositions().forEach(position -> {
-                            System.out.println("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
+                            //System.out.println("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
                         });
                         System.out.println(symbol + " 포지션 종료");
                     }
@@ -565,20 +591,28 @@ public class FutureMLService {
                     boolean enterFlag = false;
                     String positionSide = null;
 
-                    switch (barEvent) {
-                        case LONG_ENTRY:
-                            //if (currentTrend.equals("UP") && checkTrendConsistency("LONG", trendMap)) {
-                                enterFlag = true;
-                                positionSide = "LONG";
-                            //}
-                            break;
-                        case SHORT_ENTRY:
-                            //if (currentTrend.equals("DOWN") && checkTrendConsistency("SHORT", trendMap)) {
-                                enterFlag = true;
-                                positionSide = "SHORT";
-                            //}
-                            break;
+                    if (longSignal) {
+                        enterFlag = true;
+                        positionSide = "LONG";
+                    } else if (shortSignal) {
+                        enterFlag = true;
+                        positionSide = "SHORT";
                     }
+
+                    //switch (barEvent) {
+                    //    case LONG_ENTRY:
+                    //        //if (currentTrend.equals("UP") && checkTrendConsistency("LONG", trendMap)) {
+                    //            enterFlag = true;
+                    //            positionSide = "LONG";
+                    //        //}
+                    //        break;
+                    //    case SHORT_ENTRY:
+                    //        //if (currentTrend.equals("DOWN") && checkTrendConsistency("SHORT", trendMap)) {
+                    //            enterFlag = true;
+                    //            positionSide = "SHORT";
+                    //        //}
+                    //        break;
+                    //}
 
                     if (enterFlag) {
                         System.out.println(symbol + " " + positionSide + " 포지션 오픈");
@@ -716,7 +750,7 @@ public class FutureMLService {
                 // klineEvent를 데이터베이스에 저장
                 EventEntity eventEntity = saveKlineEvent(event, tradingEntity);
                 BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
-                strategyMaker(tradingEntity, false, false);
+                strategyMaker(tradingEntity, series, false, false);
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
@@ -985,9 +1019,9 @@ public class FutureMLService {
             requestParam.put("timestamp", getServerTime());
             requestParam.remove("leverage");
             log.info("!!!new Order : " + requestParam);
-            String orderResult = client.account().newOrder(requestParam);
-            log.info("!!!result : " + orderResult);
-            resultMap.put("result", orderResult);
+            //String orderResult = client.account().newOrder(requestParam);
+            //log.info("!!!result : " + orderResult);
+            //resultMap.put("result", orderResult);
         } catch (Exception e) {
             throw e;
         }
@@ -1159,6 +1193,7 @@ public class FutureMLService {
         Num low    = series.numOf(klineObj.getDouble("l"));
         Num close  = series.numOf(klineObj.getDouble("c"));
         Num volume = series.numOf(klineObj.getDouble("v"));
+
         Bar newBar = new BaseBar(Duration.ofMinutes(15), closeTime, open, high, low, close, volume ,null);
         Bar lastBar = series.getLastBar();
         if (!newBar.getEndTime().isAfter(lastBar.getEndTime())) {
@@ -1230,7 +1265,7 @@ public class FutureMLService {
             }
         } catch (Exception e){
             log.error("오픈 가능한 트레이딩이 없습니다.");
-            printTradingEntitys();
+            //printTradingEntitys();
             nextFlag = false;
         }
 
@@ -1263,7 +1298,7 @@ public class FutureMLService {
                         String symbol = String.valueOf(tradingTargetSymbol.get("symbol"));
                         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
                         if(tradingEntityOpt.isPresent()){
-                            printTradingEntitys();
+                            //printTradingEntitys();
                             throw new AutoTradingDuplicateException(symbol+" 이미 오픈된 트레이딩이 존재합니다.");
                         }
                     }
@@ -1318,7 +1353,7 @@ public class FutureMLService {
                     try{
                         Optional<TradingEntity> tradingEntityOpt = Optional.ofNullable(TRADING_ENTITYS.get(symbol));
                         if(tradingEntityOpt.isPresent()){
-                            printTradingEntitys();
+                            //printTradingEntitys();
                             throw new RuntimeException(tradingEntityOpt.get().getSymbol() + "이미 오픈된 트레이딩이 존재합니다.");
                         }else{
                             TRADING_ENTITYS.put(symbol, autoTradeStreamOpen(newTradingEntity));
@@ -1421,37 +1456,25 @@ public class FutureMLService {
                 String tradingCd = tempTradingEntity.getTradingCd();
                 String interval = tempTradingEntity.getCandleInterval();
 
-                seriesMaker(tempTradingEntity, false);
-                BaseBarSeries series = seriesMap.get(tempTradingEntity.getTradingCd() + "_" + tempTradingEntity.getCandleInterval());
-                if (series.getBarCount() < 1500) {
-                    continue;
-                }
-                strategyMaker(tempTradingEntity, false, false);
-
-                Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
-                Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
-                MLModel mlModel = mlModelMap.get(tempTradingEntity.getTradingCd());
-
-                boolean longEntrySignal = longStrategy.shouldEnter(series.getEndIndex());
-                boolean longExitSignal = longStrategy.shouldExit(series.getEndIndex());
-                boolean shortEntrySignal = shortStrategy.shouldEnter(series.getEndIndex());
-                boolean shortExitSignal = shortStrategy.shouldExit(series.getEndIndex());
-                //printTradingSignals(symbol, series.getLastBar(), longEntrySignal, longExitSignal, shortEntrySignal, shortExitSignal);
-                List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
-
-                double threshold = 0.5; // 시그널 임계값
-                double proximityThreshold = 0.3; // 근접 임계값
-                SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
-
-                RealisticBackTest backtest = new RealisticBackTest(series, longStrategy, shortStrategy,
-                        Duration.ofSeconds(5), 0.1);
-                TradingRecord record = backtest.run();
-
-                String bestPosition = backtest.getBestPosition();
-                String currentTrend = getTrend(series);  // 현재 트렌드 확인
-
-                System.out.println("Current Trend: " + currentTrend);
-                System.out.println("Best Position: " + bestPosition);
+                //BaseBarSeries series = seriesMap.get(tempTradingEntity.getTradingCd() + "_" + tempTradingEntity.getCandleInterval());
+                //if (series.getBarCount() < 1500) {
+                //    continue;
+                //}
+                //strategyMaker(tempTradingEntity, series, false, false);
+                //Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
+                //Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
+                //MLModel mlModel = mlModelMap.get(tempTradingEntity.getTradingCd());
+                //List<Indicator<Num>> indicators = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+                //double threshold = 0.5; // 시그널 임계값
+                //double proximityThreshold = 0.3; // 근접 임계값
+                //SignalProximityScanner scanner = new SignalProximityScanner(indicators, series, mlModel, threshold, proximityThreshold);
+                //RealisticBackTest backtest = new RealisticBackTest(series, mlModel, longStrategy, shortStrategy,
+                //        Duration.ofSeconds(5), 0.1);
+                //TradingRecord record = backtest.run();
+                //String bestPosition = backtest.getBestPosition();
+                //String currentTrend = getTrend(series);  // 현재 트렌드 확인
+                //System.out.println("Current Trend: " + currentTrend);
+                //System.out.println("Best Position: " + bestPosition);
 
                 //scanner.printSignalProximity(symbol);
 
@@ -1462,8 +1485,6 @@ public class FutureMLService {
                     if (
                         true
                         //&& scanner.isNearSignal() // 시그널 근접 여부
-                        && scanner.isLikelyToMove() // 움직일 가능성 여부
-                        && series.getBarCount() == 1500
                         //&& ((bestPosition.equals("LONG") && currentTrend.equals("UP"))||(bestPosition.equals("SHORT") && currentTrend.equals("DOWN")))
                         //&& (longEntrySignal || shortEntrySignal)
                         //&&expectationProfit.compareTo(BigDecimal.ONE) > 0
@@ -1488,6 +1509,93 @@ public class FutureMLService {
         resultMap.put("reports", reports);
         resultMap.put("overlappingData", overlappingData);
         return resultMap;
+    }
+
+    public void scrapingTest(HttpServletRequest request, TradingDTO tradingDTO){
+        System.out.println("backTest >>>>>" + tradingDTO.toString());
+        TradingEntity tradingEntity = tradingDTO.toEntity();
+        tradingEntity.setTradingCd(UUID.randomUUID().toString());
+        tradingEntity.setCandleInterval("5m");
+        klineScraping(tradingEntity, null,  0, 3);
+        System.out.println("seriesMap : " + seriesMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval()).getBarCount());
+    }
+
+    public void klineScraping(TradingEntity tradingEntity, String endTime, int idx, int page) {
+        System.out.println("scrapingTest >>>>>" + idx + "/" + page);
+        String tradingCd = tradingEntity.getTradingCd();
+        String interval = tradingEntity.getCandleInterval();
+
+        System.out.println("scrapingTest >>>>>");
+        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+        requestParam.put("timestamp", getServerTime());
+        requestParam.put("symbol", tradingEntity.getSymbol());
+        requestParam.put("interval", tradingEntity.getCandleInterval());
+        requestParam.put("limit", 1500);
+        if (idx != 0) {
+            requestParam.put("endTime", endTime);
+        }
+        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
+        String resultStr = client.market().klines(requestParam);
+
+        JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
+        JSONArray firstIdxArray = jsonArray.getJSONArray(0);
+        System.out.println("firstIdxArray : " + firstIdxArray);
+        String firstTime = String.valueOf(firstIdxArray.get(0));
+
+        String tradingKey = tradingCd + "_" + interval;
+        List<Bar> allBars = new ArrayList<>();
+
+        // 기존 시리즈의 바를 리스트에 추가
+        Optional<BaseBarSeries> existingSeriesOpt = Optional.ofNullable(seriesMap.get(tradingKey));
+        if (existingSeriesOpt.isPresent()) {
+            BaseBarSeries existingSeries = existingSeriesOpt.get();
+            for (int i = 0; i < existingSeries.getBarCount(); i++) {
+                allBars.add(existingSeries.getBar(i));
+            }
+        }
+
+        // 새로운 데이터를 리스트에 추가
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONArray klineArray = jsonArray.getJSONArray(i);
+            KlineEntity klineEntity = parseKlineEntity(klineArray);
+            //System.out.println("klineEntity : " + klineEntity.toString());
+
+            ZonedDateTime endTimeZone = klineEntity.getEndTime().atZone(ZoneOffset.UTC);
+            Num open = DecimalNum.valueOf(klineEntity.getOpenPrice());
+            Num high = DecimalNum.valueOf(klineEntity.getHighPrice());
+            Num low = DecimalNum.valueOf(klineEntity.getLowPrice());
+            Num close = DecimalNum.valueOf(klineEntity.getClosePrice());
+            Num volume = DecimalNum.valueOf(klineEntity.getVolume());
+
+            Bar newBar = new BaseBar(Duration.ofMinutes(5), endTimeZone, open, high, low, close, volume, DecimalNum.valueOf(0));
+            allBars.add(newBar);
+        }
+
+        // 중복 제거 및 정렬
+        List<Bar> uniqueSortedBars = allBars.stream()
+                .distinct()
+                .sorted(Comparator.comparing(Bar::getEndTime))
+                .collect(Collectors.toList());
+
+        // 새로운 시리즈 생성
+        BaseBarSeries newSeries = new BaseBarSeries();
+        for (Bar bar : uniqueSortedBars) {
+            newSeries.addBar(bar);
+        }
+
+        // 새로운 시리즈를 맵에 저장
+        seriesMap.put(tradingKey, newSeries);
+
+        String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
+        System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
+
+        idx++;
+        if (idx < page) {
+            klineScraping(tradingEntity, firstTime, idx, page);
+        } else {
+            System.out.println("newSeries : " + newSeries.getBarCount());
+            System.out.println("scrapingTest >>>>> END");
+        }
     }
 
     public Map<String,Object> backTest(HttpServletRequest request, TradingDTO tradingDTO){
@@ -1536,6 +1644,7 @@ public class FutureMLService {
 
             //트레이딩 데이터 수집의 주가 되는 객체
             TradingEntity tempTradingEntity = tradingEntity.clone();
+            tempTradingEntity.setTradingCd(UUID.randomUUID().toString());
             tempTradingEntity.setSymbol(symbol);
 
             Map<String, Object> klineMap = backTestExec(tempTradingEntity,false);
@@ -1587,62 +1696,25 @@ public class FutureMLService {
             Num close = series.numOf(klineEntity.getClosePrice());
             Num volume = series.numOf(klineEntity.getVolume());
 
-            series.addBar(klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume);
+            //System.out.println("open : " + open + " high : " + high + " low : " + low + " close : " + close + " volume : " + volume);
+
+            Bar newBar = new BaseBar(Duration.ofMinutes(15), klineEntity.getEndTime().atZone(ZoneOffset.UTC), open, high, low, close, volume ,null);
+            series.addBar(newBar);
         }
     }
 
 
-    public void strategyMaker(TradingEntity tradingEntity, boolean testFlag, boolean logFlag) {
+    public void strategyMaker(TradingEntity tradingEntity, BaseBarSeries series, boolean testFlag, boolean logFlag) {
         String tradingCd = tradingEntity.getTradingCd();
         String symbol = tradingEntity.getSymbol();
         String interval = tradingEntity.getCandleInterval();
-        int candleCount = tradingEntity.getCandleCount();
-        double priceChangeThreshold = tradingEntity.getPriceChangeThreshold();
-
-        BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
 
         int shortMovingPeriod = tradingEntity.getShortMovingPeriod();
-        int midPeriod = tradingEntity.getMidMovingPeriod();
         int longMovingPeriod = tradingEntity.getLongMovingPeriod();
 
-        // 지표 설정
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator sma = new SMAIndicator(closePrice, shortMovingPeriod);
-        SMAIndicator ema = new SMAIndicator(closePrice, longMovingPeriod);
-        SMAIndicator shortSMA = new SMAIndicator(closePrice, shortMovingPeriod * 2);
-        SMAIndicator longSMA = new SMAIndicator(closePrice, longMovingPeriod * 2);
-
-        // 볼린저 밴드 설정
-        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, longMovingPeriod);
-        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(ema);
-        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
-        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
-
-        // 기타 지표 설정
-        RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14, 100);
-        ADXIndicator adxIndicator = new ADXIndicator(series, 14);
-
-        // 규칙 정의
-        Rule smaBuyingRule = new OverIndicatorRule(sma, ema);
-        Rule smaSellingRule = new UnderIndicatorRule(sma, ema);
-        Rule bollingerBuyingRule = new CrossedDownIndicatorRule(closePrice, lowerBBand);
-        Rule bollingerSellingRule = new CrossedUpIndicatorRule(closePrice, upperBBand);
-        Rule macdHistogramPositive = new MACDHistogramRule(closePrice, shortMovingPeriod, longMovingPeriod, true);
-        Rule macdHistogramNegative = new MACDHistogramRule(closePrice, shortMovingPeriod, longMovingPeriod, false);
-
-        // 추가 규칙
-        Rule overAtrRule = new OverIndicatorRule(relativeATR, series.numOf(1));
-        Rule underAtrRule = new UnderIndicatorRule(relativeATR, series.numOf(3));
-        Rule adxEntryRule = new OverIndicatorRule(adxIndicator, DecimalNum.valueOf(20))
-                .and(new UnderIndicatorRule(adxIndicator, DecimalNum.valueOf(50)));
-        Rule upTrendRule = new OverIndicatorRule(shortSMA, longSMA);
-        Rule downTrendRule = new UnderIndicatorRule(shortSMA, longSMA);
-
         // ML 모델 설정
-        MLModel mlModel = setupMLModel(series, tradingEntity, testFlag, shortMovingPeriod, longMovingPeriod);
         List<Indicator<Num>> indicators = initializeIndicators(series, shortMovingPeriod, longMovingPeriod);
-        //GeneticMLModel geModel = new GeneticMLModel(0);
-        //geModel.trainWithGeneticAlgorithm(series, indicators, series.getBarCount());
+        MLModel mlModel = setupMLModel(series, indicators, tradingEntity, testFlag);
 
         double volatilityThreshold = 1;
         double entryThreshold = 0.4;
@@ -1654,14 +1726,6 @@ public class FutureMLService {
         //Rule mlLongExitRule = new MLLongExitRule(mlModel, indicators, exitThreshold);
         //Rule mlShortExitRule = new MLShortExitRule(mlModel, indicators, exitThreshold);
         Rule mlExitRule = new MLExitRule(mlModel, indicators, exitThreshold);
-
-        // 손익 규칙
-        int takeProfitRate = tradingEntity.getTakeProfitRate();
-        int stopLossRate = tradingEntity.getStopLossRate();
-        Rule takeProfitRule = new StopGainRule(closePrice, takeProfitRate);
-        Rule stopLossRule = new StopLossRule(closePrice, stopLossRate);
-        Rule longMinimumProfitRule = new MinimumProfitRule(closePrice, true, takeProfitRate);
-        Rule shortMinimumProfitRule = new MinimumProfitRule(closePrice, false, takeProfitRate);
 
         // 전략 규칙 리스트 초기화
         List<Rule> longEntryRules = new ArrayList<>();
@@ -1679,81 +1743,12 @@ public class FutureMLService {
             shortExitRules.add(mlExitRule);
         }
 
-        if (tradingEntity.getBollingerBandChecker() == 1) {
-            longEntryRules.add(bollingerBuyingRule);
-            longExitRules.add(bollingerSellingRule);
-            shortEntryRules.add(bollingerSellingRule);
-            shortExitRules.add(bollingerBuyingRule);
-        }
-
-        if (tradingEntity.getMovingAverageChecker() == 1) {
-            longEntryRules.add(smaBuyingRule);
-            shortEntryRules.add(smaSellingRule);
-            longExitRules.add(new AndRule(smaSellingRule, longMinimumProfitRule));
-            shortExitRules.add(new AndRule(smaBuyingRule, shortMinimumProfitRule));
-        }
-
-        if (tradingEntity.getMacdHistogramChecker() == 1) {
-            longExitRules.add(new AndRule(macdHistogramNegative, longMinimumProfitRule));
-            shortExitRules.add(new AndRule(macdHistogramPositive, shortMinimumProfitRule));
-        }
-
-        if (tradingEntity.getStopLossChecker() == 1) {
-            longExitRules.add(stopLossRule);
-            shortExitRules.add(stopLossRule);
-        }
-
-        if (tradingEntity.getTakeProfitChecker() == 1) {
-            longExitRules.add(takeProfitRule);
-            shortExitRules.add(takeProfitRule);
-        }
-
         // 복합 규칙 생성
-        Rule combinedLongEntryRule = createCombinedRule(longEntryRules, true);
-        Rule combinedShortEntryRule = createCombinedRule(shortEntryRules, true);
-        Rule combinedLongExitRule = createCombinedRule(longExitRules, false);
-        Rule combinedShortExitRule = createCombinedRule(shortExitRules, false);
-
-        // ADX, ATR, 트렌드 팔로우 규칙 추가
-        if (tradingEntity.getAdxChecker() == 1) {
-            combinedLongEntryRule = new AndRule(combinedLongEntryRule, adxEntryRule);
-            combinedShortEntryRule = new AndRule(combinedShortEntryRule, adxEntryRule);
-        }
-        if (tradingEntity.getAtrChecker() == 1) {
-            Rule atrRule = new AndRule(overAtrRule, underAtrRule);
-            combinedLongEntryRule = new AndRule(combinedLongEntryRule, atrRule);
-            combinedShortEntryRule = new AndRule(combinedShortEntryRule, atrRule);
-        }
-        if (tradingEntity.getTrendFollowFlag() == 1) {
-            combinedLongEntryRule = new AndRule(combinedLongEntryRule, upTrendRule);
-            combinedShortEntryRule = new AndRule(combinedShortEntryRule, downTrendRule);
-        }
-
-        // 역방향 거래 처리
-        Rule finalCombinedLongEntryRule = tradingEntity.getReverseTradeChecker() == 1 ? combinedShortEntryRule : combinedLongEntryRule;
-        Rule finalCombinedShortEntryRule = tradingEntity.getReverseTradeChecker() == 1 ? combinedLongEntryRule : combinedShortEntryRule;
-
-        // 전략 생성 및 저장
-        //Strategy combinedLongStrategy = new BaseStrategy(finalCombinedLongEntryRule, combinedLongExitRule);
-        //Strategy combinedShortStrategy = new BaseStrategy(finalCombinedShortEntryRule, combinedShortExitRule);
-
         Strategy combinedLongStrategy = new BaseStrategy(mlLongEntryRule, new OrRule(mlLongExitRule, mlExitRule));
         Strategy combinedShortStrategy = new BaseStrategy(mlShortEntryRule, new OrRule(mlShortExitRule, mlExitRule));
 
         strategyMap.put(tradingCd + "_" + interval + "_long_strategy", combinedLongStrategy);
         strategyMap.put(tradingCd + "_" + interval + "_short_strategy", combinedShortStrategy);
-
-        // 전략 구성 출력
-        if (true) {
-            System.out.println("\n===== " + tradingCd + " " + interval + " 전략 구성 =====");
-            System.out.println("Long 전략:");
-            System.out.println("  진입 규칙: " + describeRule(finalCombinedLongEntryRule));
-            System.out.println("  청산 규칙: " + describeRule(combinedLongExitRule));
-            System.out.println("Short 전략:");
-            System.out.println("  진입 규칙: " + describeRule(finalCombinedShortEntryRule));
-            System.out.println("  청산 규칙: " + describeRule(combinedShortExitRule));
-            System.out.println("=====================================\n");
-        }
     }
 
     private Rule createCombinedRule(List<Rule> rules, boolean isEntryRule) {
@@ -1781,19 +1776,18 @@ public class FutureMLService {
         }
     }
 
-    private MLModel setupMLModel(BaseBarSeries series, TradingEntity tradingEntity, boolean testFlag,
-                                 int shortMovingPeriod, int longMovingPeriod) {
-        MLModel mlModel = new MLModel(tradingEntity.getPriceChangeThreshold());
+    private MLModel setupMLModel(BaseBarSeries series, List<Indicator<Num>> indicators, TradingEntity tradingEntity, boolean testFlag) {
+        MLModel mlModel = new MLModel(tradingEntity.getPriceChangeThreshold(), indicators);
+        //TrendPredictionModel mlModel = new TrendPredictionModel(indicators, 14);
         int totalSize = series.getBarCount();
-        int trainSize = (int) (totalSize * 0.5);
+        int trainSize = (int) (totalSize * 0.75);
         BarSeries trainSeries = series.getSubSeries(0, trainSize);
         BarSeries testSeries = series.getSubSeries(trainSize, totalSize);
-        List<Indicator<Num>> indicators = initializeIndicators(series, shortMovingPeriod, longMovingPeriod);
 
         if (testFlag) {
-            mlModel.train(testSeries, indicators, trainSize);
+            mlModel.train(trainSeries, trainSize);
         } else {
-            mlModel.train(series, indicators, totalSize);
+            mlModel.train(series, totalSize);
         }
         mlModelMap.put(tradingEntity.getTradingCd(), mlModel);
         return mlModel;
@@ -1835,23 +1829,27 @@ public class FutureMLService {
         LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
 
         // 시리즈 생성
-        seriesMaker(tradingEntity, logFlag);
+        klineScraping(tradingEntity, null,  0, 4);
         BaseBarSeries series = seriesMap.get(tradingCd + "_" + interval);
 
+        int totalSize = series.getBarCount();
+        int trainSize = (int) (totalSize * 0.75);
+        // 학습 시리즈
+        BaseBarSeries trainSeries = series.getSubSeries(0, trainSize);
+        // 테스트 시리즈
+        BaseBarSeries testSeries = series.getSubSeries(trainSize, totalSize);
+
         // 전략 생성
-        strategyMaker(tradingEntity, true, logFlag);
+        strategyMaker(tradingEntity, series, true, logFlag);
         Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
         Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
-        int totalSize = series.getBarCount();
-        int trainSize = (int) (totalSize * 0.5);
         //System.out.println("Train data size: " + trainSize);
 
         // 훈련 데이터와 테스트 데이터 분리
-        BarSeries trainSeries = series.getSubSeries(0, trainSize);
-        BaseBarSeries testSeries = series.getSubSeries(trainSize, totalSize);
+        MLModel mlModel = mlModelMap.get(tradingCd);
 
-        RealisticBackTest backtest = new RealisticBackTest(testSeries, longStrategy, shortStrategy,
+        RealisticBackTest backtest = new RealisticBackTest(testSeries, mlModel, longStrategy, shortStrategy,
                 Duration.ofSeconds(5), 0.1);
         TradingRecord record = backtest.run();
 
@@ -2015,8 +2013,55 @@ public class FutureMLService {
         }
     }
 
+    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+        List<Indicator<Num>> indicators = new ArrayList<>();
 
-    /*private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+        // EMA를 사용 (SMA 대신)
+        EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
+        EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
+
+        //StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
+        //BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(shortEMA);
+        //BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        //BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+
+        MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
+
+        indicators.add(macdIndicator);
+        //indicators.add(lowerBBand);
+        //indicators.add(middleBBand);
+        //indicators.add(upperBBand);
+        indicators.add(shortEMA);
+        indicators.add(longEMA);
+        //indicators.add(new RSIIndicator(closePrice, shortMovingPeriod));
+        //indicators.add(new StochasticOscillatorKIndicator(series, shortMovingPeriod));
+        //indicators.add(new CCIIndicator(series, shortMovingPeriod));
+        //indicators.add(new ROCIndicator(closePrice, shortMovingPeriod));
+
+        // Volume 관련 지표 추가
+        //indicators.add(new OnBalanceVolumeIndicator(series));
+        //indicators.add(new AccumulationDistributionIndicator(series));
+        //indicators.add(new ChaikinMoneyFlowIndicator(series, shortMovingPeriod));
+
+        // 추가적인 단기 모멘텀 지표
+        //indicators.add(new WilliamsRIndicator(series, shortMovingPeriod));
+
+        // 주석 처리된 지표들 (필요시 주석 해제)
+        //indicators.add(new RelativeATRIndicator(series, shortMovingPeriod, longMovingPeriod));
+        indicators.add(new ATRIndicator(series, shortMovingPeriod));  // ATR 추가
+        indicators.add(new ADXIndicator(series, longMovingPeriod));
+        indicators.add(new PlusDIIndicator(series, longMovingPeriod));
+        indicators.add(new MinusDIIndicator(series, longMovingPeriod));
+        // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
+        // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
+        // indicators.add(new ParabolicSarIndicator(series));
+
+        return indicators;
+    }
+
+   /*private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
         List<Indicator<Num>> indicators = new ArrayList<>();
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -2199,7 +2244,7 @@ public class FutureMLService {
         return indicators;
     }*/
 
-    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+    /*private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
         List<Indicator<Num>> indicators = new ArrayList<>();
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -2276,7 +2321,7 @@ public class FutureMLService {
         });
 
         return indicators;
-    }
+    }*/
 
     // 거래량 상대화 메서드 (예: 20일 평균 대비)
     private double getRelativeVolume(BarSeries series, int index, int period) {
@@ -2320,17 +2365,17 @@ public class FutureMLService {
         List<Map<String, Object>> topLimitItems = sortedBy.stream()
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("busd"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("usdc"))
-                // 무빙 없는 종목 제외
+                //종목제외
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("btc"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
-                // 개새끼 코인 && 검증된 쓰레기 코인들 다 제외
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("floki"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("people"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("reef"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("super"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("sui"))
-                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("neiro"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
+                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("floki"))
+                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
+                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("people"))
+                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("reef"))
+                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("super"))
+                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("sui"))
+                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("neiro"))
                 .limit(limit)
                 .collect(Collectors.toList());
         //topLimitItems.forEach(item -> {

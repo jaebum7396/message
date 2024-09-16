@@ -2,6 +2,7 @@ package trade.future.ml;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
@@ -18,14 +19,21 @@ import java.util.stream.IntStream;
 
 public class MLModel {
     private static final Logger logger = Logger.getLogger(MLModel.class.getName());
+    @Getter
+    List<Indicator<Num>> indicators;
     private RandomForest model;
     private final double priceChangeThreshold;
     private static final int MINIMUM_DATA_POINTS = 50;
     private double[] featureImportance;
     private ObjectMapper mapper = new ObjectMapper();
 
-    public MLModel(double priceChangeThreshold) {
+    public MLModel(List<Indicator<Num>> indicators) {
+        this(0.01, indicators); // 기본값 설정
+    }
+
+    public MLModel(double priceChangeThreshold, List<Indicator<Num>> indicators) {
         this.priceChangeThreshold = priceChangeThreshold;
+        this.indicators = indicators;
     }
 
     // 특성 이름과 중요도를 함께 저장하기 위한 내부 클래스
@@ -47,7 +55,7 @@ public class MLModel {
         }
     }
 
-    public void train(BarSeries series, List<Indicator<Num>> indicators, int trainSize) {
+    public void train(BarSeries series, int trainSize) {
         try {
             if (series.getBarCount() < MINIMUM_DATA_POINTS) {
                 logger.warning("훈련에 필요한 데이터 포인트가 부족합니다. 필요: " + MINIMUM_DATA_POINTS + ", 가용: " + series.getBarCount());
@@ -79,10 +87,12 @@ public class MLModel {
                         logger.warning(i + "번째 인덱스에서 0의 가격 발견");
                         return;
                     }
+                    double feeRate = 0.0005;
+
                     double priceChangePercent = (nextPrice - currentPrice) / currentPrice * 100;
 
-                    if (priceChangePercent > priceChangeThreshold) y[i] = 1;
-                    else if (priceChangePercent < -priceChangeThreshold) y[i] = -1;
+                    if (priceChangePercent > (priceChangeThreshold + feeRate)) y[i] = 1;
+                    else if (priceChangePercent < -(priceChangeThreshold + feeRate)) y[i] = -1;
                     else y[i] = 0;
                 } else {
                     y[i] = 0;
@@ -129,12 +139,12 @@ public class MLModel {
         double rawPrediction = predictRaw(indicators, index);
         double[] probabilities = predictProbabilities(indicators, index);
 
-        logger.info(String.format("Raw prediction: %.4f", rawPrediction));
-        logger.info(String.format("Probabilities - Down: %.4f, Neutral: %.4f, Up: %.4f",
-                probabilities[0], probabilities[1], probabilities[2]));
+        //logger.info(String.format("Raw prediction: %.4f", rawPrediction));
+        /*logger.info(String.format("Probabilities - Down: %.4f, Neutral: %.4f, Up: %.4f",
+                probabilities[0], probabilities[1], probabilities[2]));*/
 
-        logCurrentFeatureValues(indicators, index);
-        logTopFeatures(indicators, 5);
+        //logCurrentFeatureValues(indicators, index);
+        //logTopFeatures(indicators, 5);
 
         int finalPrediction;
         if (rawPrediction > 0.5) {
@@ -145,7 +155,7 @@ public class MLModel {
             finalPrediction = 0;
         }
 
-        logger.info("Final prediction: " + finalPrediction);
+        //logger.info("Final prediction: " + finalPrediction);
         return finalPrediction;
     }
 
@@ -237,11 +247,6 @@ public class MLModel {
 
             Map<String, Object> explanation = new HashMap<>();
             explanation.put("raw_prediction", roundToFourDecimals(rawPrediction));
-            explanation.put("probabilities", new HashMap<String, Double>() {{
-                put("down", roundToFourDecimals(probabilities[0]));
-                put("neutral", roundToFourDecimals(probabilities[1]));
-                put("up", roundToFourDecimals(probabilities[2]));
-            }});
 
             List<Map<String, Object>> topFeaturesList = new ArrayList<>();
             for (int i = 0; i < topFeatures.size(); i++) {
@@ -253,6 +258,12 @@ public class MLModel {
                 topFeaturesList.add(featureMap);
             }
             explanation.put("top_features", topFeaturesList);
+
+            explanation.put("probabilities", new HashMap<String, Double>() {{
+                put("down", roundToFourDecimals(probabilities[0]));
+                put("neutral", roundToFourDecimals(probabilities[1]));
+                put("up", roundToFourDecimals(probabilities[2]));
+            }});
 
             return mapper.writeValueAsString(explanation);
         } catch (JsonProcessingException e) {

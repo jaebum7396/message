@@ -550,7 +550,8 @@ public class FutureService {
         Rule highVolumeRule = new RelativeVolumeRule(series, 20, 1.5, true);
 
         // 머신러닝 룰 생성
-        MLModel mlModel = new MLModel(priceChangeThreshold);
+        List<Indicator<Num>> indicators = initializeIndicators(series);
+        MLModel mlModel = new MLModel(priceChangeThreshold, indicators);
         int totalSize = series.getBarCount();
         int trainSize = (int) (totalSize * 0.5);
         System.out.println("Train data size: " + trainSize);
@@ -559,14 +560,13 @@ public class FutureService {
         BarSeries trainSeries = series.getSubSeries(0, trainSize);
         BarSeries testSeries = series.getSubSeries(trainSize, totalSize);
         // 머신러닝에 쓰일 지표 초기화
-        List<Indicator<Num>> indicators = initializeIndicators(series);
         double upThreshold = 0.6;   // 60% 이상의 상승 확률일 때 매수 신호
         double downThreshold = 0.6; // 60% 이상의 하락 확률일 때 매도 신호
 
         if (testFlag){
-            mlModel.train(testSeries, indicators, trainSize);
+            mlModel.train(testSeries, trainSize);
         } else {
-            mlModel.train(series, indicators, totalSize);
+            mlModel.train(series, totalSize);
         }
         //  MLRule 생성
         Rule mlRule = new MLRule(mlModel, indicators, upThreshold, downThreshold);
