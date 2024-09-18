@@ -135,7 +135,7 @@ public class FutureMLService {
         BaseBarSeries trainSeries = series.getSubSeries(0, trainSize);
         // 테스트 시리즈
         BaseBarSeries testSeries = series.getSubSeries(trainSize, totalSize);
-        System.out.println("testSeries count : " + testSeries.getBarCount());
+        //System.out.println("testSeries count : " + testSeries.getBarCount());
 
         strategyMaker(tradingEntity, series, true,true);
         Strategy longStrategy = strategyMap.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval() + "_long_strategy");
@@ -535,7 +535,7 @@ public class FutureMLService {
                 boolean longSignal = longPredict > 0.4;
                 boolean neutralSignal = neutralPredict > longPredict && neutralPredict > shortPredict;
 
-                System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
+                //System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
 
                 // 백테스팅 포지션 출력
                 //Position backTestPosition = tradingRecord.getCurrentPosition();
@@ -574,6 +574,7 @@ public class FutureMLService {
                     //exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
 
                     if (exitFlag) {
+                        System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
                         makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), "포지션 청산");
                         TOTAL_POSITION_COUNT--;
                         //backTestResult(tradingRecord, series, symbol, tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral(), true);
@@ -615,6 +616,7 @@ public class FutureMLService {
                     //}
 
                     if (enterFlag) {
+                        System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
                         System.out.println(symbol + " " + positionSide + " 포지션 오픈");
                         makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
                         TOTAL_POSITION_COUNT++;
@@ -2349,7 +2351,7 @@ public class FutureMLService {
     }
 
     public List<Map<String, Object>> getSort(JSONArray resultArray, String sortBy, String orderBy, int limit) {
-        log.info("getSort >>>>> sortBy : {}, orderBy : {}, limit : {}", sortBy, orderBy, limit);
+        //log.info("getSort >>>>> sortBy : {}, orderBy : {}, limit : {}", sortBy, orderBy, limit);
 
         // 거래량 상위 N개를 제외할 수
         final int VOLUME_EXCLUDE_COUNT = 15;
@@ -2384,7 +2386,7 @@ public class FutureMLService {
                 .map(item -> item.get("symbol").toString().toLowerCase())
                 .collect(Collectors.toSet());
 
-        System.out.println("거래량 상위 " + VOLUME_EXCLUDE_COUNT + "개 제외 대상 : " + excludeSymbols);
+        //System.out.println("거래량 상위 " + VOLUME_EXCLUDE_COUNT + "개 제외 대상 : " + excludeSymbols);
 
         // 필터링 및 상위 항목 선택
         List<Map<String, Object>> topLimitItems = sortedBy.stream()
@@ -2397,7 +2399,7 @@ public class FutureMLService {
                 .limit(limit)
                 .collect(Collectors.toList());
 
-        System.out.println("상위 " + limit + "개 항목 : " + topLimitItems);
+        //System.out.println("상위 " + limit + "개 항목 : " + topLimitItems);
         return topLimitItems;
     }
 
