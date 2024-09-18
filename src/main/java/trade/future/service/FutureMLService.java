@@ -373,7 +373,7 @@ public class FutureMLService {
 
     private BaseBarSeries klineJsonToSeries(String jsonStr){
         String weight = new JSONObject(jsonStr).getString("x-mbx-used-weight-1m");
-        System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
+        //System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
         JSONArray jsonArray = new JSONArray(new JSONObject(jsonStr).get("data").toString());
         BaseBarSeries series = new BaseBarSeries();
         for (int i = 0; i < jsonArray.length(); i++) {
@@ -517,7 +517,7 @@ public class FutureMLService {
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
-                System.out.println("series count : " + series.getBarCount());
+                //System.out.println(symbol + " series count : " + series.getBarCount());
 
                 RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
                 //RealisticBackTest.BarEvent barEvent = currentBackTest.addBar(series.getBar(series.getEndIndex()));
@@ -535,7 +535,7 @@ public class FutureMLService {
                 boolean longSignal = longPredict > 0.4;
                 boolean neutralSignal = neutralPredict > longPredict && neutralPredict > shortPredict;
 
-                System.out.println(mlModel.explainPrediction(indicators, series.getEndIndex()));
+                System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
 
                 // 백테스팅 포지션 출력
                 //Position backTestPosition = tradingRecord.getCurrentPosition();
@@ -713,8 +713,12 @@ public class FutureMLService {
                 tradingEntity.getPositionSide(),
                 tradingEntity.getCollateral()
         );
-        System.out.println(symbol + " ROI : " + currentROI);
-        System.out.println(symbol + " PNL : " + currentPnl);
+
+        CONSOLE_COLORS roiColor = currentROI.compareTo(BigDecimal.ZERO) >= 0 ? CONSOLE_COLORS.GREEN : CONSOLE_COLORS.RED;
+        CONSOLE_COLORS pnlColor = currentPnl.compareTo(BigDecimal.ZERO) >= 0 ? CONSOLE_COLORS.GREEN : CONSOLE_COLORS.RED;
+
+        System.out.println(symbol + " ROI : " + roiColor + currentROI + "%" + CONSOLE_COLORS.RESET);
+        System.out.println(symbol + " PNL : " + pnlColor + currentPnl + CONSOLE_COLORS.RESET);
     }
 
     private void klineProcess_backup(String event){
@@ -1264,6 +1268,7 @@ public class FutureMLService {
                 throw new RuntimeException("오픈 가능한 트레이딩이 없습니다.");
             }
         } catch (Exception e){
+            autoTradingOpenFlag = false;
             log.error("오픈 가능한 트레이딩이 없습니다.");
             //printTradingEntitys();
             nextFlag = false;
@@ -1593,8 +1598,8 @@ public class FutureMLService {
         if (idx < page) {
             klineScraping(tradingEntity, firstTime, idx, page);
         } else {
-            System.out.println("newSeries : " + newSeries.getBarCount());
-            System.out.println("scrapingTest >>>>> END");
+            //System.out.println("newSeries : " + newSeries.getBarCount());
+            //System.out.println("scrapingTest >>>>> END");
         }
     }
 
@@ -2345,6 +2350,10 @@ public class FutureMLService {
 
     public List<Map<String, Object>> getSort(JSONArray resultArray, String sortBy, String orderBy, int limit) {
         log.info("getSort >>>>> sortBy : {}, orderBy : {}, limit : {}", sortBy, orderBy, limit);
+
+        // 거래량 상위 N개를 제외할 수
+        final int VOLUME_EXCLUDE_COUNT = 15;
+
         // JSON 데이터를 Java 객체로 파싱하여 리스트에 저장
         List<Map<String, Object>> itemList = new ArrayList<>();
         for (int i = 0; i < resultArray.length(); i++) {
@@ -2352,35 +2361,43 @@ public class FutureMLService {
             itemList.add(item.toMap());
         }
 
+        // 거래량 기준으로 정렬한 복사본 생성
+        List<Map<String, Object>> sortedByVolume = new ArrayList<>(itemList);
+        Collections.sort(sortedByVolume, (item1, item2) -> {
+            double volume1 = Double.parseDouble(item1.get("volume").toString());
+            double volume2 = Double.parseDouble(item2.get("volume").toString());
+            return Double.compare(volume2, volume1);  // 내림차순 정렬
+        });
+
         // sortBy 기준으로 orderBy(DESC/ASC)으로 정렬한 복사본
         List<Map<String, Object>> sortedBy = new ArrayList<>(itemList);
         Collections.sort(sortedBy, (item1, item2) -> {
-            double volume1 = Double.parseDouble(item1.get(sortBy).toString());
-            double volume2 = Double.parseDouble(item2.get(sortBy).toString());
-            if (orderBy.equals("DESC")) return Double.compare(volume2, volume1);
-            else return Double.compare(volume1, volume2);
+            double value1 = Double.parseDouble(item1.get(sortBy).toString());
+            double value2 = Double.parseDouble(item2.get(sortBy).toString());
+            if (orderBy.equals("DESC")) return Double.compare(value2, value1);
+            else return Double.compare(value1, value2);
         });
 
-        // 상위 5개 항목 선택
+        // 거래량 상위 N개의 symbol을 Set에 저장
+        Set<String> excludeSymbols = sortedBy.stream()
+                .limit(VOLUME_EXCLUDE_COUNT)
+                .map(item -> item.get("symbol").toString().toLowerCase())
+                .collect(Collectors.toSet());
+
+        System.out.println("거래량 상위 " + VOLUME_EXCLUDE_COUNT + "개 제외 대상 : " + excludeSymbols);
+
+        // 필터링 및 상위 항목 선택
         List<Map<String, Object>> topLimitItems = sortedBy.stream()
+                .filter(item -> !excludeSymbols.contains(item.get("symbol").toString().toLowerCase()))  // 거래량 상위 N개 제외
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("busd"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("usdc"))
-                //종목제외
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("btc"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
-                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("floki"))
-                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("crv"))
-                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("people"))
-                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("reef"))
-                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("super"))
-                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("sui"))
-                //.filter(item -> !item.get("symbol").toString().toLowerCase().contains("neiro"))
                 .limit(limit)
                 .collect(Collectors.toList());
-        //topLimitItems.forEach(item -> {
-        //    System.out.println(item.get("symbol") + " : " + item.get(sortBy));
-        //});
+
+        System.out.println("상위 " + limit + "개 항목 : " + topLimitItems);
         return topLimitItems;
     }
 

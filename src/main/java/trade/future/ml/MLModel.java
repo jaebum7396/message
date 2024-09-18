@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.num.Num;
 import smile.data.DataFrame;
@@ -28,31 +31,12 @@ public class MLModel {
     private ObjectMapper mapper = new ObjectMapper();
 
     public MLModel(List<Indicator<Num>> indicators) {
-        this(0.01, indicators); // 기본값 설정
+        this(0.01, indicators);
     }
 
     public MLModel(double priceChangeThreshold, List<Indicator<Num>> indicators) {
         this.priceChangeThreshold = priceChangeThreshold;
         this.indicators = indicators;
-    }
-
-    // 특성 이름과 중요도를 함께 저장하기 위한 내부 클래스
-    private static class FeatureImportance {
-        private final String name;
-        private final double importance;
-
-        public FeatureImportance(String name, double importance) {
-            this.name = name;
-            this.importance = importance;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public double getImportance() {
-            return importance;
-        }
     }
 
     public void train(BarSeries series, int trainSize) {
@@ -68,8 +52,7 @@ public class MLModel {
 
             for (int i = 0; i < trainSize; i++) {
                 for (int j = 0; j < indicators.size(); j++) {
-                    if (indicators.get(j).equals(ClosePriceIndicator.class)) {
-                        //logger.warning("ClosePriceIndicator는 지표로 사용할 수 없습니다.");
+                    if (indicators.get(j) instanceof ClosePriceIndicator) {
                         continue;
                     }
                     Num value = indicators.get(j).getValue(i);
@@ -111,23 +94,6 @@ public class MLModel {
 
             this.featureImportance = model.importance();
 
-            // 특성 이름과 중요도를 매핑하고 내림차순으로 정렬
-            String[] indicatorNames = indicators.stream()
-                    .map(indicator -> indicator.getClass().getSimpleName())
-                    .toArray(String[]::new);
-
-            FeatureImportance[] sortedImportance = IntStream.range(0, featureImportance.length)
-                    .mapToObj(i -> new FeatureImportance(indicatorNames[i], featureImportance[i]))
-                    .sorted(Comparator.comparingDouble(FeatureImportance::getImportance).reversed())
-                    .toArray(FeatureImportance[]::new);
-
-            // 정렬된 특성 중요도 로깅
-            StringBuilder sb = new StringBuilder("특성 중요도 (내림차순):\n");
-            for (FeatureImportance fi : sortedImportance) {
-                sb.append(String.format("%s: %.4f\n", fi.getName(), fi.getImportance()));
-            }
-            logger.info(sb.toString());
-
             logger.info("모델 학습이 성공적으로 완료되었습니다.");
         } catch (Exception e) {
             logger.severe("모델 학습 중 오류 발생: " + e.getMessage());
@@ -136,32 +102,76 @@ public class MLModel {
     }
 
     public int predict(List<Indicator<Num>> indicators, int index) {
-        double rawPrediction = predictRaw(indicators, index);
         double[] probabilities = predictProbabilities(indicators, index);
+        double modelPrediction = probabilities[2] - probabilities[0]; // -1 to 1 range
 
-        //logger.info(String.format("Raw prediction: %.4f", rawPrediction));
-        /*logger.info(String.format("Probabilities - Down: %.4f, Neutral: %.4f, Up: %.4f",
-                probabilities[0], probabilities[1], probabilities[2]));*/
+        // 추가적인 지표 분석
+        boolean isUptrend = isUptrend(indicators, index);
+        double macdValue = getMACDValue(indicators, index);
+        double adxValue = getADXValue(indicators, index);
 
-        //logCurrentFeatureValues(indicators, index);
-        //logTopFeatures(indicators, 5);
-
-        int finalPrediction;
-        if (rawPrediction > 0.5) {
-            finalPrediction = 1;
-        } else if (rawPrediction < -0.5) {
-            finalPrediction = -1;
-        } else {
-            finalPrediction = 0;
+        // 최종 예측 결정
+        double finalPrediction = modelPrediction;
+        if (isUptrend && macdValue > 0 && adxValue > 25) {
+            finalPrediction += 0.2; // Slightly increase long bias
+        } else if (!isUptrend && macdValue < 0 && adxValue > 25) {
+            finalPrediction -= 0.2; // Slightly increase short bias
         }
 
-        //logger.info("Final prediction: " + finalPrediction);
-        return finalPrediction;
+        if (finalPrediction > 0.3) {
+            return 1; // Long
+        } else if (finalPrediction < -0.3) {
+            return -1; // Short
+        } else {
+            return 0; // Neutral
+        }
+    }
+
+    private boolean isUptrend(List<Indicator<Num>> indicators, int index) {
+        Optional<Indicator<Num>> shortEMA = indicators.stream()
+                .filter(i -> i instanceof EMAIndicator)
+                .findFirst();
+        Optional<Indicator<Num>> longEMA = indicators.stream()
+                .filter(i -> i instanceof EMAIndicator && i != shortEMA.orElse(null))
+                .findFirst();
+
+        if (shortEMA.isPresent() && longEMA.isPresent()) {
+            return shortEMA.get().getValue(index).isGreaterThan(longEMA.get().getValue(index));
+        }
+        return false;
+    }
+
+    private double getMACDValue(List<Indicator<Num>> indicators, int index) {
+        Optional<Indicator<Num>> macd = indicators.stream()
+                .filter(i -> i instanceof MACDIndicator)
+                .findFirst();
+
+        return macd.map(indicator -> indicator.getValue(index).doubleValue()).orElse(0.0);
+    }
+
+    private double getADXValue(List<Indicator<Num>> indicators, int index) {
+        Optional<Indicator<Num>> adx = indicators.stream()
+                .filter(i -> i instanceof ADXIndicator)
+                .findFirst();
+
+        return adx.map(indicator -> indicator.getValue(index).doubleValue()).orElse(0.0);
     }
 
     public double[] predictProbabilities(List<Indicator<Num>> indicators, int index) {
         try {
-            double rawPrediction = predictRaw(indicators, index);
+            double[] features = new double[indicators.size()];
+            for (int i = 0; i < indicators.size(); i++) {
+                features[i] = indicators.get(i).getValue(index).doubleValue();
+            }
+
+            String[] featureNames = IntStream.range(0, indicators.size())
+                    .mapToObj(i -> "feature" + i)
+                    .toArray(String[]::new);
+
+            double[][] featuresArray = new double[][]{features};
+            DataFrame df = DataFrame.of(featuresArray, featureNames);
+
+            double rawPrediction = model.predict(df)[0];
 
             double[] probabilities = new double[3];
             double expNeg = Math.exp(-rawPrediction);
@@ -179,22 +189,6 @@ public class MLModel {
             e.printStackTrace();
             return new double[]{0, 1, 0};
         }
-    }
-
-    private double predictRaw(List<Indicator<Num>> indicators, int index) {
-        double[] features = new double[indicators.size()];
-        for (int i = 0; i < indicators.size(); i++) {
-            features[i] = indicators.get(i).getValue(index).doubleValue();
-        }
-
-        String[] featureNames = IntStream.range(0, indicators.size())
-                .mapToObj(i -> "feature" + i)
-                .toArray(String[]::new);
-
-        double[][] featuresArray = new double[][]{features};
-        DataFrame df = DataFrame.of(featuresArray, featureNames);
-
-        return model.predict(df)[0];
     }
 
     public double[] getFeatureImportance() {
@@ -236,7 +230,7 @@ public class MLModel {
 
     public String explainPrediction(List<Indicator<Num>> indicators, int index) {
         try {
-            double rawPrediction = predictRaw(indicators, index);
+            int prediction = predict(indicators, index);
             double[] probabilities = predictProbabilities(indicators, index);
             Map<String, Double> importanceMap = getFeatureImportanceMap(indicators);
 
@@ -246,7 +240,7 @@ public class MLModel {
                     .collect(Collectors.toList());
 
             Map<String, Object> explanation = new HashMap<>();
-            explanation.put("raw_prediction", roundToFourDecimals(rawPrediction));
+            explanation.put("prediction", prediction);
 
             List<Map<String, Object>> topFeaturesList = new ArrayList<>();
             for (int i = 0; i < topFeatures.size(); i++) {
@@ -265,6 +259,12 @@ public class MLModel {
                 put("up", roundToFourDecimals(probabilities[2]));
             }});
 
+            explanation.put("trend", new HashMap<String, Object>() {{
+                put("is_uptrend", isUptrend(indicators, index));
+                put("macd", roundToFourDecimals(getMACDValue(indicators, index)));
+                put("adx", roundToFourDecimals(getADXValue(indicators, index)));
+            }});
+
             return mapper.writeValueAsString(explanation);
         } catch (JsonProcessingException e) {
             logger.severe("JSON 생성 중 오류 발생: " + e.getMessage());
@@ -275,5 +275,4 @@ public class MLModel {
     private double roundToFourDecimals(double value) {
         return Math.round(value * 10000.0) / 10000.0;
     }
-
 }

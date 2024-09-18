@@ -22,14 +22,6 @@ public class TrendPredictionModel extends MLModel {
         super.train(series, trainSize);
     }
 
-    @Override
-    public int predict(List<Indicator<Num>> indicators, int index) {
-        int prediction = super.predict(indicators, index);
-        String trendPrediction = prediction == 1 ? "상승 트렌드 유지" : "하락 트렌드 유지 또는 반전";
-        //logger.info("트렌드 예측 결과: " + trendPrediction);
-        return prediction;
-    }
-
     public String getTrendStrength(BarSeries series, int index) {
         if (index < trendPeriod) {
             return "트렌드 강도를 계산하기에 충분한 데이터가 없습니다.";

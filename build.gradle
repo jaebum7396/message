@@ -45,6 +45,9 @@ ext {
 	queryDslVersion = "5.0.0"
 }
 
+def dl4jVersion = '1.0.0-beta7'
+def nd4jVersion = '1.0.0-beta7'
+
 dependencies {
 	//swagger
 	implementation 'io.springfox:springfox-boot-starter:3.0.0'
@@ -124,6 +127,20 @@ dependencies {
 
 	// If you need Smile's Math utilities
 	implementation 'com.github.haifengl:smile-math:2.6.0'
+
+	implementation "org.deeplearning4j:deeplearning4j-core:${dl4jVersion}"
+	implementation "org.nd4j:nd4j-native-platform:${nd4jVersion}"
+
+	// ND4J 백엔드. CPU 버전을 사용하려면 아래 줄을 주석 처리하세요.
+	implementation "org.nd4j:nd4j-cuda-10.2-platform:${nd4jVersion}"
+
+	// Apache Commons Lang 의존성 추가
+	//implementation 'org.apache.commons:commons-lang3:3.12.0'
+
+	// 만약 이미 다른 버전의 commons-lang3가 있다면, 강제로 특정 버전을 사용하도록 할 수 있습니다:
+	implementation('org.apache.commons:commons-lang3:3.12.0') {
+	    force = true
+	}
 }
 
 dependencyManagement {

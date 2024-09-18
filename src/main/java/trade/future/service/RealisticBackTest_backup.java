@@ -3,23 +3,17 @@ package trade.future.service;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.ta4j.core.*;
-import org.ta4j.core.indicators.*;
+import org.ta4j.core.indicators.ATRIndicator;
+import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.adx.MinusDIIndicator;
 import org.ta4j.core.indicators.adx.PlusDIIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
-import org.ta4j.core.indicators.volume.AccumulationDistributionIndicator;
-import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
-import org.ta4j.core.indicators.volume.OnBalanceVolumeIndicator;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.AndRule;
 import org.ta4j.core.rules.OrRule;
 import trade.future.ml.MLModel;
-import trade.future.model.Rule.RelativeATRIndicator;
 
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
@@ -28,7 +22,7 @@ import java.util.List;
 import java.util.Random;
 
 @Slf4j
-public class RealisticBackTest {
+public class RealisticBackTest_backup {
     private static final String ANSI_RESET = "\u001B[0m";
     private static final String ANSI_RED = "\u001B[31m";
     private static final String ANSI_GREEN = "\u001B[32m";
@@ -82,8 +76,8 @@ public class RealisticBackTest {
         NO_SIGNAL
     }
 
-    public RealisticBackTest(BaseBarSeries series, MLModel mlModel, Strategy longStrategy, Strategy shortStrategy,
-                             Duration executionDelay, double slippagePercent) {
+    public RealisticBackTest_backup(BaseBarSeries series, MLModel mlModel, Strategy longStrategy, Strategy shortStrategy,
+                                    Duration executionDelay, double slippagePercent) {
         this.series = series;
         this.mlModel = mlModel;
         this.longStrategy = longStrategy;
@@ -115,8 +109,8 @@ public class RealisticBackTest {
         double neutralPredict = predict[1];
         double longPredict = predict[2];
 
-        boolean shortSignal = shortPredict > 0.4;
-        boolean longSignal = longPredict > 0.4;
+        boolean shortSignal = shortPredict > longPredict;
+        boolean longSignal = longPredict > shortPredict;
         boolean neutralSignal = neutralPredict > longPredict && neutralPredict > shortPredict;
 
         Position currentPosition = tradingRecord.getCurrentPosition();
@@ -129,15 +123,15 @@ public class RealisticBackTest {
             Num entryPrice = currentPosition.getEntry().getNetPrice();
             Num currentPrice = currentBar.getClosePrice();
             double changePercentage = (currentPrice.doubleValue() - entryPrice.doubleValue()) / entryPrice.doubleValue() * 100;
-            boolean exitDueToLoss = (currentType == Trade.TradeType.BUY && changePercentage <= -4.0) ||
-                    (currentType == Trade.TradeType.SELL && changePercentage >= 4.0);
+            boolean exitDueToLoss = (currentType == Trade.TradeType.BUY && changePercentage <= -2.0) ||
+                    (currentType == Trade.TradeType.SELL && changePercentage >= 2.0);
 
-            /*if (exitDueToLoss) {
+            if (exitDueToLoss) {
                 // 1% 이상 손실 시 다른 시그널 무시하고 즉시 종료
                 String exitRule = "1% 손실 도달";
                 simulateTrade(tradingRecord, currentType, currentBar, i, true, exitRule);
                 return currentType == Trade.TradeType.BUY ? BarEvent.LONG_EXIT : BarEvent.SHORT_EXIT;
-            }*/
+            }
 
             // 기존 로직 유지
             if (currentType.equals(Trade.TradeType.BUY)) {
@@ -349,14 +343,14 @@ public class RealisticBackTest {
             Num roi = calculateROI(executionPrice);
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
-            //System.out.println("***************************************************************");
-            //System.out.println(mlModel.explainPrediction(initializeIndicators(series, 20, 50), entryIndex));
-            //log.info("{}ENTER {}[{}/{}] => EXIT {}[{}/{}]{} | ROI: {}{}%{} | Entry: {} | Exit: {}",
-            //        tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(),
-            //        lastEntryType, executionIndex, executionPrice.doubleValue(), ANSI_RESET,
-            //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
-            //        entryRule, rule);
-            //System.out.println(mlModel.explainPrediction(initializeIndicators(series, 20, 50), executionIndex));
+            System.out.println("***************************************************************");
+            System.out.println(mlModel.explainPrediction(initializeIndicators(series, 20, 50), entryIndex));
+            log.info("{}ENTER {}[{}/{}] => EXIT {}[{}/{}]{} | ROI: {}{}%{} | Entry: {} | Exit: {}",
+                    tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(),
+                    lastEntryType, executionIndex, executionPrice.doubleValue(), ANSI_RESET,
+                    roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
+                    entryRule, rule);
+            System.out.println(mlModel.explainPrediction(initializeIndicators(series, 20, 50), executionIndex));
 
             double roiValue = roi.doubleValue();
             if (lastEntryType == Trade.TradeType.BUY) {
