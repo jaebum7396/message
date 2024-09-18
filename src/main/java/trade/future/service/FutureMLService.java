@@ -719,8 +719,8 @@ public class FutureMLService {
         CONSOLE_COLORS roiColor = currentROI.compareTo(BigDecimal.ZERO) >= 0 ? CONSOLE_COLORS.GREEN : CONSOLE_COLORS.RED;
         CONSOLE_COLORS pnlColor = currentPnl.compareTo(BigDecimal.ZERO) >= 0 ? CONSOLE_COLORS.GREEN : CONSOLE_COLORS.RED;
 
-        System.out.println(symbol + " ROI : " + roiColor + currentROI + "%" + CONSOLE_COLORS.RESET);
-        System.out.println(symbol + " PNL : " + pnlColor + currentPnl + CONSOLE_COLORS.RESET);
+        System.out.println(symbol+"/"+tradingEntity.getPositionSide() + " ROI : " + roiColor + currentROI + "%" + CONSOLE_COLORS.RESET);
+        System.out.println(symbol+"/"+tradingEntity.getPositionSide() + " PNL : " + pnlColor + currentPnl + CONSOLE_COLORS.RESET);
     }
 
     private void klineProcess_backup(String event){
