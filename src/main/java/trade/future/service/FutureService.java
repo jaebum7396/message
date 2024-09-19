@@ -1241,7 +1241,7 @@ public class FutureService {
         // 기술지표 계산
         TechnicalIndicatorReportEntity technicalIndicatorReportEntity = technicalIndicatorCalculate(tradingEntity);
         // 트렌드
-        tradingEntity.setTrend(technicalIndicatorReportEntity.getDirectionDi());
+        tradingEntity.setTrend5m(technicalIndicatorReportEntity.getDirectionDi());
         technicalIndicatorReportEntity.setKlineEntity(klineEvent.getKlineEntity());
         klineEvent.getKlineEntity().setTechnicalIndicatorReportEntity(technicalIndicatorReportEntity);
 
