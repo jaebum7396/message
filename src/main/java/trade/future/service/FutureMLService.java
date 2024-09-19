@@ -572,12 +572,14 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (
                         tradingEntity.getPositionSide().equals("LONG")
+                        &&tradingEntity.getTrend15m().equals("SHORT")
                         &&(shortSignal||neutralSignal))
                     {
                         exitFlag = true;
                     };
                     if (
                         tradingEntity.getPositionSide().equals("SHORT")
+                        &&tradingEntity.getTrend15m().equals("LONG")
                         &&(longSignal||neutralSignal))
                     {
                         exitFlag = true;
@@ -615,12 +617,14 @@ public class FutureMLService {
 
                     if (
                         longSignal
+                        &&tradingEntity.getTrend1h().equals("LONG")
                         &&tradingEntity.getTrend15m().equals("LONG")
                     ) {
                         enterFlag = true;
                         positionSide = "LONG";
                     } else if (
                         shortSignal
+                        &&tradingEntity.getTrend1h().equals("SHORT")
                         &&tradingEntity.getTrend15m().equals("SHORT")
                     ){
                         enterFlag = true;
