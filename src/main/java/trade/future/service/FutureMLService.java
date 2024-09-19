@@ -448,7 +448,7 @@ public class FutureMLService {
 
         returnMap.put("GRID", gridBuilder.toString());
 
-        System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
+        //System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
 
         return returnMap;
     }
