@@ -408,10 +408,10 @@ public class FutureMLService {
         String trend15M = determineTrend(series15M);
         String trend5M = determineTrend(series5M);
 
-        returnMap.put("4H", trend4H);
-        returnMap.put("1H", trend1H);
-        returnMap.put("15M", trend15M);
-        returnMap.put("5M", trend5M);
+        returnMap.put("4h", trend4H);
+        returnMap.put("1h", trend1H);
+        returnMap.put("15m", trend15M);
+        returnMap.put("5m", trend5M);
 
         // 종합적인 추세 판단
         int upTrendCount = 0;
@@ -439,10 +439,10 @@ public class FutureMLService {
         gridBuilder.append("+------+--------+\n");
         gridBuilder.append("| Time | Trend  |\n");
         gridBuilder.append("+------+--------+\n");
-        gridBuilder.append(String.format("| 4H   | %-6s |\n", formatTrend(trend4H)));
-        gridBuilder.append(String.format("| 1H   | %-6s |\n", formatTrend(trend1H)));
-        gridBuilder.append(String.format("| 15M  | %-6s |\n", formatTrend(trend15M)));
-        gridBuilder.append(String.format("| 5M   | %-6s |\n", formatTrend(trend5M)));
+        gridBuilder.append(String.format("| 4h   | %-6s |\n", formatTrend(trend4H)));
+        gridBuilder.append(String.format("| 1h   | %-6s |\n", formatTrend(trend1H)));
+        gridBuilder.append(String.format("| 15m  | %-6s |\n", formatTrend(trend15M)));
+        gridBuilder.append(String.format("| 5m   | %-6s |\n", formatTrend(trend5M)));
         gridBuilder.append("+------+--------+\n");
         //gridBuilder.append(String.format("Overall Trend: %s\n", overallTrend));
 
