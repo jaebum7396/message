@@ -166,7 +166,7 @@ public class FutureMLService {
             log.error("tradingSaved >>>>> "+tradingEntity.getSymbol() + "("+tradingEntity.getStreamId()+") : " + tradingEntity.getTradingCd());
             restartTrading(tradingEntity);
         } else {
-            System.out.println("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
+            log.error("[RECOVER-ERR] >>>>> "+streamId +" 번 스트림을 복구하지 못했습니다.");
         }
     }
 
@@ -518,7 +518,7 @@ public class FutureMLService {
                 Strategy longStrategy = strategyMap.get(tradingCd + "_" + interval + "_long_strategy");
                 Strategy shortStrategy = strategyMap.get(tradingCd + "_" + interval + "_short_strategy");
 
-                //System.out.println(symbol + " series count : " + series.getBarCount());
+                String krTime = krTimeExpression(series.getBar(series.getEndIndex()));
 
                 RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
                 //RealisticBackTest.BarEvent barEvent = currentBackTest.addBar(series.getBar(series.getEndIndex()));
@@ -595,17 +595,17 @@ public class FutureMLService {
                     //exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
 
                     if (exitFlag) {
-                        System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
-                        makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), "포지션 청산");
+                        System.out.println(krTime + symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
+                        makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), krTime + "포지션 청산");
                         TOTAL_POSITION_COUNT--;
                         //backTestResult(tradingRecord, series, symbol, tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral(), true);
                         Trade entry = tradingRecord.getCurrentPosition().getEntry();
                         Trade exit = tradingRecord.getCurrentPosition().getExit();
-                        System.out.println(symbol+ " : " +entry.getNetPrice()+"("+tradingRecord.getCurrentPosition().isOpened()+")/"+exit.getNetPrice());
+                        System.out.println(krTime + symbol+ " : " +entry.getNetPrice()+"("+tradingRecord.getCurrentPosition().isOpened()+")/"+exit.getNetPrice());
                         tradingRecord.getPositions().forEach(position -> {
                             //System.out.println("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
                         });
-                        System.out.println(symbol + " 포지션 종료");
+                        System.out.println(krTime + symbol + " 포지션 종료");
                     }
                 } else {
                     // 포지션이 열려있지 않은 경우
@@ -643,12 +643,12 @@ public class FutureMLService {
                     //}
 
                     if (enterFlag) {
-                        System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
-                        System.out.println(symbol + " " + positionSide + " 포지션 오픈");
+                        System.out.println(krTime + symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
+                        System.out.println(krTime + symbol + " " + positionSide + " 포지션 오픈");
                         makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
                         TOTAL_POSITION_COUNT++;
                     } else {
-                        System.out.println(symbol + " 진입 조건 충족되지 않음");
+                        System.out.println(krTime + symbol + " 진입 조건 충족되지 않음");
                         //if (!currentBackTest.isLikelyToMove()) {
                         //    log.info(symbol + " 스트림 종료 >>>>> " + tradingEntity.getSymbol() + " / " + tradingEntity.getStreamId());
                         //    restartTrading(tradingEntity);
@@ -970,7 +970,7 @@ public class FutureMLService {
             e.printStackTrace();
         } finally {
             tradingEntity.setEntryCount(tradingEntity.getEntryCount() + 1); // 진입횟수 증가
-            System.out.println("openTradingEntity >>>>> " + tradingEntity);
+            //System.out.println("openTradingEntity >>>>> " + tradingEntity);
             tradingRepository.save(tradingEntity);
         }
     }
@@ -984,7 +984,7 @@ public class FutureMLService {
             e.printStackTrace();
         } finally {
             restartTrading(tradingEntity);
-            System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+            //System.out.println("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
         }
     }
@@ -1559,7 +1559,6 @@ public class FutureMLService {
         String tradingCd = tradingEntity.getTradingCd();
         String interval = tradingEntity.getCandleInterval();
 
-        System.out.println("scrapingTest >>>>>");
         LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
         requestParam.put("timestamp", getServerTime());
         requestParam.put("symbol", tradingEntity.getSymbol());
@@ -1573,7 +1572,7 @@ public class FutureMLService {
 
         JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
         JSONArray firstIdxArray = jsonArray.getJSONArray(0);
-        System.out.println("firstIdxArray : " + firstIdxArray);
+        //System.out.println("firstIdxArray : " + firstIdxArray);
         String firstTime = String.valueOf(firstIdxArray.get(0));
 
         String tradingKey = tradingCd + "_" + interval;
@@ -2423,6 +2422,8 @@ public class FutureMLService {
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("btc"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("xrp"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("waves"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("agix"))
                 .limit(limit)
                 .collect(Collectors.toList());
 
