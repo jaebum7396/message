@@ -2424,6 +2424,7 @@ public class FutureMLService {
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ada"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("waves"))
                 .filter(item -> !item.get("symbol").toString().toLowerCase().contains("agix"))
+                .filter(item -> !item.get("symbol").toString().toLowerCase().contains("ocean"))
                 .limit(limit)
                 .collect(Collectors.toList());
 
