@@ -17,31 +17,29 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.ta4j.core.*;
-import org.ta4j.core.indicators.*;
+import org.ta4j.core.indicators.ATRIndicator;
+import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.adx.MinusDIIndicator;
 import org.ta4j.core.indicators.adx.PlusDIIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
-import org.ta4j.core.indicators.volume.AccumulationDistributionIndicator;
-import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
-import org.ta4j.core.indicators.volume.OnBalanceVolumeIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
-import org.ta4j.core.rules.*;
-import smile.plot.swing.Base;
+import org.ta4j.core.rules.AndRule;
+import org.ta4j.core.rules.BooleanRule;
+import org.ta4j.core.rules.OrRule;
 import trade.common.CommonUtils;
 import trade.common.MemoryUsageMonitor;
 import trade.configuration.MyWebSocketClientImpl;
 import trade.exception.AutoTradingDuplicateException;
-import trade.future.ml.GeneticMLModel;
 import trade.future.ml.MLModel;
 import trade.future.ml.SignalProximityScanner;
-import trade.future.ml.TrendPredictionModel;
-import trade.future.model.Rule.*;
+import trade.future.model.Rule.MLExitRule;
+import trade.future.model.Rule.MLLongRule;
+import trade.future.model.Rule.MLShortRule;
+import trade.future.model.Rule.RelativeATRIndicator;
 import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
 import trade.future.model.enums.CONSOLE_COLORS;
@@ -55,7 +53,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
-import java.time.*;
+import java.time.Duration;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -447,7 +448,7 @@ public class FutureMLService {
 
         returnMap.put("GRID", gridBuilder.toString());
 
-        //System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
+        System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
 
         return returnMap;
     }
@@ -545,6 +546,16 @@ public class FutureMLService {
                 int limit = 50;
                 HashMap<String, Object> trendMap = trendMonitoring(symbol, limit);
 
+                String trend5m = String.valueOf(trendMap.get("5m"));
+                String trend15m = String.valueOf(trendMap.get("15m"));
+                String trend1h = String.valueOf(trendMap.get("1h"));
+                String trend4h = String.valueOf(trendMap.get("4h"));
+
+                tradingEntity.setTrend5m(trend5m);
+                tradingEntity.setTrend15m(trend15m);
+                tradingEntity.setTrend1h(trend1h);
+                tradingEntity.setTrend4h(trend4h);
+
                 if (tradingEntity.getPositionStatus() != null && tradingEntity.getPositionStatus().equals("OPEN")) {
                     //checkPositionMismatch(backTestPosition, tradingEntity);
                     // 포지션이 열려있는 경우
@@ -559,8 +570,20 @@ public class FutureMLService {
                     printPositionInfo(tradingEntity, eventEntity);
 
                     boolean exitFlag = false;
-                    if (tradingEntity.getPositionSide().equals("LONG")&&(shortSignal||neutralSignal)) exitFlag = true;
-                    if (tradingEntity.getPositionSide().equals("SHORT")&&(longSignal||neutralSignal)) exitFlag = true;
+                    if (
+                        tradingEntity.getPositionSide().equals("LONG")
+                        &&tradingEntity.getTrend15m().equals("LONG")
+                        &&(shortSignal||neutralSignal))
+                    {
+                        exitFlag = true;
+                    };
+                    if (
+                        tradingEntity.getPositionSide().equals("SHORT")
+                        &&tradingEntity.getTrend15m().equals("SHORT")
+                        &&(longSignal||neutralSignal))
+                    {
+                        exitFlag = true;
+                    };
 
                     //switch (barEvent) {
                     //    case LONG_EXIT:
