@@ -969,7 +969,7 @@ public class FutureMLService {
             //    orderSubmit(takeProfitOrderParams);
             //}
 
-            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_GREEN+"*********************[진입] "+tradingEntity.getSymbol()+"*********************"+CONSOLE_COLORS.RESET);
+            System.out.println(CONSOLE_COLORS.GREEN+"*********************[진입]" +tradingEntity.getPositionSide()+" "+tradingEntity.getSymbol()+"*********************"+CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -983,7 +983,7 @@ public class FutureMLService {
         tradingEntity.setClosePrice(closePrice);
         try { //마켓가로 클로즈 주문을 제출한다.
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
-            System.out.println(CONSOLE_COLORS.BRIGHT_BACKGROUND_RED+"*********************[청산/"+tradingEntity.getSymbol()+" - 청산사유]"+remark+"*********************"+CONSOLE_COLORS.RESET);
+            System.out.println(CONSOLE_COLORS.RED+"*********************[청산/" +tradingEntity.getPositionSide()+" "+tradingEntity.getSymbol()+" - 청산사유]*********************"+CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
