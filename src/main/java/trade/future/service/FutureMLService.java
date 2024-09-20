@@ -569,12 +569,38 @@ public class FutureMLService {
 
                     printPositionInfo(tradingEntity, eventEntity);
 
+                    // 현재 수익률 계산
+                    BigDecimal currentPrice = new BigDecimal(eventEntity.getKlineEntity().getClosePrice().toString());
+                    BigDecimal entryPrice = new BigDecimal(tradingEntity.getOpenPrice().toString());
+                    BigDecimal profitPercentage;
+
+                    if (tradingEntity.getPositionSide().equals("LONG")) {
+                        profitPercentage = currentPrice.subtract(entryPrice)
+                                .divide(entryPrice, 4, RoundingMode.HALF_UP)
+                                .multiply(new BigDecimal("100"));
+                    } else if (tradingEntity.getPositionSide().equals("SHORT")) {
+                        profitPercentage = entryPrice.subtract(currentPrice)
+                                .divide(entryPrice, 4, RoundingMode.HALF_UP)
+                                .multiply(new BigDecimal("100"));
+                    } else {
+                        profitPercentage = BigDecimal.ZERO;
+                    }
+
+                    // 5% 이상 수익 시 클로즈 오더
+                    if (profitPercentage.compareTo(new BigDecimal("5.0")) >= 0) {
+                        System.out.println(krTime + symbol + " : 5% 이상 수익 달성. 포지션 청산.");
+                        makeCloseOrder(tradingEntity, currentPrice, krTime + "5% 수익 실현");
+                        TOTAL_POSITION_COUNT--;
+                        System.out.println(krTime + symbol + " 포지션 종료 (수익률: " + profitPercentage.setScale(2, RoundingMode.HALF_UP) + "%)");
+                        return; // 수익 실현으로 종료했으므로 추가 로직 실행 방지
+                    }
+
                     boolean exitFlag = false;
                     if (
                         tradingEntity.getPositionSide().equals("LONG")
                         &&(shortSignal
                                 ||neutralSignal
-                                ||tradingEntity.getTrend1h().equals("SHORT")
+                                //||tradingEntity.getTrend1h().equals("SHORT")
                                 ||tradingEntity.getTrend4h().equals("SHORT")
                         )
                     ){
@@ -584,7 +610,7 @@ public class FutureMLService {
                         tradingEntity.getPositionSide().equals("SHORT")
                         &&(longSignal
                                 ||neutralSignal
-                                ||tradingEntity.getTrend1h().equals("LONG")
+                                //||tradingEntity.getTrend1h().equals("LONG")
                                 ||tradingEntity.getTrend4h().equals("LONG")
                         )
                     ){
@@ -624,7 +650,7 @@ public class FutureMLService {
                     if (
                         longSignal
                         &&tradingEntity.getTrend4h().equals("LONG")
-                        &&tradingEntity.getTrend1h().equals("LONG")
+                        //&&tradingEntity.getTrend1h().equals("LONG")
                         //&&tradingEntity.getTrend15m().equals("LONG")
                         //&&tradingEntity.getTrend5m().equals("LONG")
                     ) {
@@ -633,7 +659,7 @@ public class FutureMLService {
                     } else if (
                         shortSignal
                         &&tradingEntity.getTrend4h().equals("SHORT")
-                        &&tradingEntity.getTrend1h().equals("SHORT")
+                        //&&tradingEntity.getTrend1h().equals("SHORT")
                         //&&tradingEntity.getTrend15m().equals("SHORT")
                         //&&tradingEntity.getTrend5m().equals("SHORT")
                     ){
