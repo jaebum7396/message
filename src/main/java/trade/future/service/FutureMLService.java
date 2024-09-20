@@ -503,11 +503,11 @@ public class FutureMLService {
                 throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어 있습니다.");
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            //e.printStackTrace();
             nextFlag = false;
-            for(TradingEntity tradingEntity : tradingEntitys){
+            /*for(TradingEntity tradingEntity : tradingEntitys){
                 restartTrading(tradingEntity);
-            }
+            }*/
         }
         if (nextFlag) {
             TradingEntity tradingEntity = tradingEntitys.get(0);
@@ -572,13 +572,21 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (
                         tradingEntity.getPositionSide().equals("LONG")
-                        &&(shortSignal||neutralSignal||tradingEntity.getTrend4h().equals("SHORT"))
+                        &&(shortSignal
+                                ||neutralSignal
+                                ||tradingEntity.getTrend1h().equals("SHORT")
+                                ||tradingEntity.getTrend4h().equals("SHORT")
+                        )
                     ){
                         exitFlag = true;
                     };
                     if (
                         tradingEntity.getPositionSide().equals("SHORT")
-                        &&(longSignal||neutralSignal||tradingEntity.getTrend4h().equals("LONG"))
+                        &&(longSignal
+                                ||neutralSignal
+                                ||tradingEntity.getTrend1h().equals("LONG")
+                                ||tradingEntity.getTrend4h().equals("LONG")
+                        )
                     ){
                         exitFlag = true;
                     };
@@ -616,7 +624,7 @@ public class FutureMLService {
                     if (
                         longSignal
                         &&tradingEntity.getTrend4h().equals("LONG")
-                        //&&tradingEntity.getTrend1h().equals("LONG")
+                        &&tradingEntity.getTrend1h().equals("LONG")
                         //&&tradingEntity.getTrend15m().equals("LONG")
                         //&&tradingEntity.getTrend5m().equals("LONG")
                     ) {
@@ -625,7 +633,7 @@ public class FutureMLService {
                     } else if (
                         shortSignal
                         &&tradingEntity.getTrend4h().equals("SHORT")
-                        //&&tradingEntity.getTrend1h().equals("SHORT")
+                        &&tradingEntity.getTrend1h().equals("SHORT")
                         //&&tradingEntity.getTrend15m().equals("SHORT")
                         //&&tradingEntity.getTrend5m().equals("SHORT")
                     ){
@@ -778,9 +786,9 @@ public class FutureMLService {
             }
         } catch (Exception e) {
             nextFlag = false;
-            for(TradingEntity tradingEntity : tradingEntitys){
+            /*for(TradingEntity tradingEntity : tradingEntitys){
                 restartTrading(tradingEntity);
-            }
+            }*/
         }
         if (nextFlag) {
             TradingEntity tradingEntity = tradingEntitys.get(0);
