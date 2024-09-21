@@ -1092,9 +1092,9 @@ public class FutureMLService {
             requestParam.put("timestamp", getServerTime());
             requestParam.remove("leverage");
             log.info("!!!new Order : " + requestParam);
-            //String orderResult = client.account().newOrder(requestParam);
+            String orderResult = client.account().newOrder(requestParam);
             //log.info("!!!result : " + orderResult);
-            //resultMap.put("result", orderResult);
+            resultMap.put("result", orderResult);
         } catch (Exception e) {
             throw e;
         }
