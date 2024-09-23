@@ -1,11 +1,6 @@
 package trade.common;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.ta4j.core.Bar;
-import org.ta4j.core.Indicator;
-import org.ta4j.core.indicators.RSIIndicator;
-import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.num.Num;
 import trade.common.model.Response;
 import trade.configuration.JacksonConfig;
@@ -19,9 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
-import trade.future.model.dto.KlineDTO;
-import trade.future.model.dto.EventDTO;
-import trade.future.model.entity.KlineEntity;
+import trade.future.model.entity.EventEntity;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
@@ -32,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.text.DecimalFormat;
 import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,14 +33,15 @@ import java.util.stream.Collectors;
 
 @Component
 @Slf4j
-public class CommonUtils {
+public class 공통유틸 {
     @Value("${jwt.secret.key}")
     private String JWT_SECRET_KEY;
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /**
      * <h3>성공 응답을 포장하는 ResponseEntity를 생성합니다.</h3>
      */
-    public ResponseEntity<Response> okResponsePackaging(Map<String, Object> result) {
+    public static ResponseEntity<Response> okResponsePackaging(Map<String, Object> result) {
         Response response = Response.builder()
                 .message("요청 성공")
                 .result(result).build();
@@ -96,7 +91,7 @@ public class CommonUtils {
         String strReturn = "";
         try {
             if (p_obj != null) {
-                strReturn = CommonUtils.getString(JacksonConfig.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(p_obj));
+                strReturn = getString(JacksonConfig.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(p_obj));
             }
         } catch (Exception e) {
             log.debug("{}", e.toString());
@@ -154,64 +149,6 @@ public class CommonUtils {
         DecimalFormat df = new DecimalFormat("#,###.##");
         return "$" + df.format(Double.parseDouble(amount));
     }
-
-    public static KlineEntity parseKlineEntity(JSONArray klineArray) {
-        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(0)), ZoneOffset.UTC);
-        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(klineArray.getLong(6)), ZoneOffset.UTC);
-
-        return KlineEntity.builder()
-                .kLineCd(null) // ID는 자동 생성
-                .startTime(startTime)
-                .endTime(endTime)
-                //.symbol("BTCUSDT") // 심볼은 주어진 데이터에 없으므로 임의로 지정
-                .candleInterval("1m") // 인터벌도 임의로 지정
-                .firstTradeId(null) // 데이터에 포함되지 않으므로 null로 설정
-                .lastTradeId(null) // 데이터에 포함되지 않으므로 null로 설정
-                .openPrice(new BigDecimal(klineArray.getString(1)))
-                .closePrice(new BigDecimal(klineArray.getString(4)))
-                .highPrice(new BigDecimal(klineArray.getString(2)))
-                .lowPrice(new BigDecimal(klineArray.getString(3)))
-                .volume(new BigDecimal(klineArray.getString(5)))
-                .tradeCount(klineArray.getInt(8))
-                .isClosed(true) // 데이터에 포함되지 않으므로 임의로 true로 설정
-                .quoteAssetVolume(new BigDecimal(klineArray.getString(7)))
-                .takerBuyBaseAssetVolume(new BigDecimal(klineArray.getString(9)))
-                .takerBuyQuoteAssetVolume(new BigDecimal(klineArray.getString(10)))
-                .ignoreField(klineArray.getInt(11))
-                .build();
-    }
-
-    public static EventDTO convertKlineEventDTO(String event) {
-        JSONObject eventDataObj = new JSONObject(event);
-        JSONObject eventObj = new JSONObject(eventDataObj.get("data").toString());
-        JSONObject klineObj = new JSONObject(eventObj.get("k").toString());
-        EventDTO eventDTO = EventDTO.builder()
-            .e(eventObj.get("e").toString())
-            .E(Long.parseLong(eventObj.get("E").toString()))
-            .s(eventObj.get("s").toString())
-            .k(KlineDTO.builder()
-                .t(Long.parseLong(klineObj.get("t").toString()))
-                .T(Long.parseLong(klineObj.get("T").toString()))
-                .s(klineObj.get("s").toString())
-                .i(klineObj.get("i").toString())
-                .f(new BigDecimal(klineObj.get("f").toString()))
-                .L(new BigDecimal(klineObj.get("L").toString()))
-                .o(new BigDecimal(klineObj.get("o").toString()))
-                .c(new BigDecimal(klineObj.get("c").toString()))
-                .h(new BigDecimal(klineObj.get("h").toString()))
-                .l(new BigDecimal(klineObj.get("l").toString()))
-                .v(new BigDecimal(klineObj.get("v").toString()))
-                .n(Integer.parseInt(klineObj.get("n").toString()))
-                .x(Boolean.parseBoolean(klineObj.get("x").toString()))
-                .q(new BigDecimal(klineObj.get("q").toString()))
-                .V(new BigDecimal(klineObj.get("V").toString()))
-                .Q(new BigDecimal(klineObj.get("Q").toString()))
-                .B(Integer.parseInt(klineObj.get("B").toString()))
-                .build()
-            ).build();
-        return eventDTO;
-    }
-
     // x배율 롱포지션에서 n% 이득을 보는 가격 계산
     public static BigDecimal calculateLongPositionGoalPrice(BigDecimal currentPrice, int leverage, int profitPercentage) {
         // n% 이득을 보려면 목표 가격(targetPrice)를 다음과 같이 계산할 수 있습니다.
@@ -268,4 +205,32 @@ public class CommonUtils {
         return decimalValue.setScale(tickSize.scale(), RoundingMode.DOWN);
     }
 
+    public static String krTimeExpression(Bar bar){
+        // 포맷 적용하여 문자열로 변환
+        ZonedDateTime utcEndTime = bar.getEndTime(); //캔들이 !!!끝나는 시간!!!
+        return krTimeExpression(utcEndTime);
+    }
+    public static String krTimeExpression(EventEntity eventEntity){
+        // 포맷 적용하여 문자열로 변환
+        ZonedDateTime utcEndTime = ZonedDateTime.from(eventEntity.getEventTime()); //캔들이 !!!끝나는 시간!!!
+        return krTimeExpression(utcEndTime);
+    }
+    public static String krTimeExpression(ZonedDateTime utcEndTime){
+        // 포맷 적용하여 문자열로 변환
+        ZonedDateTime kstEndTime = utcEndTime.withZoneSameInstant(ZoneId.of("Asia/Seoul")); //한국시간 설정
+        String formattedEndTime = formatter.format(kstEndTime);
+        String krTimeExpression = "["+formattedEndTime+"]";
+        return krTimeExpression;
+    }
+    public static void printAlignedOutput(String timestamp, String symbol, String message) {
+        // 각 필드의 최대 길이 설정
+        int timestampWidth = 21;  // [YYYY-MM-DD HH:MM:SS] 길이
+        int symbolWidth = 15;     // 가장 긴 심볼 길이에 맞춤
+
+        // 포맷 문자열 생성
+        String format = "%-" + timestampWidth + "s %-" + symbolWidth + "s %s%n";
+
+        // 포맷에 맞춰 출력
+        System.out.printf(format, timestamp, symbol.toUpperCase(), message);
+    }
 }

@@ -8,13 +8,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import trade.common.CommonUtils;
 import trade.future.model.dto.TradingDTO;
 import trade.future.service.FutureMLService;
-import trade.future.service.FutureService;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
+
+import static trade.common.공통유틸.okResponsePackaging;
 
 @Slf4j
 @Api(tags = "FutureMLController")
@@ -24,12 +24,11 @@ import java.util.LinkedHashMap;
 public class FutureMLController {
     @Autowired
     FutureMLService futureMLService;
-    @Autowired CommonUtils commonUtils;
 
     @PostMapping(value = "/future/ml/backtest")
     @Operation(summary="백테스팅", description="백테스팅")
     public ResponseEntity backTest(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
-        return commonUtils.okResponsePackaging(futureMLService.backTest(request, tradingDTO));
+        return okResponsePackaging(futureMLService.backTest(request, tradingDTO));
     }
 
     @PostMapping(value = "/future/ml/scraping/test")
@@ -41,7 +40,7 @@ public class FutureMLController {
     @PostMapping(value = "/future/ml/open")
     @Operation(summary="자동매매를 시작합니다.", description="자동매매를 시작합니다.")
     public ResponseEntity autoTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
-        return commonUtils.okResponsePackaging(futureMLService.autoTradingOpen(request, tradingDTO));
+        return okResponsePackaging(futureMLService.autoTradingOpen(request, tradingDTO));
     }
 
     @GetMapping(value = "/future/ml/close")

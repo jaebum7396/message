@@ -1,10 +1,14 @@
 package trade.future.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.*;
-import trade.common.CommonUtils;
-import trade.future.model.entity.KlineEntity;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import trade.future.model.entity.EventEntity;
+import trade.future.model.entity.KlineEntity;
+
+import static trade.common.공통유틸.convertTimestampToDateTime;
 
 @Builder
 @NoArgsConstructor
@@ -20,7 +24,7 @@ public class EventDTO {
     public EventEntity toEntity() {
         EventEntity entity = new EventEntity();
         entity.setEventType(this.e);
-        entity.setEventTime(CommonUtils.convertTimestampToDateTime(this.E));
+        entity.setEventTime(convertTimestampToDateTime(this.E));
         KlineEntity kEntity = this.k.toEntity();
         kEntity.setEvent(entity);
         entity.setKlineEntity(kEntity);

@@ -17,18 +17,18 @@ import trade.common.model.Response;
 import trade.exception.TradingException;
 import trade.future.model.entity.TradingEntity;
 import trade.future.repository.TradingRepository;
-import trade.future.service.FutureService;
+import trade.future.service.FutureMLService;
 
 @RestControllerAdvice
 public class ErrorResponseAdvice {
 	private Logger logger = LoggerFactory.getLogger(ErrorResponseAdvice.class);
-	@Autowired FutureService futureService;
+	@Autowired
+	FutureMLService futureService;
 	@Autowired TradingRepository tradingRepository;
 
 	@ExceptionHandler(TradingException.class)
 	public void handleTradingException(TradingEntity tradingEntity) {
 		// 포지션 종료하고 새로 오픈하는 소스 작성
-		futureService.reconnectStream(tradingEntity);
 	}
 	
 	@ExceptionHandler(Exception.class)

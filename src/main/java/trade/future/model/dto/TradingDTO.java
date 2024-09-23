@@ -3,9 +3,6 @@ package trade.future.model.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.*;
-import org.springframework.web.bind.annotation.RequestParam;
-import trade.common.CommonUtils;
-import trade.future.model.entity.KlineEntity;
 import trade.future.model.entity.TradingEntity;
 
 import java.math.BigDecimal;

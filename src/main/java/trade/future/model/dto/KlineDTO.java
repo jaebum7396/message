@@ -5,11 +5,13 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import trade.common.CommonUtils;
 import trade.future.model.entity.KlineEntity;
 
 import java.math.BigDecimal;
 import java.time.ZoneOffset;
+
+import static trade.common.공통유틸.convertTimestampToDateTime;
+import static trade.common.공통유틸.convertTimestampToDateTimeKr;
 
 @Builder
 @NoArgsConstructor
@@ -37,9 +39,9 @@ public class KlineDTO {
 
     public KlineEntity toEntity() {
         KlineEntity entity = new KlineEntity();
-        entity.setStartTime(CommonUtils.convertTimestampToDateTime(this.T));
-        entity.setEndTime(CommonUtils.convertTimestampToDateTime(this.T));
-        entity.setEndTimeKr(CommonUtils.convertTimestampToDateTimeKr(this.T));
+        entity.setStartTime(convertTimestampToDateTime(this.T));
+        entity.setEndTime(convertTimestampToDateTime(this.T));
+        entity.setEndTimeKr(convertTimestampToDateTimeKr(this.T));
         entity.setSymbol(this.s);
         entity.setCandleInterval(this.i);
         entity.setFirstTradeId(this.f);

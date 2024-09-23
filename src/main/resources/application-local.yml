@@ -6,3 +6,13 @@ spring:
     service-registry:
       auto-registration:
         enabled: 'false'
+  datasource:
+    url: jdbc:mysql://${AFLK_DB_DEV_URI}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC
+    username: ${AFLK_DB_USERNAME}
+    password: ${AFLK_DB_PASSWORD}
+    initialization-mode: always #import data
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
