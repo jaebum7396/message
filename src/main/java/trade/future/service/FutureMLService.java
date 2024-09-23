@@ -422,7 +422,8 @@ public class FutureMLService {
                     if (enterFlag) {
                         String predictionStr = mlModel.explainPrediction(indicators, series.getEndIndex());
                         JSONObject predictionObj = new JSONObject(predictionStr);
-                        String adx = String.valueOf(predictionObj.get("adx"));
+                        JSONObject trendObj = predictionObj.getJSONObject("trend");
+                        String adx = String.valueOf(trendObj.get("adx"));
                         if (new BigDecimal(adx).compareTo(new BigDecimal(25)) > 0 && new BigDecimal(adx).compareTo(new BigDecimal(40)) < 0) {
                             printAlignedOutput(krTime, symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
                             printAlignedOutput(krTime, symbol, positionSide + " 포지션 오픈");
