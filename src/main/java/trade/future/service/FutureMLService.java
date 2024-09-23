@@ -284,7 +284,7 @@ public class FutureMLService {
                 EventEntity eventEntity           = saveKlineEvent(event, tradingEntity);
 
                 BaseBarSeries series              = SERIES_MAP.get(tradingCd + "_" + interval);
-                MLModel mlModel                   = ML_MODEL_MAP.get(tradingCd);
+                //MLModel mlModel                   = ML_MODEL_MAP.get(tradingCd);
                 RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
                 TradingRecord tradingRecord       = currentBackTest.getTradingRecord();
                 List<Indicator<Num>> indicators   = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
@@ -295,7 +295,7 @@ public class FutureMLService {
                 String krTime         = krTimeExpression(series.getBar(series.getEndIndex()));
                 //RealisticBackTest.BarEvent barEvent = currentBackTest.addBar(series.getBar(series.getEndIndex()));
                 // 훈련된 모델 예측.
-                //MLModel mlModel       = setupMLModel(series, indicators, tradingEntity, false);
+                MLModel mlModel       = setupMLModel(series, indicators, tradingEntity, false);
                 double[] predict      = mlModel.predictProbabilities(indicators, series.getEndIndex());
                 // 0: SHORT, 1: NEUTRAL, 2: LONG
                 double shortPredict   = predict[0];
@@ -342,13 +342,13 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (
                         tradingEntity.getPositionSide().equals("LONG") // 포지션이 LONG인 경우
-                        &&(shortSignal||neutralSignal||tradingEntity.getTrend1h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
+                        &&(shortSignal||neutralSignal||tradingEntity.getTrend4h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
                     ){
                         exitFlag = true;
                     };
                     if (
                         tradingEntity.getPositionSide().equals("SHORT")
-                        &&(longSignal||neutralSignal||tradingEntity.getTrend1h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
+                        &&(longSignal||neutralSignal||tradingEntity.getTrend4h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
                     ){
                         exitFlag = true;
                     };
@@ -388,8 +388,8 @@ public class FutureMLService {
                         longSignal
                         //&&tradingEntity.getTrend5m().equals("LONG")
                         //&&tradingEntity.getTrend15m().equals("LONG")
-                        &&tradingEntity.getTrend1h().equals("LONG")
-                        //&&tradingEntity.getTrend4h().equals("LONG")
+                        //&&tradingEntity.getTrend1h().equals("LONG")
+                        &&tradingEntity.getTrend4h().equals("LONG")
                     ) {
                         enterFlag = true;
                         positionSide = "LONG";
@@ -397,8 +397,8 @@ public class FutureMLService {
                         shortSignal
                         //&&tradingEntity.getTrend5m().equals("SHORT")
                         //&&tradingEntity.getTrend15m().equals("SHORT")
-                        &&tradingEntity.getTrend1h().equals("SHORT")
-                        //&&tradingEntity.getTrend4h().equals("SHORT")
+                        //tradingEntity.getTrend1h().equals("SHORT")
+                        &&tradingEntity.getTrend4h().equals("SHORT")
                     ){
                         enterFlag = true;
                         positionSide = "SHORT";
@@ -420,10 +420,15 @@ public class FutureMLService {
                     //}
 
                     if (enterFlag) {
-                        printAlignedOutput(krTime, symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
-                        printAlignedOutput(krTime, symbol, positionSide + " 포지션 오픈");
-                        makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
-                        TOTAL_POSITION_COUNT++;
+                        String predictionStr = mlModel.explainPrediction(indicators, series.getEndIndex());
+                        JSONObject predictionObj = new JSONObject(predictionStr);
+                        String adx = String.valueOf(predictionObj.get("adx"));
+                        if (new BigDecimal(adx).compareTo(new BigDecimal(25)) > 0 && new BigDecimal(adx).compareTo(new BigDecimal(40)) < 0) {
+                            printAlignedOutput(krTime, symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
+                            printAlignedOutput(krTime, symbol, positionSide + " 포지션 오픈");
+                            makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
+                            TOTAL_POSITION_COUNT++;
+                        }
                     } else {
                         printAlignedOutput(krTime, symbol, "진입 조건 충족되지 않음");
                     }
