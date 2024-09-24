@@ -222,7 +222,9 @@ public class 공통유틸 {
         String krTimeExpression = "["+formattedEndTime+"]";
         return krTimeExpression;
     }
-    public static void printAlignedOutput(String timestamp, String symbol, String message) {
+    public static void printAlignedOutput(String symbol, String message) {
+        String endTime = formatter.format(ZonedDateTime.now(ZoneId.of("Asia/Seoul")));
+        String krTime = "["+endTime+"]";
         // 각 필드의 최대 길이 설정
         int timestampWidth = 21;  // [YYYY-MM-DD HH:MM:SS] 길이
         int symbolWidth = 15;     // 가장 긴 심볼 길이에 맞춤
@@ -231,6 +233,6 @@ public class 공통유틸 {
         String format = "%-" + timestampWidth + "s %-" + symbolWidth + "s %s%n";
 
         // 포맷에 맞춰 출력
-        System.out.printf(format, timestamp, symbol.toUpperCase(), message);
+        System.out.printf(format, krTime, symbol.toUpperCase(), message);
     }
 }

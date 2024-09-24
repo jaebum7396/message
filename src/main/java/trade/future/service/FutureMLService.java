@@ -163,11 +163,11 @@ public class FutureMLService {
         MLModel mlModel        = ML_MODEL_MAP.get(tradingEntity.getTradingCd());
 
         // 백테스트 실행
-        RealisticBackTest backtest = new RealisticBackTest(testSeries, mlModel, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
-        backtest.run();
+        //RealisticBackTest backtest = new RealisticBackTest(testSeries, mlModel, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
+        //backtest.run();
 
         // 백테스트 결과 저장
-        TRADING_RECORDS.put(tradingEntity.getTradingCd(), backtest);
+        //TRADING_RECORDS.put(tradingEntity.getTradingCd(), backtest);
         log.info("tradingSaved >>>>> "+tradingEntity.getSymbol() + "("+tradingEntity.getStreamId()+") : " + tradingEntity.getTradingCd());
     }
     // ****************************************************************************************
@@ -294,8 +294,8 @@ public class FutureMLService {
 
                 BaseBarSeries series              = SERIES_MAP.get(tradingCd + "_" + interval);
                 MLModel mlModel                   = ML_MODEL_MAP.get(tradingCd);
-                RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
-                TradingRecord tradingRecord       = currentBackTest.getTradingRecord();
+                //RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
+                //TradingRecord tradingRecord       = currentBackTest.getTradingRecord();
                 List<Indicator<Num>> indicators   = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
                 //Strategy longStrategy             = STRATEGY_MAP.get(tradingCd + "_" + interval + "_long_strategy");
                 //Strategy shortStrategy            = STRATEGY_MAP.get(tradingCd + "_" + interval + "_short_strategy")
@@ -374,17 +374,17 @@ public class FutureMLService {
                     //exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
 
                     if (exitFlag) {
-                        printAlignedOutput(krTime, symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
+                        printAlignedOutput(symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
                         makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), krTime + "포지션 청산");
                         TOTAL_POSITION_COUNT--;
                         //backTestResult(tradingRecord, series, symbol, tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral(), true);
-                        Trade entry = tradingRecord.getCurrentPosition().getEntry();
-                        Trade exit  = tradingRecord.getCurrentPosition().getExit();
-                        printAlignedOutput(krTime, symbol, entry.getNetPrice()+"("+tradingRecord.getCurrentPosition().isOpened()+")/"+exit.getNetPrice());
-                        tradingRecord.getPositions().forEach(position -> {
-                            //System.out.println("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
-                        });
-                        printAlignedOutput(krTime, symbol, " 포지션 종료");
+                        //Trade entry = tradingRecord.getCurrentPosition().getEntry();
+                        //Trade exit  = tradingRecord.getCurrentPosition().getExit();
+                        //printAlignedOutput(symbol, entry.getNetPrice()+"("+tradingRecord.getCurrentPosition().isOpened()+")/"+exit.getNetPrice());
+                        //tradingRecord.getPositions().forEach(position -> {
+                        //    //System.out.println("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
+                        //});
+                        printAlignedOutput(symbol, " 포지션 종료");
                     }
                 } else {
                     // 포지션이 열려있지 않은 경우
@@ -437,13 +437,12 @@ public class FutureMLService {
                             && new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
                             && new BigDecimal(adx).compareTo(new BigDecimal(30)) < 0
                         ){
-                            printAlignedOutput(krTime, symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
-                            printAlignedOutput(krTime, symbol, positionSide + " 포지션 오픈");
+                            printAlignedOutput(symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
                             makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
                             TOTAL_POSITION_COUNT++;
                         }
                     } else {
-                        printAlignedOutput(krTime, symbol, "진입 조건 충족되지 않음");
+                        printAlignedOutput(symbol, CONSOLE_COLORS.BRIGHT_YELLOW + "진입 조건 충족되지 않음" + CONSOLE_COLORS.RESET);
                     }
                 }
             }
@@ -533,8 +532,7 @@ public class FutureMLService {
             //    LinkedHashMap<String, Object> takeProfitOrderParams = (LinkedHashMap<String, Object>) orderParams.get("takeProfitOrder");
             //    orderSubmit(takeProfitOrderParams);
             //}
-
-            System.out.println(CONSOLE_COLORS.GREEN+"*********************[진입]" +tradingEntity.getPositionSide()+" "+tradingEntity.getSymbol()+"*********************"+CONSOLE_COLORS.RESET);
+            printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ tradingEntity.getPositionSide()+"("+tradingEntity.getOpenPrice()+")"+ CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -547,7 +545,8 @@ public class FutureMLService {
         tradingEntity.setClosePrice(closePrice);
         try { //마켓가로 클로즈 주문을 제출한다.
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
-            System.out.println(CONSOLE_COLORS.RED+"*********************[청산/" +tradingEntity.getPositionSide()+" "+tradingEntity.getSymbol()+" - 청산사유]*********************"+CONSOLE_COLORS.RESET);
+            printAlignedOutput(tradingEntity.getSymbol()
+                    , CONSOLE_COLORS.RED + "청산/"+ tradingEntity.getPositionSide()+"("+tradingEntity.getOpenPrice()+" to "+ tradingEntity.getClosePrice()+")"+ CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -617,10 +616,9 @@ public class FutureMLService {
             UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
             requestParam.put("timestamp", getServerTime());
             requestParam.remove("leverage");
-            log.info("!!!new Order : " + requestParam);
             if (!DEV_MODE){
                 String orderResult = client.account().newOrder(requestParam);
-                log.info("!!!result : " + orderResult);
+                printAlignedOutput(String.valueOf(requestParam.get("symbol")), "새 주문 : " + orderResult);
             }
             //resultMap.put("result", orderResult);
         } catch (Exception e) {
@@ -1777,8 +1775,8 @@ public class FutureMLService {
         String krTime = "["+endTime+"]";
         CONSOLE_COLORS roiColor = currentROI.compareTo(BigDecimal.ZERO) >= 0 ? CONSOLE_COLORS.GREEN : CONSOLE_COLORS.RED;
         CONSOLE_COLORS pnlColor = currentPnl.compareTo(BigDecimal.ZERO) >= 0 ? CONSOLE_COLORS.GREEN : CONSOLE_COLORS.RED;
-        printAlignedOutput(krTime, symbol, tradingEntity.getPositionSide() + " ROI : " + roiColor + currentROI + "%" + CONSOLE_COLORS.RESET);
-        printAlignedOutput(krTime, symbol, tradingEntity.getPositionSide() + " PNL : " + pnlColor + currentPnl + CONSOLE_COLORS.RESET);
+        printAlignedOutput(symbol, tradingEntity.getPositionSide() + " ROI : " + roiColor + currentROI + "%" + CONSOLE_COLORS.RESET);
+        printAlignedOutput(symbol, tradingEntity.getPositionSide() + " PNL : " + pnlColor + currentPnl + CONSOLE_COLORS.RESET);
     }
     private void checkPositionMismatch(Position backTestPosition, TradingEntity tradingEntity) {
         boolean backTestHasPosition = backTestPosition != null && backTestPosition.isOpened();
