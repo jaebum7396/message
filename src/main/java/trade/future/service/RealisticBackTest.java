@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import static trade.common.캔들유틸.initializeIndicators;
+
 @Slf4j
 public class RealisticBackTest {
     private static final String ANSI_RESET = "\u001B[0m";
@@ -246,54 +248,6 @@ public class RealisticBackTest {
         }
 
         return SignalType.NO_SIGNAL;
-    }
-
-    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
-        List<Indicator<Num>> indicators = new ArrayList<>();
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-
-        // EMA를 사용 (SMA 대신)
-        EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
-        EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
-
-        //StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
-        //BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(shortEMA);
-        //BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
-        //BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
-
-        MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
-
-        indicators.add(macdIndicator);
-        //indicators.add(lowerBBand);
-        //indicators.add(middleBBand);
-        //indicators.add(upperBBand);
-        indicators.add(shortEMA);
-        indicators.add(longEMA);
-        //indicators.add(new RSIIndicator(closePrice, shortMovingPeriod));
-        //indicators.add(new StochasticOscillatorKIndicator(series, shortMovingPeriod));
-        //indicators.add(new CCIIndicator(series, shortMovingPeriod));
-        //indicators.add(new ROCIndicator(closePrice, shortMovingPeriod));
-
-        // Volume 관련 지표 추가
-        //indicators.add(new OnBalanceVolumeIndicator(series));
-        //indicators.add(new AccumulationDistributionIndicator(series));
-        //indicators.add(new ChaikinMoneyFlowIndicator(series, shortMovingPeriod));
-
-        // 추가적인 단기 모멘텀 지표
-        //indicators.add(new WilliamsRIndicator(series, shortMovingPeriod));
-
-        // 주석 처리된 지표들 (필요시 주석 해제)
-        //indicators.add(new RelativeATRIndicator(series, shortMovingPeriod, longMovingPeriod));
-        indicators.add(new ATRIndicator(series, shortMovingPeriod));  // ATR 추가
-        indicators.add(new ADXIndicator(series, longMovingPeriod));
-        indicators.add(new PlusDIIndicator(series, longMovingPeriod));
-        indicators.add(new MinusDIIndicator(series, longMovingPeriod));
-        // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
-        // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
-        // indicators.add(new ParabolicSarIndicator(series));
-
-        return indicators;
     }
 
     private String getTrend(int currentIndex) {

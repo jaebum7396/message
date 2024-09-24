@@ -8,6 +8,17 @@ import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBarSeries;
+import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.ATRIndicator;
+import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.adx.ADXIndicator;
+import org.ta4j.core.indicators.adx.MinusDIIndicator;
+import org.ta4j.core.indicators.adx.PlusDIIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
+import org.ta4j.core.indicators.bollinger.PercentBIndicator;
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
 import org.ta4j.core.num.Num;
 import trade.future.model.dto.EventDTO;
 import trade.future.model.dto.KlineDTO;
@@ -17,6 +28,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @Slf4j
@@ -134,6 +147,59 @@ public class 캔들유틸 {
             e.printStackTrace();
             return "Error converting to JSON";
         }
+    }
+
+    public static List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+        List<Indicator<Num>> indicators = new ArrayList<>();
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+        // EMA를 사용 (SMA 대신)
+        EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
+        EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
+
+        //StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(shortEMA);
+        //BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        //BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+
+        MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
+
+        int timeFrame = 20; // 볼린저 밴드의 기간
+        double k = 2.0; // 표준편차의 배수
+        PercentBIndicator percentB = new PercentBIndicator(closePrice, timeFrame, 2.0);
+
+        indicators.add(macdIndicator);
+        //indicators.add(lowerBBand);
+        //indicators.add(middleBBand);
+        //indicators.add(upperBBand);
+        indicators.add(percentB);
+        indicators.add(shortEMA);
+        indicators.add(longEMA);
+        //indicators.add(new RSIIndicator(closePrice, shortMovingPeriod));
+        //indicators.add(new StochasticOscillatorKIndicator(series, shortMovingPeriod));
+        //indicators.add(new CCIIndicator(series, shortMovingPeriod));
+        //indicators.add(new ROCIndicator(closePrice, shortMovingPeriod));
+
+        // Volume 관련 지표 추가
+        //indicators.add(new OnBalanceVolumeIndicator(series));
+        //indicators.add(new AccumulationDistributionIndicator(series));
+        indicators.add(new ChaikinMoneyFlowIndicator(series, longMovingPeriod));
+
+        // 추가적인 단기 모멘텀 지표
+        //indicators.add(new WilliamsRIndicator(series, shortMovingPeriod));
+
+        // 주석 처리된 지표들 (필요시 주석 해제)
+        //indicators.add(new RelativeATRIndicator(series, shortMovingPeriod, longMovingPeriod));
+        indicators.add(new ATRIndicator(series, shortMovingPeriod));  // ATR 추가
+        indicators.add(new ADXIndicator(series, longMovingPeriod));
+        indicators.add(new PlusDIIndicator(series, longMovingPeriod));
+        indicators.add(new MinusDIIndicator(series, longMovingPeriod));
+        // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
+        // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
+        // indicators.add(new ParabolicSarIndicator(series));
+
+        return indicators;
     }
 
     private static String formatPrice(double price) {

@@ -22,7 +22,10 @@ import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.adx.MinusDIIndicator;
 import org.ta4j.core.indicators.adx.PlusDIIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
+import org.ta4j.core.indicators.bollinger.PercentBIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.AndRule;
@@ -424,7 +427,11 @@ public class FutureMLService {
                         JSONObject predictionObj = new JSONObject(predictionStr);
                         JSONObject trendObj = predictionObj.getJSONObject("trend");
                         String adx = String.valueOf(trendObj.get("adx"));
-                        if (new BigDecimal(adx).compareTo(new BigDecimal(25)) > 0 && new BigDecimal(adx).compareTo(new BigDecimal(40)) < 0) {
+                        if (
+                            true
+                            //&& new BigDecimal(adx).compareTo(new BigDecimal(25)) > 0
+                            && new BigDecimal(adx).compareTo(new BigDecimal(40)) < 0
+                        ){
                             printAlignedOutput(krTime, symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
                             printAlignedOutput(krTime, symbol, positionSide + " 포지션 오픈");
                             makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
@@ -1624,53 +1631,6 @@ public class FutureMLService {
         }
     }
 
-    private List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
-        List<Indicator<Num>> indicators = new ArrayList<>();
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-
-        // EMA를 사용 (SMA 대신)
-        EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
-        EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
-
-        //StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
-        //BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(shortEMA);
-        //BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
-        //BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
-
-        MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
-
-        indicators.add(macdIndicator);
-        //indicators.add(lowerBBand);
-        //indicators.add(middleBBand);
-        //indicators.add(upperBBand);
-        indicators.add(shortEMA);
-        indicators.add(longEMA);
-        //indicators.add(new RSIIndicator(closePrice, shortMovingPeriod));
-        //indicators.add(new StochasticOscillatorKIndicator(series, shortMovingPeriod));
-        //indicators.add(new CCIIndicator(series, shortMovingPeriod));
-        //indicators.add(new ROCIndicator(closePrice, shortMovingPeriod));
-
-        // Volume 관련 지표 추가
-        //indicators.add(new OnBalanceVolumeIndicator(series));
-        //indicators.add(new AccumulationDistributionIndicator(series));
-        //indicators.add(new ChaikinMoneyFlowIndicator(series, shortMovingPeriod));
-
-        // 추가적인 단기 모멘텀 지표
-        //indicators.add(new WilliamsRIndicator(series, shortMovingPeriod));
-
-        // 주석 처리된 지표들 (필요시 주석 해제)
-        //indicators.add(new RelativeATRIndicator(series, shortMovingPeriod, longMovingPeriod));
-        indicators.add(new ATRIndicator(series, shortMovingPeriod));  // ATR 추가
-        indicators.add(new ADXIndicator(series, longMovingPeriod));
-        indicators.add(new PlusDIIndicator(series, longMovingPeriod));
-        indicators.add(new MinusDIIndicator(series, longMovingPeriod));
-        // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
-        // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
-        // indicators.add(new ParabolicSarIndicator(series));
-
-        return indicators;
-    }
     public List<Map<String, Object>> getSort(JSONArray resultArray, String sortBy, String orderBy, int limit) {
         //log.info("getSort >>>>> sortBy : {}, orderBy : {}, limit : {}", sortBy, orderBy, limit);
 
