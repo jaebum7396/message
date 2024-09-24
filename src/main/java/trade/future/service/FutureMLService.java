@@ -429,8 +429,8 @@ public class FutureMLService {
                         String adx = String.valueOf(trendObj.get("adx"));
                         if (
                             true
-                            //&& new BigDecimal(adx).compareTo(new BigDecimal(25)) > 0
-                            && new BigDecimal(adx).compareTo(new BigDecimal(40)) < 0
+                            && new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
+                            && new BigDecimal(adx).compareTo(new BigDecimal(30)) < 0
                         ){
                             printAlignedOutput(krTime, symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
                             printAlignedOutput(krTime, symbol, positionSide + " 포지션 오픈");
