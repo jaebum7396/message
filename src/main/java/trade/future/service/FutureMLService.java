@@ -261,7 +261,7 @@ public class FutureMLService {
         String streamNm          = String.valueOf(eventObj.get("stream"));
         String symbol            = streamNm.substring(0, streamNm.indexOf("@"));
         String interval          = streamNm.substring(streamNm.indexOf("_") + 1);
-
+        //streamClose(tradingEntity.getStreamId());
         boolean nextFlag = true;
         List<TradingEntity> tradingEntitys = new ArrayList<>();
         try{
@@ -274,6 +274,12 @@ public class FutureMLService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            Map<Integer, TradingEntity> TradingEntitys = umWebSocketStreamClient.getTradingEntitys();
+            TradingEntitys.forEach((key, tradingEntity) -> {
+                if(tradingEntity.getSymbol().equals(symbol)){
+                    streamClose(tradingEntity.getStreamId());
+                }
+            });
             nextFlag = false;
             /*for(TradingEntity tradingEntity : tradingEntitys){
                 restartTrading(tradingEntity);
@@ -355,7 +361,6 @@ public class FutureMLService {
                     ){
                         exitFlag = true;
                     };
-
 
                     //switch (barEvent) {
                     //    case LONG_EXIT:
