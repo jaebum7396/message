@@ -692,6 +692,8 @@ public class FutureMLService {
             if(new BigDecimal(String.valueOf(symbolObj.get("positionAmt"))).compareTo(new BigDecimal("0")) != 0){
                 LinkedHashMap<String, Object> paramMap = new LinkedHashMap<>();
                 String symbol = String.valueOf(symbolObj.get("symbol"));
+                TradingEntity tradingEntity = TRADING_ENTITYS.get(symbol);
+                resourceCleanup(tradingEntity);
                 TRADING_ENTITYS.remove(symbol);
                 paramMap.put("symbol", symbol);
                 paramMap.put("positionSide", symbolObj.get("positionSide"));
