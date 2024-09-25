@@ -726,8 +726,11 @@ public class FutureMLService {
         SERIES_MAP.remove(tradingCd + "_" + candleInterval);
         STRATEGY_MAP.remove(tradingCd + "_" + candleInterval + "_long_strategy");
         STRATEGY_MAP.remove(tradingCd + "_" + candleInterval + "_short_strategy");
-        ML_MODEL_MAP.remove(tradingCd);
+        ML_MODEL_MAP.remove(tradingCd + " " + "LONG");
+        ML_MODEL_MAP.remove(tradingCd + " " + "SHORT");
         TRADING_RECORDS.remove(tradingCd);
+
+        autoTradingOpenFlag = false;
 
         // 메모리 사용량 출력
         new MemoryUsageMonitor().printMemoryUsage();
