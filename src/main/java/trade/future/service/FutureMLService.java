@@ -360,14 +360,12 @@ public class FutureMLService {
                         tradingEntity.getPositionSide().equals("LONG") // 포지션이 LONG인 경우
                         &&(longExitSignal||tradingEntity.getTrend1h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
                     ){
-                        printAlignedOutput(symbol, mlLongModel.explainPrediction(longIndicators, series.getEndIndex()));
                         exitFlag = true;
                     };
                     if (
                         tradingEntity.getPositionSide().equals("SHORT")
                         &&(shortExitSignal||tradingEntity.getTrend1h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
                     ){
-                        printAlignedOutput(symbol, mlShortModel.explainPrediction(shortIndicators, series.getEndIndex()));
                         exitFlag = true;
                     };
 
@@ -383,6 +381,46 @@ public class FutureMLService {
                     //exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
 
                     if (exitFlag) {
+                        String predictionStr = "";
+                        if (tradingEntity.getPositionSide().equals("LONG")) {
+                            //printAlignedOutput(tradingEntity.getSymbol(), mlLongModel.explainPrediction(longIndicators, series.getEndIndex()));
+                            predictionStr = mlLongModel.explainPrediction(longIndicators, series.getEndIndex());
+                        } else {
+                            //printAlignedOutput(tradingEntity.getSymbol(), mlShortModel.explainPrediction(shortIndicators, series.getEndIndex()));
+                            predictionStr = mlShortModel.explainPrediction(shortIndicators, series.getEndIndex());
+                        }
+                        JSONObject predictionObj = new JSONObject(predictionStr);
+                        JSONObject trendObj = predictionObj.getJSONObject("trend");
+                        String adx = String.valueOf(trendObj.get("adx"));
+                        JSONObject probabilitiesObj = predictionObj.getJSONObject("probabilities");
+
+                        BigDecimal profitLoss;
+                        String profitLossText;
+
+                        BigDecimal openPrice  = tradingEntity.getOpenPrice();
+                        BigDecimal closePrice = tradingEntity.getClosePrice();
+
+                        if (tradingEntity.getPositionSide().equals("LONG")) {
+                            profitLoss = closePrice.subtract(openPrice);
+                        } else { // SHORT
+                            profitLoss = openPrice.subtract(closePrice);
+                        }
+                        BigDecimal profitLossPercentage = profitLoss.divide(openPrice, 4, RoundingMode.HALF_UP)
+                                .multiply(new BigDecimal("100"));
+
+                        if (profitLoss.compareTo(BigDecimal.ZERO) > 0) {
+                            profitLossText = CONSOLE_COLORS.GREEN + "수익: " + " (" + profitLossPercentage + "%)" + CONSOLE_COLORS.RESET;
+                        } else if (profitLoss.compareTo(BigDecimal.ZERO) < 0) {
+                            profitLossText = CONSOLE_COLORS.RED + "손실: " + " (" + profitLossPercentage + "%)" + CONSOLE_COLORS.RESET;
+                        } else {
+                            profitLossText = "손익 없음";
+                        }
+
+                        printAlignedOutput(tradingEntity.getSymbol(),
+                                CONSOLE_COLORS.RED + "청산/" + tradingEntity.getPositionSide() +
+                                        "(" + tradingEntity.getOpenPrice() + " to " + tradingEntity.getClosePrice() +
+                                        "/ probabilities : " + probabilitiesObj + ") " +
+                                        profitLossText + CONSOLE_COLORS.RESET);
                         makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), krTime + "포지션 청산");
                         TOTAL_POSITION_COUNT--;
                         //backTestResult(tradingRecord, series, symbol, tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral(), true);
@@ -438,20 +476,22 @@ public class FutureMLService {
                     if (enterFlag) {
                         String predictionStr = "";
                         if (positionSide.equals("LONG")) {
-                            printAlignedOutput(symbol, mlLongModel.explainPrediction(longIndicators, series.getEndIndex()));
+                            //printAlignedOutput(symbol, mlLongModel.explainPrediction(longIndicators, series.getEndIndex()));
                             predictionStr = mlLongModel.explainPrediction(longIndicators, series.getEndIndex());
                         } else {
-                            printAlignedOutput(symbol, mlShortModel.explainPrediction(shortIndicators, series.getEndIndex()));
+                            //printAlignedOutput(symbol, mlShortModel.explainPrediction(shortIndicators, series.getEndIndex()));
                             predictionStr = mlShortModel.explainPrediction(shortIndicators, series.getEndIndex());
                         }
                         JSONObject predictionObj = new JSONObject(predictionStr);
                         JSONObject trendObj = predictionObj.getJSONObject("trend");
                         String adx = String.valueOf(trendObj.get("adx"));
+                        JSONObject probabilitiesObj = predictionObj.getJSONObject("probabilities");
                         if (
                             true
                             && new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
                             && new BigDecimal(adx).compareTo(new BigDecimal(30)) < 0
                         ){
+                            printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ tradingEntity.getPositionSide()+"( ADX : "+adx+"/ probabilities :"+probabilitiesObj+")"+ CONSOLE_COLORS.RESET);
                             makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
                             TOTAL_POSITION_COUNT++;
                         }
@@ -546,7 +586,7 @@ public class FutureMLService {
             //    LinkedHashMap<String, Object> takeProfitOrderParams = (LinkedHashMap<String, Object>) orderParams.get("takeProfitOrder");
             //    orderSubmit(takeProfitOrderParams);
             //}
-            printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ tradingEntity.getPositionSide()+"("+tradingEntity.getOpenPrice()+")"+ CONSOLE_COLORS.RESET);
+            //printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ tradingEntity.getPositionSide()+"("+tradingEntity.getOpenPrice()+")"+ CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -559,8 +599,6 @@ public class FutureMLService {
         tradingEntity.setClosePrice(closePrice);
         try { //마켓가로 클로즈 주문을 제출한다.
             Map<String, Object> resultMap = orderSubmit(makeOrder(tradingEntity, "CLOSE"));
-            printAlignedOutput(tradingEntity.getSymbol()
-                    , CONSOLE_COLORS.RED + "청산/"+ tradingEntity.getPositionSide()+"("+tradingEntity.getOpenPrice()+" to "+ tradingEntity.getClosePrice()+")"+ CONSOLE_COLORS.RESET);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
