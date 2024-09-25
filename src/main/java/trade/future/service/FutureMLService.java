@@ -398,7 +398,7 @@ public class FutureMLService {
                         String profitLossText;
 
                         BigDecimal openPrice  = tradingEntity.getOpenPrice();
-                        BigDecimal closePrice = tradingEntity.getClosePrice();
+                        BigDecimal closePrice = eventEntity.getKlineEntity().getClosePrice();
 
                         if (tradingEntity.getPositionSide().equals("LONG")) {
                             profitLoss = closePrice.subtract(openPrice);
@@ -418,7 +418,7 @@ public class FutureMLService {
 
                         printAlignedOutput(tradingEntity.getSymbol(),
                                 CONSOLE_COLORS.RED + "청산/" + tradingEntity.getPositionSide() +
-                                        "(" + tradingEntity.getOpenPrice() + " to " + tradingEntity.getClosePrice() +
+                                        "(" + tradingEntity.getOpenPrice() + " to " + eventEntity.getKlineEntity().getClosePrice() +
                                         "/ probabilities : " + probabilitiesObj + ") " +
                                         profitLossText + CONSOLE_COLORS.RESET);
                         makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), krTime + "포지션 청산");
