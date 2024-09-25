@@ -273,7 +273,6 @@ public class FutureMLService {
                 throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어 있습니다.");
             }
         } catch (Exception e) {
-            e.printStackTrace();
             Map<Integer, TradingEntity> TradingEntitys = umWebSocketStreamClient.getTradingEntitys();
             TradingEntitys.forEach((key, tradingEntity) -> {
                 if(tradingEntity.getSymbol().equals(symbol)){
@@ -351,13 +350,13 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (
                         tradingEntity.getPositionSide().equals("LONG") // 포지션이 LONG인 경우
-                        &&(shortSignal||neutralSignal||tradingEntity.getTrend4h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
+                        &&(shortSignal||neutralSignal||tradingEntity.getTrend1h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
                     ){
                         exitFlag = true;
                     };
                     if (
                         tradingEntity.getPositionSide().equals("SHORT")
-                        &&(longSignal||neutralSignal||tradingEntity.getTrend4h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
+                        &&(longSignal||neutralSignal||tradingEntity.getTrend1h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
                     ){
                         exitFlag = true;
                     };
@@ -396,8 +395,8 @@ public class FutureMLService {
                         longSignal
                         //&&tradingEntity.getTrend5m().equals("LONG")
                         //&&tradingEntity.getTrend15m().equals("LONG")
-                        //&&tradingEntity.getTrend1h().equals("LONG")
-                        &&tradingEntity.getTrend4h().equals("LONG")
+                        &&tradingEntity.getTrend1h().equals("LONG")
+                        //&&tradingEntity.getTrend4h().equals("LONG")
                     ) {
                         enterFlag = true;
                         positionSide = "LONG";
@@ -405,8 +404,8 @@ public class FutureMLService {
                         shortSignal
                         //&&tradingEntity.getTrend5m().equals("SHORT")
                         //&&tradingEntity.getTrend15m().equals("SHORT")
-                        //tradingEntity.getTrend1h().equals("SHORT")
-                        &&tradingEntity.getTrend4h().equals("SHORT")
+                        &&tradingEntity.getTrend1h().equals("SHORT")
+                        //&&tradingEntity.getTrend4h().equals("SHORT")
                     ){
                         enterFlag = true;
                         positionSide = "SHORT";
@@ -834,7 +833,7 @@ public class FutureMLService {
     // 추세 판단 및 출력 함수
     private String determineTrend(BaseBarSeries series) {
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator shortSMA = new SMAIndicator(closePrice, 3);
+        SMAIndicator shortSMA = new SMAIndicator(closePrice, 5);
         SMAIndicator longSMA = new SMAIndicator(closePrice, 10);
 
         int lastIndex = series.getEndIndex();
