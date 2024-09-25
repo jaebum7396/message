@@ -361,7 +361,7 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (
                         tradingEntity.getPositionSide().equals("LONG") // 포지션이 LONG인 경우
-                        &&(longExitSignal||tradingEntity.getTrend1h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
+                        &&(longExitSignal||tradingEntity.getTrend4h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
                     ){
                         exitFlag = true;
                     };
@@ -446,7 +446,7 @@ public class FutureMLService {
                         //&&tradingEntity.getTrend5m().equals("LONG")
                         //&&tradingEntity.getTrend15m().equals("LONG")
                         //&&tradingEntity.getTrend1h().equals("LONG")
-                        //&&tradingEntity.getTrend4h().equals("LONG")
+                        &&tradingEntity.getTrend4h().equals("LONG")
                     ) {
                         enterFlag = true;
                         positionSide = "LONG";
@@ -454,7 +454,7 @@ public class FutureMLService {
                         shortEntrySignal
                         //&&tradingEntity.getTrend5m().equals("SHORT")
                         //&&tradingEntity.getTrend15m().equals("SHORT")
-                        //&&tradingEntity.getTrend1h().equals("SHORT")
+                        &&tradingEntity.getTrend1h().equals("SHORT")
                         //&&tradingEntity.getTrend4h().equals("SHORT")
                     ){
                         enterFlag = true;
