@@ -442,7 +442,7 @@ public class FutureMLService {
                         longEntrySignal
                         //&&tradingEntity.getTrend5m().equals("LONG")
                         //&&tradingEntity.getTrend15m().equals("LONG")
-                        &&tradingEntity.getTrend1h().equals("LONG")
+                        //&&tradingEntity.getTrend1h().equals("LONG")
                         //&&tradingEntity.getTrend4h().equals("LONG")
                     ) {
                         enterFlag = true;
@@ -451,7 +451,7 @@ public class FutureMLService {
                         shortEntrySignal
                         //&&tradingEntity.getTrend5m().equals("SHORT")
                         //&&tradingEntity.getTrend15m().equals("SHORT")
-                        &&tradingEntity.getTrend1h().equals("SHORT")
+                        //&&tradingEntity.getTrend1h().equals("SHORT")
                         //&&tradingEntity.getTrend4h().equals("SHORT")
                     ){
                         enterFlag = true;
@@ -488,8 +488,8 @@ public class FutureMLService {
                         JSONObject probabilitiesObj = predictionObj.getJSONObject("probabilities");
                         if (
                             true
-                            && new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
-                            && new BigDecimal(adx).compareTo(new BigDecimal(30)) < 0
+                            //&& new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
+                            //&& new BigDecimal(adx).compareTo(new BigDecimal(30)) < 0
                         ){
                             printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ positionSide+"(ADX: "+adx+"/ probabilities: "+probabilitiesObj+")"+ CONSOLE_COLORS.RESET);
                             makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
