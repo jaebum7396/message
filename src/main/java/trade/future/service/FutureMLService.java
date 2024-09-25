@@ -292,7 +292,6 @@ public class FutureMLService {
                 EventEntity eventEntity           = saveKlineEvent(event, tradingEntity);
 
                 BaseBarSeries series              = SERIES_MAP.get(tradingCd + "_" + interval);
-                MLModel mlModel                   = ML_MODEL_MAP.get(tradingCd);
                 MLModel mlLongModel               = ML_MODEL_MAP.get(tradingCd+ " " + "LONG");
                 MLModel mlShortModel              = ML_MODEL_MAP.get(tradingCd+ " " + "SHORT");
 
@@ -314,7 +313,6 @@ public class FutureMLService {
 
                 //RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
                 //TradingRecord tradingRecord       = currentBackTest.getTradingRecord();
-                List<Indicator<Num>> indicators   = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
                 //Strategy longStrategy             = STRATEGY_MAP.get(tradingCd + "_" + interval + "_long_strategy");
                 //Strategy shortStrategy            = STRATEGY_MAP.get(tradingCd + "_" + interval + "_short_strategy")
 
@@ -323,15 +321,6 @@ public class FutureMLService {
                 //RealisticBackTest.BarEvent barEvent = currentBackTest.addBar(series.getBar(series.getEndIndex()));
                 // 훈련된 모델 예측.
                 //MLModel mlModel       = setupMLModel(series, indicators, tradingEntity, false);
-                double[] predict      = mlModel.predictProbabilities(indicators, series.getEndIndex());
-                // 0: SHORT, 1: NEUTRAL, 2: LONG
-                double shortPredict   = predict[0];
-                double neutralPredict = predict[1];
-                double longPredict    = predict[2];
-
-                boolean shortSignal   = shortPredict > 0.4;
-                boolean longSignal    = longPredict  > 0.4;
-                boolean neutralSignal = neutralPredict > longPredict && neutralPredict > shortPredict;
 
                 //System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
 
@@ -371,12 +360,14 @@ public class FutureMLService {
                         tradingEntity.getPositionSide().equals("LONG") // 포지션이 LONG인 경우
                         &&(longExitSignal||tradingEntity.getTrend1h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
                     ){
+                        printAlignedOutput(symbol, mlLongModel.explainPrediction(longIndicators, series.getEndIndex()));
                         exitFlag = true;
                     };
                     if (
                         tradingEntity.getPositionSide().equals("SHORT")
                         &&(shortExitSignal||tradingEntity.getTrend1h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
                     ){
+                        printAlignedOutput(symbol, mlShortModel.explainPrediction(shortIndicators, series.getEndIndex()));
                         exitFlag = true;
                     };
 
@@ -392,7 +383,6 @@ public class FutureMLService {
                     //exitFlag |= !checkTrendConsistency(tradingEntity.getPositionSide(), trendMap);
 
                     if (exitFlag) {
-                        printAlignedOutput(symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
                         makeCloseOrder(tradingEntity, eventEntity.getKlineEntity().getClosePrice(), krTime + "포지션 청산");
                         TOTAL_POSITION_COUNT--;
                         //backTestResult(tradingRecord, series, symbol, tradingEntity.getLeverage(), tradingEntity.getPositionSide(), tradingEntity.getCollateral(), true);
@@ -446,7 +436,14 @@ public class FutureMLService {
                     //}
 
                     if (enterFlag) {
-                        String predictionStr = mlModel.explainPrediction(indicators, series.getEndIndex());
+                        String predictionStr = "";
+                        if (positionSide.equals("LONG")) {
+                            printAlignedOutput(symbol, mlLongModel.explainPrediction(longIndicators, series.getEndIndex()));
+                            predictionStr = mlLongModel.explainPrediction(longIndicators, series.getEndIndex());
+                        } else {
+                            printAlignedOutput(symbol, mlShortModel.explainPrediction(shortIndicators, series.getEndIndex()));
+                            predictionStr = mlShortModel.explainPrediction(shortIndicators, series.getEndIndex());
+                        }
                         JSONObject predictionObj = new JSONObject(predictionStr);
                         JSONObject trendObj = predictionObj.getJSONObject("trend");
                         String adx = String.valueOf(trendObj.get("adx"));
@@ -455,7 +452,6 @@ public class FutureMLService {
                             && new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
                             && new BigDecimal(adx).compareTo(new BigDecimal(30)) < 0
                         ){
-                            printAlignedOutput(symbol, mlModel.explainPrediction(indicators, series.getEndIndex()));
                             makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
                             TOTAL_POSITION_COUNT++;
                         }
