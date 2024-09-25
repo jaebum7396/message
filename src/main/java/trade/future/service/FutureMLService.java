@@ -270,7 +270,11 @@ public class FutureMLService {
                 throw new AutoTradingDuplicateException(symbol+" 트레이딩이 존재하지 않습니다.");
             }
             if(tradingEntitys.size() > 1){
-                throw new AutoTradingDuplicateException(symbol+" 트레이딩이 중복되어 있습니다.");
+                for (TradingEntity tradingEntity : tradingEntitys) {
+                    if(tradingEntity.getSymbol().equals(symbol)){
+                        restartTrading(tradingEntity);
+                    }
+                }
             }
         } catch (Exception e) {
             Map<Integer, TradingEntity> TradingEntitys = umWebSocketStreamClient.getTradingEntitys();
@@ -280,9 +284,6 @@ public class FutureMLService {
                 }
             });
             nextFlag = false;
-            /*for(TradingEntity tradingEntity : tradingEntitys){
-                restartTrading(tradingEntity);
-            }*/
         }
         if (nextFlag) {
             TradingEntity tradingEntity = tradingEntitys.get(0);
@@ -308,7 +309,9 @@ public class FutureMLService {
 
                 boolean longEntrySignal       = longModelPredictLong   > 0.4;
                 boolean shortEntrySignal      = shortModelPredictShort > 0.5;
-                boolean longExitSignal        = longModelPredictShort  > 0.4 || shortModelPredictShort > 0.5;
+                boolean longExitSignal        = longModelPredictShort  > 0.4
+                //|| shortModelPredictShort > 0.5
+                ;
                 boolean shortExitSignal       = shortModelPredictLong  > 0.5  || longModelPredictLong  > 0.4;
 
                 //RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
