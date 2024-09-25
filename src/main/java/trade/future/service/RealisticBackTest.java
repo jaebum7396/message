@@ -20,6 +20,7 @@ import org.ta4j.core.rules.AndRule;
 import org.ta4j.core.rules.OrRule;
 import trade.future.ml.MLModel;
 import trade.future.model.Rule.RelativeATRIndicator;
+import trade.future.model.entity.TradingEntity;
 
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
@@ -27,7 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import static trade.common.캔들유틸.initializeIndicators;
+import static trade.common.캔들유틸.initializeLongIndicators;
+import static trade.common.캔들유틸.initializeShortIndicators;
 
 @Slf4j
 public class RealisticBackTest {
@@ -37,7 +39,8 @@ public class RealisticBackTest {
 
     private final BaseBarSeries series;
 
-    private final MLModel mlModel;
+    private final MLModel mlLongModel;
+    private final MLModel mlShortModel;
     private final Strategy longStrategy;
     private final Strategy shortStrategy;
     private final Duration executionDelay;
@@ -67,6 +70,7 @@ public class RealisticBackTest {
     private final double feeRate;
     @Getter
     private TradingRecord tradingRecord;
+    private TradingEntity tradingEntity;
 
     public enum BarEvent {
         LONG_ENTRY,
@@ -84,10 +88,11 @@ public class RealisticBackTest {
         NO_SIGNAL
     }
 
-    public RealisticBackTest(BaseBarSeries series, MLModel mlModel, Strategy longStrategy, Strategy shortStrategy,
+    public RealisticBackTest(BaseBarSeries series, TradingEntity tradingEntity, MLModel mlLongModel, MLModel mlShortModel, Strategy longStrategy, Strategy shortStrategy,
                              Duration executionDelay, double slippagePercent) {
         this.series = series;
-        this.mlModel = mlModel;
+        this.mlLongModel = mlLongModel;
+        this.mlShortModel = mlShortModel;
         this.longStrategy = longStrategy;
         this.shortStrategy = shortStrategy;
         this.executionDelay = executionDelay;
@@ -98,6 +103,7 @@ public class RealisticBackTest {
         this.entryPrice = series.numOf(0);
         this.lastEntryType = null;
         this.tradingRecord = new BaseTradingRecord();
+        this.tradingEntity = tradingEntity;
 
         log.info("======= 백테스트 =======");
         //log.info("longStrategy Entry Rule: {}", getRuleDescription(longStrategy.getEntryRule()));
@@ -110,16 +116,21 @@ public class RealisticBackTest {
         Bar currentBar = series.getBar(i);
         String currentTrend = getTrend(i);
 
-        List<Indicator<Num>> indicators = initializeIndicators(series, 20, 50);
-        int trendPrediction = mlModel.predict(indicators, i);
-        double[] predict = mlModel.predictProbabilities(indicators, i);
-        double shortPredict = predict[0];
-        double neutralPredict = predict[1];
-        double longPredict = predict[2];
+        List<Indicator<Num>> longIndicators  = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+        List<Indicator<Num>> shortIndicators = initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+        double[] longModelPredict     = mlLongModel.predictProbabilities(longIndicators, i);
+        double[] shortModelPredict    = mlShortModel.predictProbabilities(shortIndicators, i);
 
-        boolean shortSignal = shortPredict > 0.4;
-        boolean longSignal = longPredict > 0.4;
-        boolean neutralSignal = neutralPredict > longPredict && neutralPredict > shortPredict;
+        double longModelPredictShort  = longModelPredict[0]; //long 모델이 예상한 숏
+        double longModelPredictLong   = longModelPredict[2]; //long 모델이 예상한 롱
+
+        double shortModelPredictShort = shortModelPredict[0]; //short 모델이 예상한 숏
+        double shortModelPredictLong  = shortModelPredict[2]; //short 모델이 예상한 롱
+
+        boolean longEntrySignal       = longModelPredictLong   > 0.4;
+        boolean shortEntrySignal      = shortModelPredictShort > 0.5;
+        boolean longExitSignal        = longModelPredictShort  > 0.4 || shortModelPredictShort > 0.5;
+        boolean shortExitSignal       = shortModelPredictLong  > 0.5  || longModelPredictLong  > 0.4;
 
         Position currentPosition = tradingRecord.getCurrentPosition();
         if (currentPosition != null && currentPosition.isOpened()) {
@@ -143,14 +154,14 @@ public class RealisticBackTest {
 
             // 기존 로직 유지
             if (currentType.equals(Trade.TradeType.BUY)) {
-                shouldExit = shortSignal || neutralSignal;
+                shouldExit = longExitSignal;
                 if (shouldExit) {
                     String exitRule = getRuleDescription(longStrategy.getExitRule());
                     simulateTrade(tradingRecord, currentType, currentBar, i, true, exitRule);
                     return BarEvent.LONG_EXIT;
                 }
             } else if (currentType.equals(Trade.TradeType.SELL)) {
-                shouldExit = longSignal || neutralSignal;
+                shouldExit = shortExitSignal;
                 if (shouldExit) {
                     String exitRule = getRuleDescription(shortStrategy.getExitRule());
                     simulateTrade(tradingRecord, currentType, currentBar, i, true, exitRule);
@@ -158,8 +169,8 @@ public class RealisticBackTest {
                 }
             }
         } else {
-            boolean shouldEnterLong = true && longSignal;
-            boolean shouldEnterShort = true && shortSignal;
+            boolean shouldEnterLong  = true && longEntrySignal;
+            boolean shouldEnterShort = true && shortEntrySignal;
 
             if (shouldEnterLong) {
                 String entryRule = getRuleDescription(longStrategy.getEntryRule());
@@ -304,13 +315,13 @@ public class RealisticBackTest {
             String tradeColor = (lastEntryType == Trade.TradeType.BUY) ? ANSI_GREEN : ANSI_RED;
             String roiColor = roi.isPositive() ? ANSI_GREEN : ANSI_RED;
             //System.out.println("***************************************************************");
-            //System.out.println(mlModel.explainPrediction(initializeIndicators(series, 20, 50), entryIndex));
+            //System.out.println(mlModel.explainPrediction(initializeLongIndicators(series, 20, 50), entryIndex));
             //log.info("{}ENTER {}[{}/{}] => EXIT {}[{}/{}]{} | ROI: {}{}%{} | Entry: {} | Exit: {}",
             //        tradeColor, lastEntryType, entryIndex, entryPrice.doubleValue(),
             //        lastEntryType, executionIndex, executionPrice.doubleValue(), ANSI_RESET,
             //        roiColor, roi.multipliedBy(series.numOf(100)).doubleValue(), ANSI_RESET,
             //        entryRule, rule);
-            //System.out.println(mlModel.explainPrediction(initializeIndicators(series, 20, 50), executionIndex));
+            //System.out.println(mlModel.explainPrediction(initializeLongIndicators(series, 20, 50), executionIndex));
 
             double roiValue = roi.doubleValue();
             if (lastEntryType == Trade.TradeType.BUY) {

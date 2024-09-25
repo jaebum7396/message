@@ -293,9 +293,28 @@ public class FutureMLService {
 
                 BaseBarSeries series              = SERIES_MAP.get(tradingCd + "_" + interval);
                 MLModel mlModel                   = ML_MODEL_MAP.get(tradingCd);
+                MLModel mlLongModel               = ML_MODEL_MAP.get(tradingCd+ " " + "LONG");
+                MLModel mlShortModel              = ML_MODEL_MAP.get(tradingCd+ " " + "SHORT");
+
+                List<Indicator<Num>> longIndicators  = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+                List<Indicator<Num>> shortIndicators = initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+                double[] longModelPredict     = mlLongModel.predictProbabilities(longIndicators, series.getEndIndex());
+                double[] shortModelPredict    = mlShortModel.predictProbabilities(shortIndicators, series.getEndIndex());
+
+                double longModelPredictShort  = longModelPredict[0]; //long 모델이 예상한 숏
+                double longModelPredictLong   = longModelPredict[2]; //long 모델이 예상한 롱
+
+                double shortModelPredictShort = shortModelPredict[0]; //short 모델이 예상한 숏
+                double shortModelPredictLong  = shortModelPredict[2]; //short 모델이 예상한 롱
+
+                boolean longEntrySignal       = longModelPredictLong   > 0.4;
+                boolean shortEntrySignal      = shortModelPredictShort > 0.5;
+                boolean longExitSignal        = longModelPredictShort  > 0.4 || shortModelPredictShort > 0.5;
+                boolean shortExitSignal       = shortModelPredictLong  > 0.5  || longModelPredictLong  > 0.4;
+
                 //RealisticBackTest currentBackTest = TRADING_RECORDS.get(tradingCd);
                 //TradingRecord tradingRecord       = currentBackTest.getTradingRecord();
-                List<Indicator<Num>> indicators   = initializeIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+                List<Indicator<Num>> indicators   = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
                 //Strategy longStrategy             = STRATEGY_MAP.get(tradingCd + "_" + interval + "_long_strategy");
                 //Strategy shortStrategy            = STRATEGY_MAP.get(tradingCd + "_" + interval + "_short_strategy")
 
@@ -350,13 +369,13 @@ public class FutureMLService {
                     boolean exitFlag = false;
                     if (
                         tradingEntity.getPositionSide().equals("LONG") // 포지션이 LONG인 경우
-                        &&(shortSignal||neutralSignal||tradingEntity.getTrend1h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
+                        &&(longExitSignal||tradingEntity.getTrend1h().equals("SHORT")) // SHORT 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 SHORT인 경우
                     ){
                         exitFlag = true;
                     };
                     if (
                         tradingEntity.getPositionSide().equals("SHORT")
-                        &&(longSignal||neutralSignal||tradingEntity.getTrend1h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
+                        &&(shortExitSignal||tradingEntity.getTrend1h().equals("LONG")) // LONG 신호가 발생하거나 중립 신호가 발생하거나 트렌드가 LONG인 경우
                     ){
                         exitFlag = true;
                     };
@@ -392,7 +411,7 @@ public class FutureMLService {
                     String positionSide = null;
 
                     if (
-                        longSignal
+                        longEntrySignal
                         //&&tradingEntity.getTrend5m().equals("LONG")
                         //&&tradingEntity.getTrend15m().equals("LONG")
                         &&tradingEntity.getTrend1h().equals("LONG")
@@ -401,7 +420,7 @@ public class FutureMLService {
                         enterFlag = true;
                         positionSide = "LONG";
                     } else if (
-                        shortSignal
+                        shortEntrySignal
                         //&&tradingEntity.getTrend5m().equals("SHORT")
                         //&&tradingEntity.getTrend15m().equals("SHORT")
                         &&tradingEntity.getTrend1h().equals("SHORT")
@@ -1330,19 +1349,24 @@ public class FutureMLService {
         int longMovingPeriod = tradingEntity.getLongMovingPeriod();
 
         // ML 모델 설정
-        List<Indicator<Num>> indicators = initializeIndicators(series, shortMovingPeriod, longMovingPeriod);
-        MLModel mlModel = setupMLModel(series, indicators, tradingEntity, testFlag);
+        List<Indicator<Num>> longIndicators = initializeLongIndicators(series, shortMovingPeriod, longMovingPeriod);
+        MLModel mlLongModel  = setupMLModel(series, "LONG", tradingEntity, testFlag);
+        List<Indicator<Num>> shortIndicators = initializeShortIndicators(series, shortMovingPeriod, longMovingPeriod);
+        MLModel mlShortModel = setupMLModel(series, "SHORT", tradingEntity, testFlag);
 
         double volatilityThreshold = 1;
         double entryThreshold = 0.4;
         double exitThreshold = 0.4;
-        Rule mlLongEntryRule = new MLLongRule(mlModel, indicators, entryThreshold);
-        Rule mlShortEntryRule = new MLShortRule(mlModel, indicators, entryThreshold);
-        Rule mlLongExitRule = new MLShortRule(mlModel, indicators, exitThreshold);
-        Rule mlShortExitRule = new MLLongRule(mlModel, indicators, exitThreshold);
-        //Rule mlLongExitRule = new MLLongExitRule(mlModel, indicators, exitThreshold);
-        //Rule mlShortExitRule = new MLShortExitRule(mlModel, indicators, exitThreshold);
-        Rule mlExitRule = new MLExitRule(mlModel, indicators, exitThreshold);
+        Rule mlLongEntryRule  = new MLLongRule(mlLongModel, longIndicators, entryThreshold);
+        Rule mlLongExitRule   = new MLShortRule(mlLongModel, longIndicators, exitThreshold);
+
+        Rule mlShortEntryRule = new MLShortRule(mlShortModel, shortIndicators, entryThreshold);
+        Rule mlShortExitRule  = new MLLongRule(mlShortModel, shortIndicators, exitThreshold);
+
+
+        //Rule mlLongExitRule = new MLLongExitRule(mlLongModel, longIndicators, exitThreshold);
+        //Rule mlShortExitRule = new MLShortExitRule(mlLongModel, longIndicators, exitThreshold);
+        Rule mlExitRule = new MLExitRule(mlLongModel, longIndicators, exitThreshold);
 
         // 전략 규칙 리스트 초기화
         List<Rule> longEntryRules = new ArrayList<>();
@@ -1361,8 +1385,8 @@ public class FutureMLService {
         }
 
         // 복합 규칙 생성
-        Strategy combinedLongStrategy = new BaseStrategy(mlLongEntryRule, new OrRule(mlLongExitRule, mlExitRule));
-        Strategy combinedShortStrategy = new BaseStrategy(mlShortEntryRule, new OrRule(mlShortExitRule, mlExitRule));
+        Strategy combinedLongStrategy  = new BaseStrategy(mlLongEntryRule, new OrRule(mlLongExitRule, mlShortEntryRule));
+        Strategy combinedShortStrategy = new BaseStrategy(mlShortEntryRule, new OrRule(mlShortExitRule, mlLongEntryRule));
 
         STRATEGY_MAP.put(tradingCd + "_" + interval + "_long_strategy", combinedLongStrategy);
         STRATEGY_MAP.put(tradingCd + "_" + interval + "_short_strategy", combinedShortStrategy);
@@ -1393,9 +1417,14 @@ public class FutureMLService {
         }
     }
 
-    private MLModel setupMLModel(BaseBarSeries series, List<Indicator<Num>> indicators, TradingEntity tradingEntity, boolean testFlag) {
+    private MLModel setupMLModel(BaseBarSeries series, String positionSide, TradingEntity tradingEntity, boolean testFlag) {
+        List <Indicator<Num>> indicators = new ArrayList<>();
+        if (positionSide.equals("LONG")) {
+            indicators = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+        } else if (positionSide.equals("SHORT")) {
+            indicators = initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+        }
         MLModel mlModel = new MLModel(tradingEntity.getPriceChangeThreshold(), indicators);
-        //TrendPredictionModel mlModel = new TrendPredictionModel(indicators, 14);
         int totalSize = series.getBarCount();
         int trainSize = (int) (totalSize * 0.75);
         BarSeries trainSeries = series.getSubSeries(0, trainSize);
@@ -1405,7 +1434,7 @@ public class FutureMLService {
         } else {
             mlModel.train(series, totalSize);
         }
-        ML_MODEL_MAP.put(tradingEntity.getTradingCd(), mlModel);
+        ML_MODEL_MAP.put(tradingEntity.getTradingCd() + " " + positionSide, mlModel);
         return mlModel;
     }
 
@@ -1463,10 +1492,10 @@ public class FutureMLService {
         //System.out.println("Train data size: " + trainSize);
 
         // 훈련 데이터와 테스트 데이터 분리
-        MLModel mlModel = ML_MODEL_MAP.get(tradingCd);
+        MLModel mlLongModel  = ML_MODEL_MAP.get(tradingCd + " " + "LONG");
+        MLModel mlShortModel = ML_MODEL_MAP.get(tradingCd + " " + "SHORT");
 
-        RealisticBackTest backtest = new RealisticBackTest(testSeries, mlModel, longStrategy, shortStrategy,
-                Duration.ofSeconds(5), 0.1);
+        RealisticBackTest backtest = new RealisticBackTest(testSeries, tradingEntity, mlLongModel, mlShortModel, longStrategy, shortStrategy, Duration.ofSeconds(5), 0.1);
         TradingRecord record = backtest.run();
 
         // 백테스트 실행

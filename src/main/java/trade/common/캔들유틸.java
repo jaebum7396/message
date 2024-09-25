@@ -9,16 +9,18 @@ import org.springframework.stereotype.Component;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBarSeries;
 import org.ta4j.core.Indicator;
-import org.ta4j.core.indicators.ATRIndicator;
-import org.ta4j.core.indicators.EMAIndicator;
-import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.adx.MinusDIIndicator;
 import org.ta4j.core.indicators.adx.PlusDIIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.bollinger.PercentBIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
+import org.ta4j.core.indicators.volume.AccumulationDistributionIndicator;
 import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
+import org.ta4j.core.indicators.volume.OnBalanceVolumeIndicator;
 import org.ta4j.core.num.Num;
 import trade.future.model.dto.EventDTO;
 import trade.future.model.dto.KlineDTO;
@@ -149,7 +151,7 @@ public class 캔들유틸 {
         }
     }
 
-    public static List<Indicator<Num>> initializeIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+    public static List<Indicator<Num>> initializeLongIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
         List<Indicator<Num>> indicators = new ArrayList<>();
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -198,6 +200,62 @@ public class 캔들유틸 {
         // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
         // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
         // indicators.add(new ParabolicSarIndicator(series));
+
+        return indicators;
+    }
+
+    public static List<Indicator<Num>> initializeShortIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
+        List<Indicator<Num>> indicators = new ArrayList<>();
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+        // 기존 지표 유지
+        EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
+        EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
+        MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
+
+        // 볼린저 밴드 관련 지표 (숏 전략에 중요)
+        int bbPeriod = 20;
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, bbPeriod);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(new SMAIndicator(closePrice, bbPeriod));
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        PercentBIndicator percentB = new PercentBIndicator(closePrice, bbPeriod, 2.0);
+
+        // RSI (과매수 상태 감지에 유용)
+        RSIIndicator rsi = new RSIIndicator(closePrice, 14);
+
+        // 스토캐스틱 오실레이터 (과매수 상태 및 반전 신호 감지)
+        StochasticOscillatorKIndicator stochK = new StochasticOscillatorKIndicator(series, 14);
+        StochasticOscillatorDIndicator stochD = new StochasticOscillatorDIndicator(stochK);
+
+        // 추가 지표
+        CCIIndicator cci = new CCIIndicator(series, 20); // 과매수/과매도 상태 감지
+        ROCIndicator roc = new ROCIndicator(closePrice, shortMovingPeriod); // 모멘텀 측정
+        WilliamsRIndicator williamsR = new WilliamsRIndicator(series, 14); // 과매수/과매도 및 반전 감지
+
+        // 기존 지표 추가
+        indicators.add(macdIndicator);
+        indicators.add(percentB);
+        indicators.add(shortEMA);
+        indicators.add(longEMA);
+        indicators.add(new ChaikinMoneyFlowIndicator(series, longMovingPeriod));
+        indicators.add(new ATRIndicator(series, shortMovingPeriod));
+        indicators.add(new ADXIndicator(series, longMovingPeriod));
+        indicators.add(new PlusDIIndicator(series, longMovingPeriod));
+        indicators.add(new MinusDIIndicator(series, longMovingPeriod));
+
+        // 새로운 지표 추가
+        indicators.add(upperBBand);
+        indicators.add(rsi);
+        indicators.add(stochK);
+        indicators.add(stochD);
+        indicators.add(cci);
+        indicators.add(roc);
+        indicators.add(williamsR);
+
+        // 추가적인 반전 관련 지표
+        indicators.add(new OnBalanceVolumeIndicator(series)); // 거래량 동향 파악
+        indicators.add(new AccumulationDistributionIndicator(series)); // 가격과 거래량의 관계
+        indicators.add(new ParabolicSarIndicator(series)); // 추세 반전 감지
 
         return indicators;
     }
