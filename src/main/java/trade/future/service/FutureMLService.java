@@ -492,7 +492,7 @@ public class FutureMLService {
                         if (
                             true
                             //&& new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
-                            //&& new BigDecimal(adx).compareTo(new BigDecimal(30)) < 0
+                            && new BigDecimal(adx).compareTo(new BigDecimal(40)) < 0
                         ){
                             printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ positionSide+"(ADX: "+adx+"/ probabilities: "+probabilitiesObj+")"+ CONSOLE_COLORS.RESET);
                             makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
