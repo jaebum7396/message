@@ -349,7 +349,7 @@ public class FutureMLService {
                     //checkPositionMismatch(backTestPosition, tradingEntity);
                     // 포지션이 열려있는 경우
                     try {
-                        //validateOpenPosition(tradingEntity);
+                        validateOpenPosition(tradingEntity);
                     } catch (Exception e) {
                         TOTAL_POSITION_COUNT--;
                         restartTrading(tradingEntity);
