@@ -64,7 +64,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static trade.common.공통유틸.*;
-import static trade.common.공통유틸.printAlignedOutput;
+import static trade.common.출력유틸.printAlignedOutput;
 import static trade.common.캔들유틸.*;
 
 @Slf4j
@@ -99,7 +99,7 @@ public class FutureMLService {
         this.symbols            = new JSONArray(String.valueOf(exchangeInfo.get("symbols")));
         this.DEV_MODE           = ACTIVE_PROFILE.equals("local");
         if(DEV_MODE){
-            System.out.println("ACTIVE_PROFILE : " + ACTIVE_PROFILE+ "/ DEV_MODE : " + DEV_MODE + " !!![개발 모드]입니다!!!");
+            log.info("ACTIVE_PROFILE : " + ACTIVE_PROFILE+ "/ DEV_MODE : " + DEV_MODE + " !!![개발 모드]입니다!!!");
         }
     }
 
@@ -176,7 +176,7 @@ public class FutureMLService {
     public void onCloseCallback(String streamId) {
         TradingEntity tradingEntity = Optional.ofNullable(umWebSocketStreamClient.getTradingEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new AutoTradingDuplicateException(streamId + "번 트레이딩이 존재하지 않습니다."));
-        System.out.println("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
+        log.info("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
         tradingEntity.setTradingStatus("CLOSE");
         tradingRepository.save(tradingEntity);
         resourceCleanup(tradingEntity);
@@ -325,7 +325,7 @@ public class FutureMLService {
                 // 훈련된 모델 예측.
                 //MLModel mlModel       = setupMLModel(series, indicators, tradingEntity, false);
 
-                //System.out.println(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
+                //log.info(symbol + " : " + mlModel.explainPrediction(indicators, series.getEndIndex()));
 
                 // 백테스팅 포지션 출력
                 //Position backTestPosition = tradingRecord.getCurrentPosition();
@@ -431,7 +431,7 @@ public class FutureMLService {
                         //Trade exit  = tradingRecord.getCurrentPosition().getExit();
                         //printAlignedOutput(symbol, entry.getNetPrice()+"("+tradingRecord.getCurrentPosition().isOpened()+")/"+exit.getNetPrice());
                         //tradingRecord.getPositions().forEach(position -> {
-                        //    //System.out.println("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
+                        //    //log.info("과거 포지션 종료: " + position.getEntry().getNetPrice() + " / " + position.getExit().getNetPrice());
                         //});
                         printAlignedOutput(symbol, " 포지션 종료");
                     }
@@ -572,7 +572,7 @@ public class FutureMLService {
             try{
                 marginTypeChange(marginTypeParamMap);
             } catch (Exception e){
-                //System.out.println("이미 교차 마진입니다.");
+                //log.info("이미 교차 마진입니다.");
             }
             // 메인 주문과 스탑로스 주문 제출
             LinkedHashMap<String, Object> orderParams = makeOrder(tradingEntity, "OPEN");
@@ -594,7 +594,7 @@ public class FutureMLService {
             e.printStackTrace();
         } finally {
             tradingEntity.setEntryCount(tradingEntity.getEntryCount() + 1); // 진입횟수 증가
-            //System.out.println("openTradingEntity >>>>> " + tradingEntity);
+            //log.info("openTradingEntity >>>>> " + tradingEntity);
             tradingRepository.save(tradingEntity);
         }
     }
@@ -606,7 +606,7 @@ public class FutureMLService {
             e.printStackTrace();
         } finally {
             restartTrading(tradingEntity);
-            //System.out.println("closeTradingEntity >>>>> " + tradingEntity);
+            //log.info("closeTradingEntity >>>>> " + tradingEntity);
             log.info("스트림 종료");
         }
     }
@@ -651,7 +651,7 @@ public class FutureMLService {
                 LinkedHashMap<String, Object> takeProfitOrder = makeStopOrder(tradingEntity, "TAKE_PROFIT_MARKET", takeProfitPrice, quantity);
                 paramMap.put("takeProfitOrder", takeProfitOrder);
             } else {
-                System.out.println("명목가치(" + notional + ")가 최소주문가능금액보다 작습니다.");
+                log.info("명목가치(" + notional + ")가 최소주문가능금액보다 작습니다.");
                 // throw new TradingException(tradingEntity);
             }
         } else if (intent.equals("CLOSE")) {
@@ -875,7 +875,7 @@ public class FutureMLService {
 
         returnMap.put("GRID", gridBuilder.toString());
 
-        //System.out.println(gridBuilder.toString());  // 콘솔에 그리드 출력
+        //log.info(gridBuilder.toString());  // 콘솔에 그리드 출력
 
         return returnMap;
     }
@@ -960,7 +960,7 @@ public class FutureMLService {
         positions.forEach(position -> { //포지션을 찾는다.
             JSONObject positionObj = new JSONObject(position.toString());
             if(positionObj.get("symbol").equals(symbol) && positionObj.get("positionSide").equals(positionSide)){
-                System.out.println("포지션 : " + positionObj);
+                //log.info("포지션 : " + positionObj);
                 positionOpt.set(Optional.of(positionObj));
             }
         });
@@ -1012,7 +1012,7 @@ public class FutureMLService {
 
         // 타게팅된 심볼이 있다면
         if (targetSymbol != null && !targetSymbol.isEmpty()) {
-            System.out.println("symbolParam : " + targetSymbol);
+            log.info("symbolParam : " + targetSymbol);
         }
 
         // *************************************************************************************************
@@ -1195,7 +1195,7 @@ public class FutureMLService {
 
         int count = 0;
         for (Map<String, Object> item : sortedByQuoteVolume) {
-            System.out.println("현재 가능한 트레이딩 갯수("+maxPositionCount+"-"+TRADING_ENTITYS.size()+") : " + (maxPositionCount - TRADING_ENTITYS.size()));
+            log.info("현재 가능한 트레이딩 갯수("+maxPositionCount+"-"+TRADING_ENTITYS.size()+") : " + (maxPositionCount - TRADING_ENTITYS.size()));
             int availablePositionCount = maxPositionCount - TRADING_ENTITYS.size();
             if (availablePositionCount <= 0) {
                 break;
@@ -1216,7 +1216,7 @@ public class FutureMLService {
                 if (
                     true
                 ) {
-                    System.out.println("[관심종목추가]symbol : " + symbol);
+                    log.info("[관심종목추가]symbol : " + symbol);
                     overlappingData.add(item);
                     count++;
                 }
@@ -1225,7 +1225,7 @@ public class FutureMLService {
         }
 
         for(Map<String, Object> item : overlappingData){
-            System.out.println("관심종목 : " + item.get("symbol"));
+            log.info("관심종목 : " + item.get("symbol"));
         }
 
         resultMap.put("reports", reports);
@@ -1238,11 +1238,11 @@ public class FutureMLService {
         tradingEntity.setTradingCd(UUID.randomUUID().toString());
         tradingEntity.setCandleInterval("5m");
         klineScraping(tradingEntity, null,  0, 3);
-        System.out.println("SERIES_MAP : " + SERIES_MAP.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval()).getBarCount());
+        log.info("SERIES_MAP : " + SERIES_MAP.get(tradingEntity.getTradingCd() + "_" + tradingEntity.getCandleInterval()).getBarCount());
     }
 
     public void klineScraping(TradingEntity tradingEntity, String endTime, int idx, int page) {
-        System.out.println(tradingEntity.getSymbol() + " klineScraping >>>>>" + idx + "/" + page);
+        log.info(tradingEntity.getSymbol() + " klineScraping >>>>>" + idx + "/" + page);
         String tradingCd = tradingEntity.getTradingCd();
         String interval = tradingEntity.getCandleInterval();
 
@@ -1259,7 +1259,7 @@ public class FutureMLService {
 
         JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
         JSONArray firstIdxArray = jsonArray.getJSONArray(0);
-        //System.out.println("firstIdxArray : " + firstIdxArray);
+        //log.info("firstIdxArray : " + firstIdxArray);
         String firstTime = String.valueOf(firstIdxArray.get(0));
 
         String tradingKey = tradingCd + "_" + interval;
@@ -1278,7 +1278,7 @@ public class FutureMLService {
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONArray klineArray = jsonArray.getJSONArray(i);
             KlineEntity klineEntity = jsonArrayToKlineEntity(klineArray);
-            //System.out.println("klineEntity : " + klineEntity.toString());
+            //log.info("klineEntity : " + klineEntity.toString());
 
             ZonedDateTime endTimeZone = klineEntity.getEndTime().atZone(ZoneOffset.UTC);
             Num open = DecimalNum.valueOf(klineEntity.getOpenPrice());
@@ -1307,18 +1307,18 @@ public class FutureMLService {
         SERIES_MAP.put(tradingKey, newSeries);
 
         String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
-        System.out.println("*************** [현재 가중치 : " + weight + "] ***************");
+        log.info("*************** [현재 가중치 : " + weight + "] ***************");
 
         idx++;
         if (idx < page) {
             klineScraping(tradingEntity, firstTime, idx, page);
         } else {
-            System.out.println(tradingEntity.getSymbol() + " klineScraping >>>>> END");
+            log.info(tradingEntity.getSymbol() + " klineScraping >>>>> END");
         }
     }
 
     public Map<String,Object> backTest(HttpServletRequest request, TradingDTO tradingDTO){
-        System.out.println("backTest >>>>>" + tradingDTO.toString());
+        log.info("backTest >>>>>" + tradingDTO.toString());
         Claims claims = getClaims(request);
         String userCd = String.valueOf(claims.get("userCd"));
         if (userCd == null || userCd.isEmpty()) {
@@ -1331,7 +1331,7 @@ public class FutureMLService {
     }
 
     public Map<String, Object> backTest(TradingEntity tradingEntity) {
-        System.out.println("backTest >>>>>" + tradingEntity.toString());
+        log.info("backTest >>>>>" + tradingEntity.toString());
         //변수 설정
         String interval = tradingEntity.getCandleInterval();
         int maxPositionCount = tradingEntity.getMaxPositionCount();
@@ -1345,7 +1345,7 @@ public class FutureMLService {
 
         // 거래량(QuoteVolume - 기준 화폐)을 기준으로 내림차순으로 정렬해서 가져옴
         List<Map<String, Object>> sortedByQuoteVolume = getSort(resultArray, "quoteVolume", "DESC", stockSelectionCount);
-        //System.out.println("sortedByQuoteVolume : " + sortedByQuoteVolume);
+        //log.info("sortedByQuoteVolume : " + sortedByQuoteVolume);
         List<Map<String, Object>> overlappingData = new ArrayList<>();
         List<TechnicalIndicatorReportEntity> reports = new ArrayList<>();
 
@@ -1370,10 +1370,10 @@ public class FutureMLService {
         }
 
         for(Map<String, Object> item : overlappingData){
-            System.out.println("관심종목 : " + item);
+            log.info("관심종목 : " + item);
         }
 
-        //System.out.println("overlappingData : " + overlappingData);
+        //log.info("overlappingData : " + overlappingData);
 
         resultMap.put("reports", reports);
         resultMap.put("overlappingData", overlappingData);
@@ -1479,7 +1479,7 @@ public class FutureMLService {
     }
 
     public Map<String, Object> backTestExec(TradingEntity tradingEntity, boolean logFlag) {
-        System.out.println("backTestExec >>>>>");
+        log.info("backTestExec >>>>>");
         long startTime = System.currentTimeMillis(); // 시작 시간 기록
 
         UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY);
@@ -1501,10 +1501,10 @@ public class FutureMLService {
         int limit = candleCount;
 
         if(false){
-            System.out.println("사용가능 : " +accountInfo.get("availableBalance"));
-            System.out.println("담보금 : " + accountInfo.get("totalWalletBalance"));
-            System.out.println("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
-            System.out.println("현재자산 : " + accountInfo.get("totalMarginBalance"));
+            log.info("사용가능 : " +accountInfo.get("availableBalance"));
+            log.info("담보금 : " + accountInfo.get("totalWalletBalance"));
+            log.info("미실현수익 : " + accountInfo.get("totalUnrealizedProfit"));
+            log.info("현재자산 : " + accountInfo.get("totalMarginBalance"));
         }
 
         tradingEntity.setCollateral(maxPositionAmount);
@@ -1529,7 +1529,7 @@ public class FutureMLService {
         Strategy longStrategy  = STRATEGY_MAP.get(tradingCd + "_" + interval + "_long_strategy");
         Strategy shortStrategy = STRATEGY_MAP.get(tradingCd + "_" + interval + "_short_strategy");
 
-        //System.out.println("Train data size: " + trainSize);
+        //log.info("Train data size: " + trainSize);
 
         // 훈련 데이터와 테스트 데이터 분리
         MLModel mlLongModel  = ML_MODEL_MAP.get(tradingCd + " " + "LONG");
@@ -1544,7 +1544,7 @@ public class FutureMLService {
         //TradingRecord shortTradingRecord = seriesManager.run(shortStrategy, Trade.TradeType.SELL);
         int leverage = tradingEntity.getLeverage(); // 레버리지
 
-        //System.out.println("");
+        //log.info("");
         HashMap<String, Object> longTradingResult = new HashMap<String, Object>();
         HashMap<String, Object> shortTradingResult = new HashMap<String, Object>();
         longTradingResult  = backTestResult(record, testSeries, symbol, leverage, "LONG", maxPositionAmount, true);
@@ -1572,7 +1572,7 @@ public class FutureMLService {
         // 결과 출력
         long endTime = System.currentTimeMillis(); // 종료 시간 기록
         long elapsedTime = endTime - startTime; // 실행 시간 계산
-        System.out.println("소요시간 : " + elapsedTime + " milliseconds");
+        log.info("소요시간 : " + elapsedTime + " milliseconds");
         resultMap.put("expectationProfit", expectationProfit);
         return resultMap;
     }
@@ -1588,7 +1588,7 @@ public class FutureMLService {
         List<Position> winPositions = new ArrayList<>();
         List<Position> losePositions = new ArrayList<>();
         if (logFlag) {
-            System.out.println(symbol+"/"+positionSide+" 리포트");
+            log.info(symbol+"/"+positionSide+" 리포트");
         }
         RelativeATRIndicator relativeATR = new RelativeATRIndicator(series, 14, 100);
         // ADX 지표 설정
@@ -1760,10 +1760,10 @@ public class FutureMLService {
         return topLimitItems;
     }
     public void printTradingEntitys() {
-        System.out.println("현재 오픈된 트레이딩 >>>>>");
+        log.info("현재 오픈된 트레이딩 >>>>>");
 
         if (TRADING_ENTITYS.isEmpty()) {
-            System.out.println("오픈된 트레이딩이 없습니다.");
+            log.info("오픈된 트레이딩이 없습니다.");
             return;
         }
 
@@ -1783,7 +1783,7 @@ public class FutureMLService {
         });
 
         System.out.printf(line, "-".repeat(20), "-".repeat(12), "-".repeat(12));
-        System.out.println("총 " + TRADING_ENTITYS.size() + "개의 오픈된 트레이딩이 있습니다.");
+        log.info("총 " + TRADING_ENTITYS.size() + "개의 오픈된 트레이딩이 있습니다.");
     }
     public void printAccountInfo(JSONObject accountInfo) {
         String format = "| %-12s | %20s |%n";
@@ -1801,7 +1801,7 @@ public class FutureMLService {
     public void printTradingSignals(String symbol, Bar currentBar,
                                     boolean longShouldEnter, boolean longShouldExit,
                                     boolean shortShouldEnter, boolean shortShouldExit) {
-        System.out.println("한국시간 : " + krTimeExpression(currentBar));
+        log.info("한국시간 : " + krTimeExpression(currentBar));
         String header = String.format("| %-15s | %-22s | %-14s | %-14s | %-15s | %-15s |",
                 "Symbol", "Current Bar", "Long Enter", "Long Exit", "Short Enter", "Short Exit");
         String separatorLine = "+-----------------+------------------------+----------------+----------------+-----------------+-----------------+";
@@ -1947,8 +1947,8 @@ public class FutureMLService {
     public Claims getClaims(HttpServletRequest request){
         try{
             Key secretKey = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
-            System.out.println("JWT_SECRET_KEY : " + JWT_SECRET_KEY);
-            System.out.println("authorization : " + request.getHeader("authorization"));
+            log.info("JWT_SECRET_KEY : " + JWT_SECRET_KEY);
+            log.info("authorization : " + request.getHeader("authorization"));
             Claims claim = Jwts.parserBuilder().setSigningKey(secretKey).build()
                     .parseClaimsJws(request.getHeader("authorization")).getBody();
             return claim;
