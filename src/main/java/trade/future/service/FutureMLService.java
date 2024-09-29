@@ -339,17 +339,30 @@ public class FutureMLService {
                 String trend15m = String.valueOf(trendMap.get("15m"));// 15분 트렌드
                 String trend1h  = String.valueOf(trendMap.get("1h")); // 1시간 트렌드
                 String trend4h  = String.valueOf(trendMap.get("4h")); // 4시간 트렌드
+                String adx5m    = String.valueOf(trendMap.get("adx5m")); // 5분 ADX
+                String adx15m   = String.valueOf(trendMap.get("adx15m")); // 15분 ADX
+                String adx1h    = String.valueOf(trendMap.get("adx1h")); // 1시간 ADX
+                String adx4h    = String.valueOf(trendMap.get("adx4h")); // 4시간 ADX
 
                 tradingEntity.setTrend5m(trend5m);
                 tradingEntity.setTrend15m(trend15m);
                 tradingEntity.setTrend1h(trend1h);
                 tradingEntity.setTrend4h(trend4h);
 
+                tradingEntity.setAdx5m(adx5m);
+                tradingEntity.setAdx15m(adx15m);
+                tradingEntity.setAdx1h(adx1h);
+                tradingEntity.setAdx4h(adx4h);
+
+                String trendInfo = "(5m/"+trend5m+":"+adx5m+", 15m/"+trend15m+":"+adx15m+", 1h/"+trend1h+":"+adx1h+", 4h/"+trend4h+":"+adx4h+")";
+
                 if (tradingEntity.getPositionStatus() != null && tradingEntity.getPositionStatus().equals("OPEN")) {
                     //checkPositionMismatch(backTestPosition, tradingEntity);
                     // 포지션이 열려있는 경우
                     try {
-                        validateOpenPosition(tradingEntity);
+                        if(!DEV_MODE){
+                            validateOpenPosition(tradingEntity);
+                        }
                     } catch (Exception e) {
                         TOTAL_POSITION_COUNT--;
                         restartTrading(tradingEntity);
@@ -447,6 +460,7 @@ public class FutureMLService {
                         //&&tradingEntity.getTrend15m().equals("LONG")
                         //&&tradingEntity.getTrend1h().equals("LONG")
                         &&tradingEntity.getTrend4h().equals("LONG")
+                        && new BigDecimal(adx4h).compareTo(new BigDecimal(40)) < 0
                     ) {
                         enterFlag = true;
                         positionSide = "LONG";
@@ -456,6 +470,7 @@ public class FutureMLService {
                         //&&tradingEntity.getTrend15m().equals("SHORT")
                         &&tradingEntity.getTrend1h().equals("SHORT")
                         //&&tradingEntity.getTrend4h().equals("SHORT")
+                        && new BigDecimal(adx4h).compareTo(new BigDecimal(40)) < 0
                     ){
                         enterFlag = true;
                         positionSide = "SHORT";
@@ -492,14 +507,13 @@ public class FutureMLService {
                         if (
                             true
                             //&& new BigDecimal(adx).compareTo(new BigDecimal(20)) > 0
-                            && new BigDecimal(adx).compareTo(new BigDecimal(40)) < 0
                         ){
-                            printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ positionSide+"(ADX: "+adx+"/ probabilities: "+probabilitiesObj+")"+ CONSOLE_COLORS.RESET);
+                            printAlignedOutput(tradingEntity.getSymbol(), CONSOLE_COLORS.GREEN + "진입/"+ positionSide+"[probabilities: "+probabilitiesObj+"/trend: "+trendInfo+"]"+ CONSOLE_COLORS.RESET);
                             makeOpenOrder(tradingEntity, positionSide, eventEntity.getKlineEntity().getClosePrice());
                             TOTAL_POSITION_COUNT++;
                         }
                     } else {
-                        printAlignedOutput(symbol, CONSOLE_COLORS.BRIGHT_YELLOW + "진입 조건 충족되지 않음" + CONSOLE_COLORS.RESET);
+                        printAlignedOutput(symbol, CONSOLE_COLORS.BRIGHT_YELLOW + "진입 조건 충족되지 않음"+"[trend: "+trendInfo+"]"+ CONSOLE_COLORS.RESET);
                     }
                 }
             }
@@ -829,16 +843,26 @@ public class FutureMLService {
         BaseBarSeries series15M = klineJsonToSeries(kline15M);
         BaseBarSeries series5M  = klineJsonToSeries(kline5M);
 
-        // 각 시간대별 추세 판단 및 저장
+        // 각 시간대별 추세 판단 및 ADX 계산
         String trend4H          = determineTrend(series4H);
         String trend1H          = determineTrend(series1H);
         String trend15M         = determineTrend(series15M);
         String trend5M          = determineTrend(series5M);
 
+        double adx4H            = calculateADX(series4H);
+        double adx1H            = calculateADX(series1H);
+        double adx15M           = calculateADX(series15M);
+        double adx5M            = calculateADX(series5M);
+
         returnMap.put("4h" , trend4H);
         returnMap.put("1h" , trend1H);
         returnMap.put("15m", trend15M);
         returnMap.put("5m" , trend5M);
+
+        returnMap.put("adx4h" , adx4H);
+        returnMap.put("adx1h" , adx1H);
+        returnMap.put("adx15m", adx15M);
+        returnMap.put("adx5m" , adx5M);
 
         // 종합적인 추세 판단
         int upTrendCount = 0;
@@ -863,22 +887,26 @@ public class FutureMLService {
         // 트렌드 그리드 생성
         StringBuilder gridBuilder = new StringBuilder();
         gridBuilder.append(String.format("Symbol: %s\n", symbol));
-        gridBuilder.append("+------+--------+\n");
-        gridBuilder.append("| Time | Trend  |\n");
-        gridBuilder.append("+------+--------+\n");
-        gridBuilder.append(String.format("| 4h   | %-6s |\n", formatTrend(trend4H)));
-        gridBuilder.append(String.format("| 1h   | %-6s |\n", formatTrend(trend1H)));
-        gridBuilder.append(String.format("| 15m  | %-6s |\n", formatTrend(trend15M)));
-        gridBuilder.append(String.format("| 5m   | %-6s |\n", formatTrend(trend5M)));
-        gridBuilder.append("+------+--------+\n");
-        //gridBuilder.append(String.format("Overall Trend: %s\n", overallTrend));
+        gridBuilder.append("+------+--------+-------+\n");
+        gridBuilder.append("| Time | Trend  | ADX   |\n");
+        gridBuilder.append("+------+--------+-------+\n");
+        gridBuilder.append(String.format("| 4h   | %-6s | %.2f |\n", formatTrend(trend4H), adx4H));
+        gridBuilder.append(String.format("| 1h   | %-6s | %.2f |\n", formatTrend(trend1H), adx1H));
+        gridBuilder.append(String.format("| 15m  | %-6s | %.2f |\n", formatTrend(trend15M), adx15M));
+        gridBuilder.append(String.format("| 5m   | %-6s | %.2f |\n", formatTrend(trend5M), adx5M));
+        gridBuilder.append("+------+--------+-------+\n");
 
         returnMap.put("GRID", gridBuilder.toString());
 
-        //log.info(gridBuilder.toString());  // 콘솔에 그리드 출력
-
         return returnMap;
     }
+
+    // ADX 계산 함수 (예시)
+    private int calculateADX(BaseBarSeries series) {
+        ADXIndicator adxIndicator = new ADXIndicator(series, 14);
+        return (int) Math.round(adxIndicator.getValue(series.getEndIndex()).doubleValue());
+    }
+
     private String formatTrend(String trend) {
         switch (trend) {
             case "LONG":
@@ -1708,7 +1736,7 @@ public class FutureMLService {
         //log.info("getSort >>>>> sortBy : {}, orderBy : {}, limit : {}", sortBy, orderBy, limit);
 
         // 거래량 상위 N개를 제외할 수
-        final int VOLUME_EXCLUDE_COUNT = 15;
+        final int VOLUME_EXCLUDE_COUNT = 0;
 
         // JSON 데이터를 Java 객체로 파싱하여 리스트에 저장
         List<Map<String, Object>> itemList = new ArrayList<>();
