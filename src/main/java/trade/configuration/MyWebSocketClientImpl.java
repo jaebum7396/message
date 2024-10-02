@@ -84,7 +84,7 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
     @Override
     public TradingEntity klineStream(TradingEntity tradingEntity, WebSocketCallback onOpenCallback, WebSocketCallback onMessageCallback, WebSocketCallback onClosingCallback, WebSocketCallback onFailureCallback) {
         ParameterChecker.checkParameterType(tradingEntity.getSymbol(), String.class, "symbol");
-        Request request = RequestBuilder.buildWebsocketRequest(String.format("%s/ws/%s@kline_%s", super.getBaseUrl(), tradingEntity.getSymbol().toLowerCase(), tradingEntity.getCandleInterval()));
+        Request request = RequestBuilder.buildWebsocketRequest(String.format("%s/ws/%s@kline_%s", super.getBaseUrl(), tradingEntity.getSymbol().toLowerCase()));
         return createConnection(tradingEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
     }
 

@@ -9,10 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import trade.future.model.dto.TradingDTO;
-import trade.future.service.FutureMLService;
+import trade.future.service.FutureService;
 
 import javax.servlet.http.HttpServletRequest;
-import java.util.LinkedHashMap;
 
 import static trade.common.공통유틸.okResponsePackaging;
 
@@ -21,31 +20,31 @@ import static trade.common.공통유틸.okResponsePackaging;
 @Tag(name = "FutureMLController", description = "선물머신러닝컨트롤러")
 @RestController
 @RequiredArgsConstructor
-public class FutureMLController {
+public class FutureController {
     @Autowired
-    FutureMLService futureMLService;
+    FutureService futureService;
 
-    @PostMapping(value = "/future/ml/backtest")
+    @PostMapping(value = "/future/backtest")
     @Operation(summary="백테스팅", description="백테스팅")
     public ResponseEntity backTest(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
-        return okResponsePackaging(futureMLService.backTest(request, tradingDTO));
+        return okResponsePackaging(futureService.backTest(request, tradingDTO));
     }
 
-    @PostMapping(value = "/future/ml/scraping/test")
+    @PostMapping(value = "/future/scraping/test")
     @Operation(summary="스크래핑", description="스크래핑")
     public void scrapingTest(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
-        futureMLService.scrapingTest(request, tradingDTO);
+        futureService.scrapingTest(request, tradingDTO);
     }
 
-    @PostMapping(value = "/future/ml/open")
+    @PostMapping(value = "/future/open")
     @Operation(summary="자동매매를 시작합니다.", description="자동매매를 시작합니다.")
     public ResponseEntity autoTradingOpen(HttpServletRequest request, @RequestBody TradingDTO tradingDTO) throws Exception {
-        return okResponsePackaging(futureMLService.autoTradingOpen(request, tradingDTO));
+        return okResponsePackaging(futureService.autoTradingOpen(request, tradingDTO));
     }
 
-    @GetMapping(value = "/future/ml/close")
+    @GetMapping(value = "/future/close")
     @Operation(summary="자동매매를 종료합니다.", description="모든 포지션을 종료합니다.")
     public void closeAllPositions() {
-        futureMLService.closeAllPositions();
+        futureService.closeAllPositions();
     }
 }

@@ -17,13 +17,13 @@ import trade.common.model.Response;
 import trade.exception.TradingException;
 import trade.future.model.entity.TradingEntity;
 import trade.future.repository.TradingRepository;
-import trade.future.service.FutureMLService;
+import trade.future.service.FutureService;
 
 @RestControllerAdvice
 public class ErrorResponseAdvice {
 	private Logger logger = LoggerFactory.getLogger(ErrorResponseAdvice.class);
 	@Autowired
-	FutureMLService futureService;
+    FutureService futureService;
 	@Autowired TradingRepository tradingRepository;
 
 	@ExceptionHandler(TradingException.class)
