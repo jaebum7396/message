@@ -336,7 +336,7 @@ public class FutureService {
                         String exitSignalKey = strategyKey+"_EXIT";
                         boolean entrySignal = (boolean) SIGNAL_MAP.get(entrySignalKey);
                         boolean exitSignal = (boolean) SIGNAL_MAP.get(exitSignalKey);
-                        log.info(positionSide + intervalKey +"(entrySignal : " + entrySignal + " / exitSignal : " + exitSignal+")");
+                        log.info(positionSide+"_"+intervalKey +"(entrySignal: " + entrySignal + "/ exitSignal: " + exitSignal+")");
                     });
                 });
 
@@ -1254,7 +1254,7 @@ public class FutureService {
         //log.info("firstIdxArray : " + firstIdxArray);
         String firstTime = String.valueOf(firstIdxArray.get(0));
 
-        String tradingKey = tradingCd + "_" + interval;
+        String tradingKey = tradingCd+"_"+interval;
         List<Bar> allBars = new ArrayList<>();
 
         // 기존 시리즈의 바를 리스트에 추가
