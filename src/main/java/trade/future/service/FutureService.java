@@ -122,6 +122,7 @@ public class FutureService {
     private final ConcurrentHashMap <String, MLModel>           ML_MODEL_MAP    = new ConcurrentHashMap <String, MLModel>();
     private final ConcurrentHashMap <String, Strategy>          STRATEGY_MAP    = new ConcurrentHashMap <String, Strategy>();
     private final ConcurrentHashMap <String, Object>            SIGNAL_MAP      = new ConcurrentHashMap <String, Object>();
+    private final ConcurrentHashMap <String, List<Indicator<Num>>> INDICATORS_MAP      = new ConcurrentHashMap <String, List<Indicator<Num>>>();
     private final ConcurrentHashMap <String, TradingEntity>     TRADING_ENTITYS = new ConcurrentHashMap <String, TradingEntity>();
     private final ConcurrentHashMap <String, RealisticBackTest> TRADING_RECORDS = new ConcurrentHashMap <String, RealisticBackTest>();
 
@@ -139,12 +140,19 @@ public class FutureService {
         tradingEntity.setTradingStatus("OPEN");
         tradingRepository.save(tradingEntity);
 
-        // 시리즈 생성 (바이낸스 데이터 한번 MAX 호출이 1500개까지이므로 4번 재귀호출해서 6000개의 데이터를 가져옴)
+        String tradingCd                     = tradingEntity.getTradingCd();
         getIntervalList().forEach(interval -> {
+            String tradingKey                    = tradingCd+"_"+interval;
+            String longStrategyKey               = tradingKey+"_"+POSITION_SIDE.LONG;
+            String shortStrategyKey              = tradingKey+"_"+POSITION_SIDE.SHORT;
+
             klineScraping(tradingEntity, interval, null, 0, 4);
             BaseBarSeries series = SERIES_MAP.get(tradingEntity.getTradingCd() + "_" + interval);
             // 학습 데이터 생성
             strategyMaker(tradingEntity, interval, series, true,true);
+
+            INDICATORS_MAP.put(longStrategyKey, initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
+            INDICATORS_MAP.put(shortStrategyKey, initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
 
             setPredictMap(tradingEntity, interval, series);
         });
@@ -237,8 +245,8 @@ public class FutureService {
         String shortEntrySignalKey           = shortStrategyKey+"_"+"ENTRY";
         String shortExitSignalKey            = shortStrategyKey+"_"+"EXIT";
 
-        List<Indicator<Num>> longIndicators  = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
-        List<Indicator<Num>> shortIndicators = initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+        List<Indicator<Num>> longIndicators  = INDICATORS_MAP.get(longStrategyKey);
+        List<Indicator<Num>> shortIndicators = INDICATORS_MAP.get(shortStrategyKey);
 
         MLModel mlLongModel                  = ML_MODEL_MAP.get(longStrategyKey);
         MLModel mlShortModel                 = ML_MODEL_MAP.get(shortStrategyKey);
@@ -246,20 +254,16 @@ public class FutureService {
         double[] longModelPredict            = mlLongModel.predictProbabilities(longIndicators, series.getEndIndex());
         double longModelPredictShort         = longModelPredict[0]; //long 모델이 예상한 숏
         double longModelPredictLong          = longModelPredict[2]; //long 모델이 예상한 롱
-        boolean longEntrySignal              = longModelPredictLong   > 0.4;
-        boolean longExitSignal               = longModelPredictShort  > 0.4;
 
-        SIGNAL_MAP.put(longEntrySignalKey, longEntrySignal);
-        SIGNAL_MAP.put(longExitSignalKey, longExitSignal);
+        SIGNAL_MAP.put(longEntrySignalKey, longModelPredictLong);
+        SIGNAL_MAP.put(longExitSignalKey, longModelPredictShort);
 
         double[] shortModelPredict           = mlShortModel.predictProbabilities(shortIndicators, series.getEndIndex());
         double shortModelPredictShort        = shortModelPredict[0]; //short 모델이 예상한 숏
         double shortModelPredictLong         = shortModelPredict[2]; //short 모델이 예상한 롱
-        boolean shortEntrySignal             = shortModelPredictShort > 0.5;
-        boolean shortExitSignal              = shortModelPredictLong  > 0.5  || longModelPredictLong  > 0.4;
 
-        SIGNAL_MAP.put(shortEntrySignalKey, shortEntrySignal);
-        SIGNAL_MAP.put(shortExitSignalKey, shortExitSignal);
+        SIGNAL_MAP.put(shortEntrySignalKey, shortModelPredictShort);
+        SIGNAL_MAP.put(shortExitSignalKey, shortModelPredictLong);
     }
 
     // ****************************************************************************************
@@ -302,22 +306,26 @@ public class FutureService {
             nextFlag = false;
         }
         if (nextFlag) {
+
             TradingEntity tradingEntity = tradingEntitys.get(0);
             String tradingCd = tradingEntity.getTradingCd();
 
+            // 현재 이벤트의 캔들을 series 및 데이터베이스에 저장
+            String tradingKey                    = tradingCd+"_"+interval;
+            String longStrategyKey               = tradingKey+"_"+POSITION_SIDE.LONG;
+            String shortStrategyKey              = tradingKey+"_"+POSITION_SIDE.SHORT;
+            String longEntrySignalKey            = longStrategyKey+"_"+"ENTRY";
+            String longExitSignalKey             = longStrategyKey+"_"+"EXIT";
+            String shortEntrySignalKey           = shortStrategyKey+"_"+"ENTRY";
+            String shortExitSignalKey            = shortStrategyKey+"_"+"EXIT";
+
+            EventEntity eventEntity              = saveKlineEvent(event, tradingEntity);
+            BaseBarSeries series                 = SERIES_MAP.get(tradingKey);
+            INDICATORS_MAP.put(longStrategyKey, initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
+            INDICATORS_MAP.put(shortStrategyKey, initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
+
             if (isFinal) { // 캔들이 끝났을 때
                 log.info("캔들 갱신(" + symbol + " / " + interval + ")");
-                // 현재 이벤트의 캔들을 series 및 데이터베이스에 저장
-                EventEntity eventEntity              = saveKlineEvent(event, tradingEntity);
-                String tradingKey                    = tradingCd+"_"+interval;
-                String longStrategyKey               = tradingKey+"_"+POSITION_SIDE.LONG;
-                String shortStrategyKey              = tradingKey+"_"+POSITION_SIDE.SHORT;
-                String longEntrySignalKey            = longStrategyKey+"_"+"ENTRY";
-                String longExitSignalKey             = longStrategyKey+"_"+"EXIT";
-                String shortEntrySignalKey           = shortStrategyKey+"_"+"ENTRY";
-                String shortExitSignalKey            = shortStrategyKey+"_"+"EXIT";
-
-                BaseBarSeries series                 = SERIES_MAP.get(tradingKey);
 
                 setPredictMap(tradingEntity, interval, series);
 
@@ -329,16 +337,15 @@ public class FutureService {
                 boolean finalLongExitSignal          = false;
                 boolean finalShortExitSignal         = false;
 
-                getIntervalList().forEach(intervalKey -> {
+                logTradingSignals(tradingCd);
+                /*getIntervalList().forEach(intervalKey -> {
                     getPositionSideList().forEach(positionSide -> {
                         String strategyKey = tradingCd+"_"+intervalKey+"_"+positionSide;
                         String entrySignalKey = strategyKey+"_ENTRY";
                         String exitSignalKey = strategyKey+"_EXIT";
-                        boolean entrySignal = (boolean) SIGNAL_MAP.get(entrySignalKey);
-                        boolean exitSignal = (boolean) SIGNAL_MAP.get(exitSignalKey);
-                        log.info(positionSide+"_"+intervalKey +"(entrySignal: " + entrySignal + "/ exitSignal: " + exitSignal+")");
+                        log.info(positionSide+"_"+intervalKey +"(entryPredict: " + SIGNAL_MAP.get(entrySignalKey) + "/ exitPredict: " + SIGNAL_MAP.get(exitSignalKey)+")");
                     });
-                });
+                });*/
 
                 /*if (tradingEntity.getPositionStatus() != null && tradingEntity.getPositionStatus().equals("OPEN")) {
                     //checkPositionMismatch(backTestPosition, tradingEntity);
@@ -486,6 +493,43 @@ public class FutureService {
             }
         }
     }
+
+    public void logTradingSignals(String tradingCd) {
+        StringBuilder logBuilder = new StringBuilder("\n");
+        String headerFormat = "%-8s | %-14s %-14s | %-14s %-14s\n";
+        String dataFormat = "%-8s | %-14.4f %-14.4f | %-14.4f %-14.4f\n";
+
+        logBuilder.append(String.format(headerFormat, "Interval", "LONG Entry", "LONG Exit", "SHORT Entry", "SHORT Exit"));
+        logBuilder.append("-".repeat(73) + "\n");
+
+        for (String intervalKey : getIntervalList()) {
+            double longEntryPredict = 0.0, longExitPredict = 0.0, shortEntryPredict = 0.0, shortExitPredict = 0.0;
+
+            for (String positionSide : getPositionSideList()) {
+                String strategyKey = tradingCd + "_" + intervalKey + "_" + positionSide;
+                String entrySignalKey = strategyKey + "_ENTRY";
+                String exitSignalKey = strategyKey + "_EXIT";
+
+                if (positionSide.equals("LONG")) {
+                    longEntryPredict = (double) SIGNAL_MAP.getOrDefault(entrySignalKey, 0.0);
+                    longExitPredict = (double) SIGNAL_MAP.getOrDefault(exitSignalKey, 0.0);
+                } else if (positionSide.equals("SHORT")) {
+                    shortEntryPredict = (double) SIGNAL_MAP.getOrDefault(entrySignalKey, 0.0);
+                    shortExitPredict = (double) SIGNAL_MAP.getOrDefault(exitSignalKey, 0.0);
+                }
+            }
+
+            logBuilder.append(String.format(dataFormat,
+                    intervalKey,
+                    longEntryPredict,
+                    longExitPredict,
+                    shortEntryPredict,
+                    shortExitPredict));
+        }
+
+        log.info(logBuilder.toString());
+    }
+
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {
         EventEntity klineEvent = null;
         klineEvent = convertKlineEventDTO(event).toEntity();
@@ -501,7 +545,7 @@ public class FutureService {
                 .klineEntity(klineEvent.getKlineEntity())
                 .build();
         klineEvent.getKlineEntity().setPositionEntity(positionEntity);
-        klineEvent = eventRepository.save(klineEvent);
+        //klineEvent = eventRepository.save(klineEvent);
         return klineEvent;
     }
 
@@ -1235,7 +1279,7 @@ public class FutureService {
     }
 
     public void klineScraping(TradingEntity tradingEntity, String interval, String endTime, int idx, int page) {
-        log.info(tradingEntity.getSymbol() + " klineScraping >>>>>" + idx + "/" + page);
+        log.info(tradingEntity.getSymbol() + " klineScraping("+interval+") >>>>>" + idx + "/" + page);
         String tradingCd = tradingEntity.getTradingCd();
 
         LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
