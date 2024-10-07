@@ -146,13 +146,13 @@ public class FutureService {
             String longStrategyKey               = tradingKey+"_"+POSITION_SIDE.LONG;
             String shortStrategyKey              = tradingKey+"_"+POSITION_SIDE.SHORT;
 
-            klineScraping(tradingEntity, interval, null, 0, 4);
+            klineScraping(tradingEntity, interval, null, 0, 40);
             BaseBarSeries series = SERIES_MAP.get(tradingEntity.getTradingCd() + "_" + interval);
             // 학습 데이터 생성
             strategyMaker(tradingEntity, interval, series, true,true);
 
             INDICATORS_MAP.put(longStrategyKey, initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
-            INDICATORS_MAP.put(shortStrategyKey, initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
+            INDICATORS_MAP.put(shortStrategyKey, initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
 
             setPredictMap(tradingEntity, interval, series);
         });
@@ -324,7 +324,7 @@ public class FutureService {
             EventEntity eventEntity              = saveKlineEvent(event, tradingEntity);
             BaseBarSeries series                 = SERIES_MAP.get(tradingKey);
             INDICATORS_MAP.put(longStrategyKey, initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
-            INDICATORS_MAP.put(shortStrategyKey, initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
+            INDICATORS_MAP.put(shortStrategyKey, initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod()));
 
             if (isFinal) { // 캔들이 끝났을 때
                 log.info("캔들 갱신(" + symbol + " / " + interval + ")");
@@ -1436,7 +1436,7 @@ public class FutureService {
 
         // ML 모델 설정
         List<Indicator<Num>> longIndicators = initializeLongIndicators(series, shortMovingPeriod, longMovingPeriod);
-        List<Indicator<Num>> shortIndicators = initializeShortIndicators(series, shortMovingPeriod, longMovingPeriod);
+        List<Indicator<Num>> shortIndicators = initializeLongIndicators(series, shortMovingPeriod, longMovingPeriod);
         MLModel mlLongModel  = setupMLModel(series, POSITION_SIDE.LONG.getPositionSide(), tradingEntity, testFlag);
         MLModel mlShortModel = setupMLModel(series, POSITION_SIDE.SHORT.getPositionSide(), tradingEntity, testFlag);
         ML_MODEL_MAP.put(tradingEntity.getTradingCd()+"_"+interval+"_"+POSITION_SIDE.LONG.getPositionSide(), mlLongModel);
@@ -1508,7 +1508,7 @@ public class FutureService {
         if (positionSide.equals("LONG")) {
             indicators = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
         } else if (positionSide.equals("SHORT")) {
-            indicators = initializeShortIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
+            indicators = initializeLongIndicators(series, tradingEntity.getShortMovingPeriod(), tradingEntity.getLongMovingPeriod());
         }
         MLModel mlModel = new MLModel(tradingEntity.getPriceChangeThreshold(), indicators);
         int totalSize = series.getBarCount();

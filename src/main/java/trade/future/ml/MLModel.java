@@ -5,10 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
-import org.ta4j.core.indicators.EMAIndicator;
-import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.adx.ADXIndicator;
+import org.ta4j.core.indicators.adx.MinusDIIndicator;
+import org.ta4j.core.indicators.adx.PlusDIIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
+import org.ta4j.core.indicators.bollinger.PercentBIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
 import org.ta4j.core.num.Num;
 import smile.data.DataFrame;
 import smile.data.formula.Formula;
@@ -39,19 +45,24 @@ public class MLModel {
         this.indicators = indicators;
     }
 
-    private double[][] preprocessIndicators(List<Indicator<Num>> indicators, int size) {
-        double[][] preprocessedData = new double[size][indicators.size()];
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < indicators.size(); j++) {
-                if (indicators.get(j) instanceof ClosePriceIndicator) {
-                    continue;
-                }
-                Num value = indicators.get(j).getValue(i);
-                if (value == null) {
-                    logger.warning("지표 " + j + "의 " + i + "번째 인덱스에서 null 값 발견");
-                    return null;
-                }
-                preprocessedData[i][j] = normalizeIndicator(indicators.get(j), value.doubleValue());
+    private double[] preprocessIndicators(List<Indicator<Num>> indicators, int index) {
+        double[] preprocessedData = new double[indicators.size()];
+        for (int j = 0; j < indicators.size(); j++) {
+            if (indicators.get(j) instanceof ClosePriceIndicator) {
+                continue;
+            }
+            Num value = indicators.get(j).getValue(index);
+            if (value == null) {
+                logger.warning("지표 " + indicators.get(j).getClass().getSimpleName() + "의 " + index + "번째 인덱스에서 null 값 발견");
+                preprocessedData[j] = 0; // null 값을 0으로 대체
+                continue;
+            }
+            double normalizedValue = normalizeIndicator(indicators.get(j), value.doubleValue());
+            if (Double.isNaN(normalizedValue)) {
+                logger.warning("지표 " + indicators.get(j).getClass().getSimpleName() + "의 " + index + "번째 인덱스에서 NaN 값 발견. 원래 값: " + value.doubleValue());
+                preprocessedData[j] = 0; // NaN 값을 0으로 대체
+            } else {
+                preprocessedData[j] = clamp(normalizedValue, -1, 1);
             }
         }
         return preprocessedData;
@@ -59,16 +70,134 @@ public class MLModel {
 
     private double normalizeIndicator(Indicator<Num> indicator, double value) {
         if (indicator instanceof ADXIndicator) {
-            return value / 100.0;  // ADX는 0-100 범위이므로 0-1로 정규화
+            return (value / 100.0) * 2 - 1;  // ADX를 -1에서 1 사이로 정규화
         } else if (indicator instanceof MACDIndicator) {
             return Math.tanh(value / 100.0);  // MACD는 tanh 함수를 사용하여 -1에서 1 사이로 정규화
         } else if (indicator instanceof EMAIndicator) {
             // EMA의 경우, 상대적 변화율을 사용
             double avgValue = getAverageValue(indicator);
             return (value - avgValue) / avgValue;
+        } else if (indicator instanceof BollingerBandsMiddleIndicator
+                || indicator instanceof BollingerBandsUpperIndicator
+                || indicator instanceof BollingerBandsLowerIndicator) {
+            // Bollinger Bands의 경우, 종가 대비 상대적 위치로 정규화
+            ClosePriceIndicator closePrice = new ClosePriceIndicator(indicator.getBarSeries());
+            return (value - closePrice.getValue(indicator.getBarSeries().getEndIndex()).doubleValue())
+                    / closePrice.getValue(indicator.getBarSeries().getEndIndex()).doubleValue();
+        } else if (indicator instanceof RSIIndicator || indicator instanceof StochasticOscillatorKIndicator) {
+            return (value / 100.0) * 2 - 1;  // RSI와 Stochastic %K는 0-100 범위를 -1에서 1로 변환
+        } else if (indicator instanceof PercentBIndicator) {
+            return (value - 0.5) * 2;  // %B는 0-1 범위를 -1에서 1로 변환
+        } else if (indicator instanceof ATRIndicator) {
+            // ATR의 경우, 최근 N일 평균 ATR로 정규화
+            return Math.tanh(value / getAverageValue(indicator));
+        } else if (indicator instanceof ChaikinMoneyFlowIndicator) {
+            return Math.tanh(value * 3);  // CMF를 -1에서 1 사이로 정규화
+        } else if (indicator instanceof PlusDIIndicator || indicator instanceof MinusDIIndicator) {
+            return (value / 100.0) * 2 - 1;  // +DI와 -DI를 -1에서 1로 변환
+        } else {
+            // 기타 지표들에 대해서는 간단한 스케일링 적용
+            return Math.tanh(value / 100.0);  // tanh를 사용하여 -1에서 1 사이로 제한
         }
-        // 기타 지표들에 대한 정규화 로직 추가
-        return value;
+    }
+
+    public void printNormalizationStats(List<Indicator<Num>> indicators, double[][] preprocessedData) {
+        for (int j = 0; j < preprocessedData[0].length; j++) {
+            double min = Double.MAX_VALUE;
+            double max = Double.MIN_VALUE;
+            double sum = 0;
+            double sumSquares = 0;
+            int count = 0;
+            int nanCount = 0;
+
+            for (int i = 0; i < preprocessedData.length; i++) {
+                double value = preprocessedData[i][j];
+                if (Double.isNaN(value)) {
+                    nanCount++;
+                    continue;
+                }
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+                sum += value;
+                sumSquares += value * value;
+                count++;
+            }
+
+            double mean = sum / count;
+            double variance = (sumSquares / count) - (mean * mean);
+            double stdDev = Math.sqrt(variance);
+
+            String indicatorName = indicators.get(j).getClass().getSimpleName();
+            logger.info(String.format("%s (Feature %d) - Min: %.4f, Max: %.4f, Mean: %.4f, StdDev: %.4f, NaN count: %d",
+                    indicatorName, j, min, max, mean, stdDev, nanCount));
+        }
+    }
+
+    public void printHistogram(double[][] preprocessedData, int featureIndex, int bins) {
+        double min = Double.MAX_VALUE;
+        double max = Double.MIN_VALUE;
+        for (double[] row : preprocessedData) {
+            min = Math.min(min, row[featureIndex]);
+            max = Math.max(max, row[featureIndex]);
+        }
+
+        int[] histogram = new int[bins];
+        double binSize = (max - min) / bins;
+
+        for (double[] row : preprocessedData) {
+            int bin = (int) ((row[featureIndex] - min) / binSize);
+            if (bin == bins) bin--;
+            histogram[bin]++;
+        }
+
+        for (int i = 0; i < bins; i++) {
+            System.out.printf("[%.2f, %.2f): %s\n",
+                    min + i * binSize, min + (i + 1) * binSize, "*".repeat(histogram[i]));
+        }
+    }
+
+    public void printCorrelationMatrix(double[][] preprocessedData) {
+        int features = preprocessedData[0].length;
+        double[][] correlationMatrix = new double[features][features];
+
+        for (int i = 0; i < features; i++) {
+            for (int j = i; j < features; j++) {
+                double correlation = calculateCorrelation(preprocessedData, i, j);
+                correlationMatrix[i][j] = correlation;
+                correlationMatrix[j][i] = correlation;
+            }
+        }
+
+        for (int i = 0; i < features; i++) {
+            for (int j = 0; j < features; j++) {
+                System.out.printf("%.2f ", correlationMatrix[i][j]);
+            }
+            System.out.println();
+        }
+    }
+
+    private double calculateCorrelation(double[][] data, int feature1, int feature2) {
+        double sum1 = 0, sum2 = 0, sum1Sq = 0, sum2Sq = 0, pSum = 0;
+        int n = data.length;
+
+        for (double[] row : data) {
+            double x = row[feature1];
+            double y = row[feature2];
+            sum1 += x;
+            sum2 += y;
+            sum1Sq += x * x;
+            sum2Sq += y * y;
+            pSum += x * y;
+        }
+
+        double num = pSum - (sum1 * sum2 / n);
+        double den = Math.sqrt((sum1Sq - sum1 * sum1 / n) * (sum2Sq - sum2 * sum2 / n));
+
+        return num / den;
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private double getAverageValue(Indicator<Num> indicator) {
@@ -88,11 +217,27 @@ public class MLModel {
                 return;
             }
 
-            double[][] X = preprocessIndicators(indicators, trainSize);
-            if (X == null) {
+            //double[][] features = preprocessIndicators(indicators, trainSize);
+
+            double[][] features = new double[series.getBarCount()][indicators.size()];
+            for (int i = 0; i < series.getBarCount(); i++) {
+                double[] preprocessedData = preprocessIndicators(indicators, i);
+                if (preprocessedData == null) {
+                    logger.severe("전처리 중 오류 발생");
+                    return;
+                }
+                features[i] = preprocessedData;
+            }
+
+            if (features == null) {
                 logger.severe("전처리 중 오류 발생");
                 return;
             }
+
+            // 정규화 결과 확인
+            printNormalizationStats(indicators, features);
+            printHistogram(features, 0, 20);  // 첫 번째 특성의 히스토그램 출력
+            printCorrelationMatrix(features);
 
             int[] y = calculateLabels(series, trainSize);
 
@@ -100,7 +245,7 @@ public class MLModel {
                     .mapToObj(i -> "feature" + i)
                     .toArray(String[]::new);
 
-            DataFrame df = DataFrame.of(X, featureNames);
+            DataFrame df = DataFrame.of(features, featureNames);
             df = df.merge(IntVector.of("y", y));
 
             Formula formula = Formula.lhs("y");
@@ -141,17 +286,22 @@ public class MLModel {
 
     public double[] predictProbabilities(List<Indicator<Num>> indicators, int index) {
         try {
-            double[][] features = preprocessIndicators(indicators, 1);
+            double[] features = preprocessIndicators(indicators, index);
             if (features == null) {
                 logger.severe("특성 전처리 중 오류 발생");
                 return new double[]{0, 1, 0};
             }
 
+            // 정규화 결과 확인
+            /*printNormalizationStats(indicators, features);
+            printHistogram(features, 0, 20);  // 첫 번째 특성의 히스토그램 출력
+            printCorrelationMatrix(features);*/
+
             String[] featureNames = IntStream.range(0, indicators.size())
                     .mapToObj(i -> "feature" + i)
                     .toArray(String[]::new);
 
-            DataFrame df = DataFrame.of(features, featureNames);
+            DataFrame df = DataFrame.of(new double[][]{features}, featureNames);
 
             double rawPrediction = model.predict(df)[0];
 

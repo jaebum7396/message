@@ -155,53 +155,59 @@ public class 캔들유틸 {
 
     public static List<Indicator<Num>> initializeLongIndicators(BaseBarSeries series, int shortMovingPeriod, int longMovingPeriod) {
         List<Indicator<Num>> indicators = new ArrayList<>();
-
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
 
-        // EMA를 사용 (SMA 대신)
+        // 기존 지표 유지
         EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
         EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
-
-        int timeFrame = 20; // 볼린저 밴드의 기간
-        double k = 2.0; // 표준편차의 배수
-
-        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
-        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(shortEMA);
-        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
-        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
-        PercentBIndicator percentB = new PercentBIndicator(closePrice, timeFrame, 2.0);
-
         MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
 
+        // 볼린저 밴드 관련 지표 (숏 전략에 중요)
+        int bbPeriod = 20;
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, bbPeriod);
+        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(new SMAIndicator(closePrice, bbPeriod));
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+        PercentBIndicator percentB = new PercentBIndicator(closePrice, bbPeriod, 2.0);
+
+        // RSI (과매수 상태 감지에 유용)
+        RSIIndicator rsi = new RSIIndicator(closePrice, 14);
+
+        // 스토캐스틱 오실레이터 (과매수 상태 및 반전 신호 감지)
+        StochasticOscillatorKIndicator stochK = new StochasticOscillatorKIndicator(series, 14);
+        StochasticOscillatorDIndicator stochD = new StochasticOscillatorDIndicator(stochK);
+
+        // 추가 지표
+        CCIIndicator cci = new CCIIndicator(series, 20); // 과매수/과매도 상태 감지
+        ROCIndicator roc = new ROCIndicator(closePrice, shortMovingPeriod); // 모멘텀 측정
+        WilliamsRIndicator williamsR = new WilliamsRIndicator(series, 14); // 과매수/과매도 및 반전 감지
+
+        // 기존 지표 추가
         indicators.add(macdIndicator);
-        indicators.add(lowerBBand);
-        indicators.add(middleBBand);
-        indicators.add(upperBBand);
-        indicators.add(percentB);
+        //indicators.add(percentB);
         indicators.add(shortEMA);
         indicators.add(longEMA);
-        //indicators.add(new RSIIndicator(closePrice, shortMovingPeriod));
-        //indicators.add(new StochasticOscillatorKIndicator(series, shortMovingPeriod));
-        //indicators.add(new CCIIndicator(series, shortMovingPeriod));
-        //indicators.add(new ROCIndicator(closePrice, shortMovingPeriod));
-
-        // Volume 관련 지표 추가
-        //indicators.add(new OnBalanceVolumeIndicator(series));
-        //indicators.add(new AccumulationDistributionIndicator(series));
         indicators.add(new ChaikinMoneyFlowIndicator(series, longMovingPeriod));
-
-        // 추가적인 단기 모멘텀 지표
-        //indicators.add(new WilliamsRIndicator(series, shortMovingPeriod));
-
-        // 주석 처리된 지표들 (필요시 주석 해제)
-        //indicators.add(new RelativeATRIndicator(series, shortMovingPeriod, longMovingPeriod));
-        indicators.add(new ATRIndicator(series, shortMovingPeriod));  // ATR 추가
-        indicators.add(new ADXIndicator(series, longMovingPeriod));
+        indicators.add(new ATRIndicator(series, shortMovingPeriod));
+        //indicators.add(new ADXIndicator(series, longMovingPeriod));
         indicators.add(new PlusDIIndicator(series, longMovingPeriod));
         indicators.add(new MinusDIIndicator(series, longMovingPeriod));
-        // indicators.add(new RSIIndicator(closePrice, longMovingPeriod));
-        // indicators.add(new CMOIndicator(closePrice, longMovingPeriod));
-        // indicators.add(new ParabolicSarIndicator(series));
+
+        // 새로운 지표 추가
+        indicators.add(middleBBand);
+        indicators.add(upperBBand);
+        indicators.add(lowerBBand);
+        indicators.add(rsi);
+        indicators.add(stochK);
+        indicators.add(stochD);
+        indicators.add(cci);
+        indicators.add(roc);
+        indicators.add(williamsR);
+
+        // 추가적인 반전 관련 지표
+        indicators.add(new OnBalanceVolumeIndicator(series)); // 거래량 동향 파악
+        //indicators.add(new AccumulationDistributionIndicator(series)); // 가격과 거래량의 관계
+        //indicators.add(new ParabolicSarIndicator(series)); // 추세 반전 감지
 
         return indicators;
     }
@@ -237,7 +243,7 @@ public class 캔들유틸 {
 
         // 기존 지표 추가
         indicators.add(macdIndicator);
-        indicators.add(percentB);
+        //indicators.add(percentB);
         indicators.add(shortEMA);
         indicators.add(longEMA);
         indicators.add(new ChaikinMoneyFlowIndicator(series, longMovingPeriod));
@@ -260,7 +266,7 @@ public class 캔들유틸 {
         // 추가적인 반전 관련 지표
         indicators.add(new OnBalanceVolumeIndicator(series)); // 거래량 동향 파악
         indicators.add(new AccumulationDistributionIndicator(series)); // 가격과 거래량의 관계
-        indicators.add(new ParabolicSarIndicator(series)); // 추세 반전 감지
+        //indicators.add(new ParabolicSarIndicator(series)); // 추세 반전 감지
 
         return indicators;
     }
