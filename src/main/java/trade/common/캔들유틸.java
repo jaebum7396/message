@@ -13,6 +13,7 @@ import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.adx.ADXIndicator;
 import org.ta4j.core.indicators.adx.MinusDIIndicator;
 import org.ta4j.core.indicators.adx.PlusDIIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
 import org.ta4j.core.indicators.bollinger.PercentBIndicator;
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -160,21 +162,21 @@ public class 캔들유틸 {
         EMAIndicator shortEMA = new EMAIndicator(closePrice, shortMovingPeriod);
         EMAIndicator longEMA = new EMAIndicator(closePrice, longMovingPeriod);
 
-        //StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
+        int timeFrame = 20; // 볼린저 밴드의 기간
+        double k = 2.0; // 표준편차의 배수
+
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, shortMovingPeriod);
         BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(shortEMA);
-        //BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
-        //BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+        BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
+        PercentBIndicator percentB = new PercentBIndicator(closePrice, timeFrame, 2.0);
 
         MACDIndicator macdIndicator = new MACDIndicator(closePrice, shortMovingPeriod, longMovingPeriod);
 
-        int timeFrame = 20; // 볼린저 밴드의 기간
-        double k = 2.0; // 표준편차의 배수
-        PercentBIndicator percentB = new PercentBIndicator(closePrice, timeFrame, 2.0);
-
         indicators.add(macdIndicator);
-        //indicators.add(lowerBBand);
-        //indicators.add(middleBBand);
-        //indicators.add(upperBBand);
+        indicators.add(lowerBBand);
+        indicators.add(middleBBand);
+        indicators.add(upperBBand);
         indicators.add(percentB);
         indicators.add(shortEMA);
         indicators.add(longEMA);
@@ -218,6 +220,7 @@ public class 캔들유틸 {
         StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, bbPeriod);
         BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(new SMAIndicator(closePrice, bbPeriod));
         BollingerBandsUpperIndicator upperBBand = new BollingerBandsUpperIndicator(middleBBand, standardDeviation);
+        BollingerBandsLowerIndicator lowerBBand = new BollingerBandsLowerIndicator(middleBBand, standardDeviation);
         PercentBIndicator percentB = new PercentBIndicator(closePrice, bbPeriod, 2.0);
 
         // RSI (과매수 상태 감지에 유용)
@@ -244,7 +247,9 @@ public class 캔들유틸 {
         indicators.add(new MinusDIIndicator(series, longMovingPeriod));
 
         // 새로운 지표 추가
+        indicators.add(middleBBand);
         indicators.add(upperBBand);
+        indicators.add(lowerBBand);
         indicators.add(rsi);
         indicators.add(stochK);
         indicators.add(stochD);
@@ -258,6 +263,19 @@ public class 캔들유틸 {
         indicators.add(new ParabolicSarIndicator(series)); // 추세 반전 감지
 
         return indicators;
+    }
+
+    public static int findIndexForTime(BaseBarSeries series, ZonedDateTime time) {
+        for (int i = series.getBeginIndex(); i <= series.getEndIndex(); i++) {
+            Bar bar = series.getBar(i);
+            if (bar.getEndTime().equals(time)) {
+                return i;
+            }
+            if (bar.getEndTime().isAfter(time)) {
+                return i - 1;  // Return the index of the previous bar
+            }
+        }
+        return series.getEndIndex();  // If not found, return the last index
     }
 
     private static String formatPrice(double price) {

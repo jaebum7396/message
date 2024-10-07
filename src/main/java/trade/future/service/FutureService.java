@@ -33,7 +33,6 @@ import trade.future.model.Rule.MLShortRule;
 import trade.future.model.Rule.RelativeATRIndicator;
 import trade.future.model.dto.TradingDTO;
 import trade.future.model.entity.*;
-import trade.future.model.enums.CANDLE_INTERVAL;
 import trade.future.model.enums.CONSOLE_COLORS;
 import trade.future.model.enums.ORDER_TYPE;
 import trade.future.model.enums.POSITION_SIDE;
@@ -57,7 +56,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import static trade.common.공통유틸.*;
+import static trade.common.공통유틸.convertTimestampToDateTime;
+import static trade.common.공통유틸.krTimeExpression;
 import static trade.common.출력유틸.printAlignedOutput;
 import static trade.common.캔들유틸.*;
 import static trade.future.model.enums.CANDLE_INTERVAL.getIntervalList;
@@ -252,6 +252,7 @@ public class FutureService {
         MLModel mlShortModel                 = ML_MODEL_MAP.get(shortStrategyKey);
 
         double[] longModelPredict            = mlLongModel.predictProbabilities(longIndicators, series.getEndIndex());
+        //System.out.println(mlLongModel.explainPrediction(longIndicators, series.getEndIndex()));
         double longModelPredictShort         = longModelPredict[0]; //long 모델이 예상한 숏
         double longModelPredictLong          = longModelPredict[2]; //long 모델이 예상한 롱
 
@@ -259,11 +260,12 @@ public class FutureService {
         SIGNAL_MAP.put(longExitSignalKey, longModelPredictShort);
 
         double[] shortModelPredict           = mlShortModel.predictProbabilities(shortIndicators, series.getEndIndex());
+        //System.out.println(mlShortModel.explainPrediction(shortIndicators, series.getEndIndex()));
         double shortModelPredictShort        = shortModelPredict[0]; //short 모델이 예상한 숏
         double shortModelPredictLong         = shortModelPredict[2]; //short 모델이 예상한 롱
 
         SIGNAL_MAP.put(shortEntrySignalKey, shortModelPredictShort);
-        SIGNAL_MAP.put(shortExitSignalKey, shortModelPredictLong);
+        SIGNAL_MAP.put(shortExitSignalKey , shortModelPredictLong);
     }
 
     // ****************************************************************************************
@@ -326,8 +328,16 @@ public class FutureService {
 
             if (isFinal) { // 캔들이 끝났을 때
                 log.info("캔들 갱신(" + symbol + " / " + interval + ")");
+                if (interval.equals("1m")){
+                    getIntervalList().forEach(intervalKey -> {
+                        String targetTradingKey   = tradingCd+"_"+intervalKey;
+                        BaseBarSeries targetSeries = SERIES_MAP.get(targetTradingKey);
+                        setPredictMap(tradingEntity, intervalKey, targetSeries);
+                    });
 
-                setPredictMap(tradingEntity, interval, series);
+                    logTradingSignals(tradingCd);
+                }
+
 
                 // 이벤트가 발생한 시간을 한국 시간으로 변환
                 String krTime                        = krTimeExpression(series.getBar(series.getEndIndex()));
@@ -337,7 +347,6 @@ public class FutureService {
                 boolean finalLongExitSignal          = false;
                 boolean finalShortExitSignal         = false;
 
-                logTradingSignals(tradingCd);
                 /*getIntervalList().forEach(intervalKey -> {
                     getPositionSideList().forEach(positionSide -> {
                         String strategyKey = tradingCd+"_"+intervalKey+"_"+positionSide;
@@ -497,7 +506,7 @@ public class FutureService {
     public void logTradingSignals(String tradingCd) {
         StringBuilder logBuilder = new StringBuilder("\n");
         String headerFormat = "%-8s | %-14s %-14s | %-14s %-14s\n";
-        String dataFormat = "%-8s | %-14.4f %-14.4f | %-14.4f %-14.4f\n";
+        String dataFormat = "%-8s | %s%-14.4f%s %s%-14.4f%s | %s%-14.4f%s %s%-14.4f%s\n";
 
         logBuilder.append(String.format(headerFormat, "Interval", "LONG Entry", "LONG Exit", "SHORT Entry", "SHORT Exit"));
         logBuilder.append("-".repeat(73) + "\n");
@@ -521,13 +530,21 @@ public class FutureService {
 
             logBuilder.append(String.format(dataFormat,
                     intervalKey,
-                    longEntryPredict,
-                    longExitPredict,
-                    shortEntryPredict,
-                    shortExitPredict));
+                    getColorForValue(longEntryPredict, true), longEntryPredict, CONSOLE_COLORS.RESET,
+                    getColorForValue(longExitPredict, false), longExitPredict, CONSOLE_COLORS.RESET,
+                    getColorForValue(shortEntryPredict, true), shortEntryPredict, CONSOLE_COLORS.RESET,
+                    getColorForValue(shortExitPredict, false), shortExitPredict, CONSOLE_COLORS.RESET));
         }
 
         log.info(logBuilder.toString());
+    }
+
+    private CONSOLE_COLORS getColorForValue(double value, boolean isEntry) {
+        if (isEntry) {
+            return value > 0.4 ? CONSOLE_COLORS.GREEN : CONSOLE_COLORS.RESET;
+        } else {
+            return value > 0.4 ? CONSOLE_COLORS.RED : CONSOLE_COLORS.RESET;
+        }
     }
 
     public EventEntity saveKlineEvent(String event, TradingEntity tradingEntity) {

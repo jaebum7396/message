@@ -70,7 +70,7 @@ public class RealisticBackTest {
     private final double feeRate;
     @Getter
     private TradingRecord tradingRecord;
-    private TradingEntity tradingEntity;
+    protected TradingEntity tradingEntity;
 
     public enum BarEvent {
         LONG_ENTRY,
@@ -261,7 +261,7 @@ public class RealisticBackTest {
         return SignalType.NO_SIGNAL;
     }
 
-    private String getTrend(int currentIndex) {
+    String getTrend(int currentIndex) {
         if (currentIndex < TREND_PERIOD) {
             return "NEUTRAL";
         }
@@ -285,7 +285,7 @@ public class RealisticBackTest {
         }
     }
 
-    private void simulateTrade(TradingRecord tradingRecord, Trade.TradeType tradeType, Bar bar, int index, boolean isExit, String rule) {
+    void simulateTrade(TradingRecord tradingRecord, Trade.TradeType tradeType, Bar bar, int index, boolean isExit, String rule) {
         int delayBars = (int) (executionDelay.toMillis() / bar.getTimePeriod().toMillis());
         int executionIndex = Math.min(index + delayBars, series.getBarCount() - 1);
         Bar executionBar = series.getBar(executionIndex);
@@ -360,7 +360,7 @@ public class RealisticBackTest {
         }
     }
 
-    private void printWinRates() {
+    void printWinRates() {
         longWinRate = longTrades > 0 ? (double) longWins / longTrades * 100 : 0;
         shortWinRate = shortTrades > 0 ? (double) shortWins / shortTrades * 100 : 0;
 
@@ -374,7 +374,7 @@ public class RealisticBackTest {
         log.info("=======================");
     }
 
-    private String getRuleDescription(Rule rule) {
+    String getRuleDescription(Rule rule) {
         if (rule instanceof AndRule) {
             AndRule andRule = (AndRule) rule;
             return "AND(" + getRuleDescription(andRule.getRule1()) + "," +

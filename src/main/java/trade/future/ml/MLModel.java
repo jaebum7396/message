@@ -24,11 +24,11 @@ public class MLModel {
     private static final Logger logger = Logger.getLogger(MLModel.class.getName());
     @Getter
     List<Indicator<Num>> indicators;
-    private RandomForest model;
-    private final double priceChangeThreshold;
-    private static final int MINIMUM_DATA_POINTS = 50;
-    private double[] featureImportance;
-    private ObjectMapper mapper = new ObjectMapper();
+    RandomForest model;
+    protected final double priceChangeThreshold;
+    protected static final int MINIMUM_DATA_POINTS = 50;
+    double[] featureImportance;
+    ObjectMapper mapper = new ObjectMapper();
 
     public MLModel(List<Indicator<Num>> indicators) {
         this(0.01, indicators);
@@ -39,6 +39,48 @@ public class MLModel {
         this.indicators = indicators;
     }
 
+    private double[][] preprocessIndicators(List<Indicator<Num>> indicators, int size) {
+        double[][] preprocessedData = new double[size][indicators.size()];
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < indicators.size(); j++) {
+                if (indicators.get(j) instanceof ClosePriceIndicator) {
+                    continue;
+                }
+                Num value = indicators.get(j).getValue(i);
+                if (value == null) {
+                    logger.warning("지표 " + j + "의 " + i + "번째 인덱스에서 null 값 발견");
+                    return null;
+                }
+                preprocessedData[i][j] = normalizeIndicator(indicators.get(j), value.doubleValue());
+            }
+        }
+        return preprocessedData;
+    }
+
+    private double normalizeIndicator(Indicator<Num> indicator, double value) {
+        if (indicator instanceof ADXIndicator) {
+            return value / 100.0;  // ADX는 0-100 범위이므로 0-1로 정규화
+        } else if (indicator instanceof MACDIndicator) {
+            return Math.tanh(value / 100.0);  // MACD는 tanh 함수를 사용하여 -1에서 1 사이로 정규화
+        } else if (indicator instanceof EMAIndicator) {
+            // EMA의 경우, 상대적 변화율을 사용
+            double avgValue = getAverageValue(indicator);
+            return (value - avgValue) / avgValue;
+        }
+        // 기타 지표들에 대한 정규화 로직 추가
+        return value;
+    }
+
+    private double getAverageValue(Indicator<Num> indicator) {
+        // 지표의 평균값 계산 (예: 최근 100개 값의 평균)
+        int count = Math.min(indicator.getBarSeries().getBarCount(), 100);
+        double sum = 0;
+        for (int i = indicator.getBarSeries().getBarCount() - count; i < indicator.getBarSeries().getBarCount(); i++) {
+            sum += indicator.getValue(i).doubleValue();
+        }
+        return sum / count;
+    }
+
     public void train(BarSeries series, int trainSize) {
         try {
             if (series.getBarCount() < MINIMUM_DATA_POINTS) {
@@ -46,41 +88,13 @@ public class MLModel {
                 return;
             }
 
-            int totalSize = series.getBarCount();
-            double[][] X = new double[trainSize][indicators.size()];
-            int[] y = new int[trainSize];
-
-            for (int i = 0; i < trainSize; i++) {
-                for (int j = 0; j < indicators.size(); j++) {
-                    if (indicators.get(j) instanceof ClosePriceIndicator) {
-                        continue;
-                    }
-                    Num value = indicators.get(j).getValue(i);
-                    if (value == null) {
-                        logger.warning("지표 " + j + "의 " + i + "번째 인덱스에서 null 값 발견");
-                        return;
-                    }
-                    X[i][j] = value.doubleValue();
-                }
-
-                if (i + 1 < totalSize) {
-                    double currentPrice = series.getBar(i).getClosePrice().doubleValue();
-                    double nextPrice = series.getBar(i + 1).getClosePrice().doubleValue();
-                    if (currentPrice == 0) {
-                        logger.warning(i + "번째 인덱스에서 0의 가격 발견");
-                        return;
-                    }
-                    double feeRate = 0.0005;
-
-                    double priceChangePercent = (nextPrice - currentPrice) / currentPrice * 100;
-
-                    if (priceChangePercent > (priceChangeThreshold + feeRate)) y[i] = 1;
-                    else if (priceChangePercent < -(priceChangeThreshold + feeRate)) y[i] = -1;
-                    else y[i] = 0;
-                } else {
-                    y[i] = 0;
-                }
+            double[][] X = preprocessIndicators(indicators, trainSize);
+            if (X == null) {
+                logger.severe("전처리 중 오류 발생");
+                return;
             }
+
+            int[] y = calculateLabels(series, trainSize);
 
             String[] featureNames = IntStream.range(0, indicators.size())
                     .mapToObj(i -> "feature" + i)
@@ -99,6 +113,68 @@ public class MLModel {
             logger.severe("모델 학습 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private int[] calculateLabels(BarSeries series, int size) {
+        int[] y = new int[size];
+        for (int i = 0; i < size; i++) {
+            if (i + 1 < series.getBarCount()) {
+                double currentPrice = series.getBar(i).getClosePrice().doubleValue();
+                double nextPrice = series.getBar(i + 1).getClosePrice().doubleValue();
+                if (currentPrice == 0) {
+                    logger.warning(i + "번째 인덱스에서 0의 가격 발견");
+                    return new int[0];
+                }
+                double feeRate = 0.0005;
+
+                double priceChangePercent = (nextPrice - currentPrice) / currentPrice * 100;
+
+                if (priceChangePercent > (priceChangeThreshold + feeRate)) y[i] = 1;
+                else if (priceChangePercent < -(priceChangeThreshold + feeRate)) y[i] = -1;
+                else y[i] = 0;
+            } else {
+                y[i] = 0;
+            }
+        }
+        return y;
+    }
+
+    public double[] predictProbabilities(List<Indicator<Num>> indicators, int index) {
+        try {
+            double[][] features = preprocessIndicators(indicators, 1);
+            if (features == null) {
+                logger.severe("특성 전처리 중 오류 발생");
+                return new double[]{0, 1, 0};
+            }
+
+            String[] featureNames = IntStream.range(0, indicators.size())
+                    .mapToObj(i -> "feature" + i)
+                    .toArray(String[]::new);
+
+            DataFrame df = DataFrame.of(features, featureNames);
+
+            double rawPrediction = model.predict(df)[0];
+
+            return softmax(rawPrediction);
+        } catch (Exception e) {
+            logger.severe("확률 예측 중 오류 발생: " + e.getMessage());
+            e.printStackTrace();
+            return new double[]{0, 1, 0};
+        }
+    }
+
+    private double[] softmax(double x) {
+        double[] probabilities = new double[3];
+        double expNeg = Math.exp(-x);
+        double expZero = Math.exp(0);
+        double expPos = Math.exp(x);
+        double sum = expNeg + expZero + expPos;
+
+        probabilities[0] = expNeg / sum;
+        probabilities[1] = expZero / sum;
+        probabilities[2] = expPos / sum;
+
+        return probabilities;
     }
 
     public int predict(List<Indicator<Num>> indicators, int index) {
@@ -127,7 +203,7 @@ public class MLModel {
         }
     }
 
-    private boolean isUptrend(List<Indicator<Num>> indicators, int index) {
+    boolean isUptrend(List<Indicator<Num>> indicators, int index) {
         Optional<Indicator<Num>> shortEMA = indicators.stream()
                 .filter(i -> i instanceof EMAIndicator)
                 .findFirst();
@@ -141,7 +217,7 @@ public class MLModel {
         return false;
     }
 
-    private double getMACDValue(List<Indicator<Num>> indicators, int index) {
+    double getMACDValue(List<Indicator<Num>> indicators, int index) {
         Optional<Indicator<Num>> macd = indicators.stream()
                 .filter(i -> i instanceof MACDIndicator)
                 .findFirst();
@@ -149,46 +225,12 @@ public class MLModel {
         return macd.map(indicator -> indicator.getValue(index).doubleValue()).orElse(0.0);
     }
 
-    private double getADXValue(List<Indicator<Num>> indicators, int index) {
+    double getADXValue(List<Indicator<Num>> indicators, int index) {
         Optional<Indicator<Num>> adx = indicators.stream()
                 .filter(i -> i instanceof ADXIndicator)
                 .findFirst();
 
         return adx.map(indicator -> indicator.getValue(index).doubleValue()).orElse(0.0);
-    }
-
-    public double[] predictProbabilities(List<Indicator<Num>> indicators, int index) {
-        try {
-            double[] features = new double[indicators.size()];
-            for (int i = 0; i < indicators.size(); i++) {
-                features[i] = indicators.get(i).getValue(index).doubleValue();
-            }
-
-            String[] featureNames = IntStream.range(0, indicators.size())
-                    .mapToObj(i -> "feature" + i)
-                    .toArray(String[]::new);
-
-            double[][] featuresArray = new double[][]{features};
-            DataFrame df = DataFrame.of(featuresArray, featureNames);
-
-            double rawPrediction = model.predict(df)[0];
-
-            double[] probabilities = new double[3];
-            double expNeg = Math.exp(-rawPrediction);
-            double expZero = Math.exp(0);
-            double expPos = Math.exp(rawPrediction);
-            double sum = expNeg + expZero + expPos;
-
-            probabilities[0] = expNeg / sum;
-            probabilities[1] = expZero / sum;
-            probabilities[2] = expPos / sum;
-
-            return probabilities;
-        } catch (Exception e) {
-            logger.severe("확률 예측 중 오류 발생: " + e.getMessage());
-            e.printStackTrace();
-            return new double[]{0, 1, 0};
-        }
     }
 
     public double[] getFeatureImportance() {
@@ -272,7 +314,9 @@ public class MLModel {
         }
     }
 
-    private double roundToFourDecimals(double value) {
+
+
+    double roundToFourDecimals(double value) {
         return Math.round(value * 10000.0) / 10000.0;
     }
 }
