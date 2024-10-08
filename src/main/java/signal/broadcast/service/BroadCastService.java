@@ -224,63 +224,66 @@ public class BroadCastService {
     /**
      * <h3>수신 캔들 데이터 처리 메서드</h3>
      */
-    private void klineProcess(String event){
-        JSONObject eventObj      = new JSONObject(event);
-        JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
-        JSONObject klineObj      = new JSONObject(klineEventObj.get("k").toString());
+    private void klineProcess(String event) {
+        try {
+            JSONObject eventObj      = new JSONObject(event);
+            JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+            JSONObject klineObj      = new JSONObject(klineEventObj.get("k").toString());
 
-        // 캔들이 끝났는지 체크 플래그
-        boolean isFinal          = klineObj.getBoolean("x");
+            // 캔들이 끝났는지 체크 플래그
+            boolean isFinal          = klineObj.getBoolean("x");
 
-        // 현재 스트림의 이름(symbol@kline_<interval>)
-        String streamNm          = String.valueOf(eventObj.get("stream"));
-        String symbol            = streamNm.substring(0, streamNm.indexOf("@"));
-        String interval          = streamNm.substring(streamNm.indexOf("_") + 1);
+            // 현재 스트림의 이름(symbol@kline_<interval>)
+            String streamNm          = String.valueOf(eventObj.get("stream"));
+            String symbol            = streamNm.substring(0, streamNm.indexOf("@"));
+            String interval          = streamNm.substring(streamNm.indexOf("_") + 1);
 
-        boolean nextFlag = true;
-        List<BroadCastEntity> broadCastEntities = new ArrayList<>();
-        try{
-            broadCastEntities = getBroadCastEntity(symbol);
-            if(broadCastEntities.size() == 0){
-                throw new BroadCastException(symbol+" 해당 broadcast 존재하지 않습니다.");
-            }
-            if(broadCastEntities.size() > 1){
-                for (BroadCastEntity broadCastEntity : broadCastEntities) {
+            boolean nextFlag = true;
+            List<BroadCastEntity> broadCastEntities = new ArrayList<>();
+            try{
+                broadCastEntities = getBroadCastEntity(symbol);
+                if(broadCastEntities.size() == 0){
+                    throw new BroadCastException(symbol+" 해당 broadcast 존재하지 않습니다.");
+                }
+                if(broadCastEntities.size() > 1){
+                    for (BroadCastEntity broadCastEntity : broadCastEntities) {
+                        if(broadCastEntity.getSymbol().equals(symbol)){
+                            restartBroadCast(broadCastEntity);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Map<Integer, BroadCastEntity> BroadCastEntitys = umWebSocketStreamClient.getBroadCastEntitys();
+                BroadCastEntitys.forEach((key, broadCastEntity) -> {
                     if(broadCastEntity.getSymbol().equals(symbol)){
-                        restartBroadCast(broadCastEntity);
+                        streamClose(broadCastEntity.getStreamId());
+                    }
+                });
+                nextFlag = false;
+            }
+            if (nextFlag) {
+                BroadCastEntity broadCastEntity = broadCastEntities.get(0);
+
+                String broadCastCd = broadCastEntity.getBroadCastCd();
+                String broadCastKey = broadCastCd+"_"+interval;
+
+                settingBarSeries(broadCastEntity.getBroadCastCd(), event);
+                INDICATORS_MAP.put(broadCastKey, initializeIndicators(broadCastEntity, interval));
+
+                if (isFinal) { // 캔들이 끝났을 때
+                    log.info("캔들 갱신(" + symbol + " / " + interval + ")");
+                    if (interval.equals("1m")){
+                        getIntervalList().forEach(intervalKey -> {
+                            String targetBroadCastKey   = broadCastCd+"_"+intervalKey;
+                            SIGNAL_MAP.put(targetBroadCastKey, setPredictMap(broadCastEntity, intervalKey));
+                        });
+
+                        logTradingSignals(broadCastCd);
                     }
                 }
             }
         } catch (Exception e) {
-            Map<Integer, BroadCastEntity> BroadCastEntitys = umWebSocketStreamClient.getBroadCastEntitys();
-            BroadCastEntitys.forEach((key, broadCastEntity) -> {
-                if(broadCastEntity.getSymbol().equals(symbol)){
-                    streamClose(broadCastEntity.getStreamId());
-                }
-            });
-            nextFlag = false;
-        }
-        if (nextFlag) {
-            BroadCastEntity broadCastEntity = broadCastEntities.get(0);
-
-            String broadCastCd = broadCastEntity.getBroadCastCd();
-            String broadCastKey = broadCastCd+"_"+interval;
-
-            settingBarSeries(broadCastEntity.getBroadCastCd(), event);
-            INDICATORS_MAP.put(broadCastKey, initializeIndicators(broadCastEntity, interval));
-
-            if (isFinal) { // 캔들이 끝났을 때
-                log.info("캔들 갱신(" + symbol + " / " + interval + ")");
-                if (interval.equals("1m")){
-                    getIntervalList().forEach(intervalKey -> {
-                        String targetTradingKey   = broadCastCd+"_"+intervalKey;
-                        BaseBarSeries targetSeries = SERIES_MAP.get(targetTradingKey);
-                        setPredictMap(broadCastEntity, intervalKey);
-                    });
-
-                    logTradingSignals(broadCastCd);
-                }
-            }
+            e.printStackTrace();
         }
     }
 
@@ -322,7 +325,7 @@ public class BroadCastService {
 
         // 기존 지표 추가
         indicators.add(macdIndicator);
-        indicators.add(percentB);
+        //indicators.add(percentB);
         indicators.add(shortEMA);
         indicators.add(longEMA);
         indicators.add(new ATRIndicator(series, shortMovingPeriod));
@@ -351,7 +354,7 @@ public class BroadCastService {
     }
 
     /**
-     * <h3>트레이드 시그널을 로깅하기 위한 메서드</h3>
+     * <h3>시그널을 로깅하기 위한 메서드</h3>
      */
     public void logTradingSignals(String broadCastCd) {
         StringBuilder logBuilder = new StringBuilder("\n");
@@ -368,11 +371,11 @@ public class BroadCastService {
                 String broadCastKey = broadCastCd + "_" + intervalKey;
 
                 if (positionSide.equals("LONG")) {
-                    longEntryPredict = (double) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0);
-                    longExitPredict = (double) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0);
+                    longEntryPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[2];
+                    longExitPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[0];
                 } else if (positionSide.equals("SHORT")) {
-                    shortEntryPredict = (double) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0);
-                    shortExitPredict = (double) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0);
+                    shortEntryPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[0];
+                    shortExitPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[2];
                 }
             }
 
@@ -469,7 +472,7 @@ public class BroadCastService {
     private List<BroadCastEntity> getBroadCastEntity(String symbol) {
         return broadCastRepository.findBySymbolAndBroadCastStatus(symbol.toUpperCase(), BROADCAST_STATUS.ACTIVE.getBroadcastStatus());
     }
-    //해당 트레이딩을 종료하고 다시 오픈하는 코드
+    //해당 broadCast를 종료하고 다시 오픈하는 코드
     public void restartBroadCast(BroadCastEntity broadCastEntity){
         broadCastEntity.setBroadCastStatus(BROADCAST_STATUS.CLOSE.getBroadcastStatus());
         broadCastEntity = broadCastRepository.save(broadCastEntity);
@@ -499,7 +502,7 @@ public class BroadCastService {
         try{
             Optional<BroadCastEntity> broadCastEntityOpt = Optional.ofNullable(BROADCAST_ENTITYS.get(symbol));
             if(broadCastEntityOpt.isPresent()){
-                throw new BroadCastException(symbol+" 이미 오픈된 트레이딩이 존재합니다.");
+                throw new BroadCastException(symbol+" 이미 오픈된 broadCast 존재합니다.");
             }
         } catch (Exception e) {
             BROADCASTING_OPEN_PROCESS_FLAG = false;
@@ -511,7 +514,7 @@ public class BroadCastService {
             try{
                 Optional<BroadCastEntity> broadCastEntityOpt = Optional.ofNullable(BROADCAST_ENTITYS.get(symbol));
                 if(broadCastEntityOpt.isPresent()){
-                    throw new RuntimeException(broadCastEntityOpt.get().getSymbol() + "이미 오픈된 broadCasting이 존재합니다.");
+                    throw new RuntimeException(broadCastEntityOpt.get().getSymbol() + "이미 오픈된 broadCast 존재합니다.");
                 }else{
                     BROADCAST_ENTITYS.put(symbol, autoTradeStreamOpen(broadCastEntity));
                 }
@@ -552,7 +555,7 @@ public class BroadCastService {
         return broadCastEntity;
     }
 
-    public void scrapingTest(HttpServletRequest request, BroadCastDTO broadCastDTO){
+    public void klineScraping(HttpServletRequest request, BroadCastDTO broadCastDTO){
         BroadCastEntity broadCastEntity = broadCastDTO.toEntity();
         broadCastEntity.setBroadCastCd(UUID.randomUUID().toString());
         getIntervalList().forEach(interval -> {

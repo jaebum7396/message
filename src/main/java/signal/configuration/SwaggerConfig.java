@@ -59,8 +59,8 @@ public class SwaggerConfig {
 
     private ApiInfo apiInfo() {
         return new ApiInfoBuilder()
-            .title("FUTURE API DOCUMENTATION")
-            .description("FUTURE API 문서")
+            .title("BROADCAST API DOCUMENTATION")
+            .description("BROADCAST API 문서")
             .version(version)
             .contact(new Contact("주재범", "", "jaebum7396@naver.com"))
             .build();

@@ -240,9 +240,9 @@ public class MLModel {
             }
 
             // 정규화 결과 확인
-            printNormalizationStats(indicators, features);
-            printHistogram(features, 0, 20);  // 첫 번째 특성의 히스토그램 출력
-            printCorrelationMatrix(features);
+            //printNormalizationStats(indicators, features);
+            //printHistogram(features, 0, 20);  // 첫 번째 특성의 히스토그램 출력
+            //printCorrelationMatrix(features);
 
             int[] y = calculateLabels(series, trainSize);
 
@@ -298,9 +298,9 @@ public class MLModel {
             }
 
             // 정규화 결과 확인
-            /*printNormalizationStats(indicators, features);
-            printHistogram(features, 0, 20);  // 첫 번째 특성의 히스토그램 출력
-            printCorrelationMatrix(features);*/
+            //printNormalizationStats(indicators, features);
+            //printHistogram(features, 0, 20);  // 첫 번째 특성의 히스토그램 출력
+            //printCorrelationMatrix(features);
 
             String[] featureNames = IntStream.range(0, indicators.size())
                     .mapToObj(i -> "feature" + i)

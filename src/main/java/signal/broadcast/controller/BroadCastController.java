@@ -16,22 +16,22 @@ import javax.servlet.http.HttpServletRequest;
 import static signal.common.공통유틸.okResponsePackaging;
 
 @Slf4j
-@Api(tags = "FutureMLController")
-@Tag(name = "FutureMLController", description = "선물머신러닝컨트롤러")
+@Api(tags = "BroadCastController")
+@Tag(name = "BroadCastController", description = "BroadCastController")
 @RestController
 @RequiredArgsConstructor
 public class BroadCastController {
     @Autowired
     BroadCastService broadCastService;
 
-    @PostMapping(value = "/future/scraping/test")
-    @Operation(summary="스크래핑", description="스크래핑")
-    public void scrapingTest(HttpServletRequest request, @RequestBody BroadCastDTO broadCastDTO) throws Exception {
-        broadCastService.scrapingTest(request, broadCastDTO);
+    @PostMapping(value = "/broadcast/scraping")
+    @Operation(summary="캔들 데이타 스크래핑", description="캔들 데이타 스크래핑")
+    public void klineScraping(HttpServletRequest request, @RequestBody BroadCastDTO broadCastDTO) throws Exception {
+        broadCastService.klineScraping(request, broadCastDTO);
     }
 
-    @PostMapping(value = "/signal/broadcast/open")
-    @Operation(summary="신호 전파를 시작합니다.", description="신호 전파를 시작합니다.")
+    @PostMapping(value = "/broadcast/open")
+    @Operation(summary="신호전파 시작", description="신호전파 시작")
     public ResponseEntity broadCastOpen(HttpServletRequest request, @RequestBody BroadCastDTO broadCastDTO) throws Exception {
         return okResponsePackaging(broadCastService.broadCastingOpen(request, broadCastDTO));
     }
