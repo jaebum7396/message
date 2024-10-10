@@ -300,26 +300,21 @@ public class BroadCastService {
                 ObjectMapper mapper = objectMapper();
                 ObjectNode rootNode = mapper.createObjectNode();
                 rootNode.put("symbol", symbol);
-                rootNode.put("interval", interval);
 
                 ObjectNode indicatorsNode = rootNode.putObject("indicators");
-                ObjectNode signalsNode = rootNode.putObject("tradingSignals");
 
                 for (String intervalKey : getIntervalList()) {
                     String targetBroadCastKey = broadCastCd + "_" + intervalKey;
-                    double[] predictValues = (double[]) PREDICT_MAP.getOrDefault(broadCastKey, new double[3]);
+                    double[] predictValues = (double[]) PREDICT_MAP.getOrDefault(targetBroadCastKey, new double[3]);
 
-                    // 지표 데이터 추가
                     ObjectNode intervalNode = indicatorsNode.putObject(intervalKey);
+                    intervalNode.put("LONG PREDICT", predictValues[2]);
+                    intervalNode.put("SHORT PREDICT", predictValues[0]);
+                    // 지표 데이터 추가
                     List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
                     for (Indicator<Num> indicator : indicators) {
                         intervalNode.put(indicator.getClass().getSimpleName(), indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue());
                     }
-
-                    // 트레이딩 시그널 데이터 추가
-                    ObjectNode signalNode = signalsNode.putObject(intervalKey);
-                    signalNode.put("LONG", predictValues[2]);
-                    signalNode.put("SHORT", predictValues[0]);
                 }
 
                 // JSON 데이터를 문자열로 변환하여 Redis로 전송
