@@ -42,10 +42,6 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
         return broadCastEntity;
     }
 
-    public BroadCastEntity getBroadCastEntity(int connectionId) {
-        return BroadCastEntitys.get(connectionId);
-    }
-
     @Override
     public void closeConnection(int connectionId) {
         if (connections.containsKey(connectionId)) {
@@ -95,7 +91,11 @@ public class MyWebSocketClientImpl extends UMWebsocketClientImpl implements MyWe
         return createConnection(broadCastEntity, onOpenCallback, onMessageCallback, onClosingCallback, onFailureCallback, request);
     }
 
-    public Map<Integer, BroadCastEntity> getBroadCastEntitys() {
+    public BroadCastEntity getBroadCastEntity(int connectionId) {
+        return BroadCastEntitys.get(connectionId);
+    }
+
+    public Map<Integer, BroadCastEntity> getBroadCastEntities() {
         return BroadCastEntitys;
     }
 }

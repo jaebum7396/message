@@ -2,6 +2,8 @@ package signal.broadcast.service;
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -11,6 +13,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +31,12 @@ import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
 import org.ta4j.core.indicators.volume.OnBalanceVolumeIndicator;
 import org.ta4j.core.num.Num;
 import signal.broadcast.ml.MLModel;
+import signal.broadcast.ml.MLTrendPredictModel;
 import signal.broadcast.model.dto.BroadCastDTO;
 import signal.broadcast.model.entity.BroadCastEntity;
 import signal.broadcast.model.enums.BROADCAST_STATUS;
 import signal.broadcast.model.enums.CONSOLE_COLORS;
+import signal.broadcast.model.enums.MODEL_TYPE;
 import signal.broadcast.repository.BroadCastRepository;
 import signal.common.MemoryUsageMonitor;
 import signal.configuration.MyWebSocketClientImpl;
@@ -48,10 +53,12 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import static org.deeplearning4j.eval.BaseEvaluation.getObjectMapper;
 import static signal.broadcast.model.enums.CANDLE_INTERVAL.getIntervalList;
 import static signal.broadcast.model.enums.POSITION_SIDE.getPositionSideList;
 import static signal.common.캔들유틸.jsonArrayToBar;
 import static signal.common.포맷유틸.convertTimestampToDateTime;
+import static signal.configuration.JacksonConfig.objectMapper;
 
 @Slf4j
 @Service
@@ -87,6 +94,7 @@ public class BroadCastService {
 
     @Autowired BroadCastRepository          broadCastRepository;
     @Autowired MyWebSocketClientImpl        umWebSocketStreamClient;
+    @Autowired RedisTemplate<String, Object> redisTemplate;
 
     private final WebSocketCallback noopCallback = msg -> {};
     private final WebSocketCallback openCallback      = this::onOpenCallback;
@@ -101,9 +109,10 @@ public class BroadCastService {
     private final ConcurrentHashMap <String, BroadCastEntity>      BROADCAST_ENTITYS = new ConcurrentHashMap <String, BroadCastEntity>();
     private final ConcurrentHashMap<String, BaseBarSeries>         SERIES_MAP      = new ConcurrentHashMap <String, BaseBarSeries>();
     private final ConcurrentHashMap <String, MLModel>              ML_MODEL_MAP    = new ConcurrentHashMap <String, MLModel>();
-    private final ConcurrentHashMap <String, Object>               SIGNAL_MAP      = new ConcurrentHashMap <String, Object>();
+    private final ConcurrentHashMap <String, MLModel>              ML_TREND_PREDICT_MODEL_MAP    = new ConcurrentHashMap <String, MLModel>();
+    private final ConcurrentHashMap <String, Object>               PREDICT_MAP      = new ConcurrentHashMap <String, Object>();
+    private final ConcurrentHashMap <String, Object>               TREND_PREDICT_MAP      = new ConcurrentHashMap <String, Object>();
     private final ConcurrentHashMap <String, List<Indicator<Num>>> INDICATORS_MAP  = new ConcurrentHashMap <String, List<Indicator<Num>>>();
-
     boolean BROADCASTING_OPEN_PROCESS_FLAG = false;
     // 날짜 포맷 지정
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -127,9 +136,9 @@ public class BroadCastService {
             // 지표 생성
             INDICATORS_MAP.put(broadCastKey, initializeIndicators(broadCastEntity, interval));
             // 머신러닝 모델 생성
-            ML_MODEL_MAP.put(broadCastKey, setupMLModel(broadCastEntity, interval, false));
+            ML_MODEL_MAP.put(broadCastKey, setupMLModel(broadCastEntity, interval, MODEL_TYPE.NORMAL.getModelType(), false));
             // 현재 머신러닝 예상값 세팅
-            SIGNAL_MAP.put(broadCastKey, setPredictMap(broadCastEntity, interval));
+            PREDICT_MAP.put(broadCastKey, setPredictMap(broadCastEntity, interval, MODEL_TYPE.NORMAL.getModelType()));
         });
         log.info("broadCastSaved >>>>> "+ broadCastEntity.getSymbol() + "("+ broadCastEntity.getStreamId()+") : " + broadCastEntity.getBroadCastCd());
     }
@@ -211,12 +220,19 @@ public class BroadCastService {
     /**
      * <h3>머신러닝이 추산한 예상치를 MAP에 세팅하는 메서드</h3>
      */
-    private double[] setPredictMap(BroadCastEntity broadCastEntity, String interval){
+    private double[] setPredictMap(BroadCastEntity broadCastEntity, String interval, String modelType){
         String broadCastKey                  = broadCastEntity.getBroadCastCd()+"_"+interval;
 
         BaseBarSeries series                 = SERIES_MAP.get(broadCastKey);
         List<Indicator<Num>> indicators      = INDICATORS_MAP.get(broadCastKey);
-        MLModel mlModel                      = ML_MODEL_MAP.get(broadCastKey);
+        MLModel mlModel                      = null;
+        if (modelType.equals(MODEL_TYPE.NORMAL.getModelType())){
+            mlModel = ML_MODEL_MAP.get(broadCastKey);
+        } else if (modelType.equals(MODEL_TYPE.TREND_PREDICT.getModelType())){
+            mlModel = ML_TREND_PREDICT_MODEL_MAP.get(broadCastKey);
+        } else {
+            throw new BroadCastException("해당 모델이 존재하지 않습니다.");
+        }
 
         double[] modelPredict                = mlModel.predictProbabilities(indicators, series.getEndIndex());
         return modelPredict;
@@ -253,8 +269,8 @@ public class BroadCastService {
                     }
                 }
             } catch (Exception e) {
-                Map<Integer, BroadCastEntity> BroadCastEntitys = umWebSocketStreamClient.getBroadCastEntitys();
-                BroadCastEntitys.forEach((key, broadCastEntity) -> {
+                Map<Integer, BroadCastEntity> broadCastEntitys = umWebSocketStreamClient.getBroadCastEntities();
+                broadCastEntitys.forEach((key, broadCastEntity) -> {
                     if(broadCastEntity.getSymbol().equals(symbol)){
                         streamClose(broadCastEntity.getStreamId());
                     }
@@ -275,12 +291,40 @@ public class BroadCastService {
                     if (interval.equals("1m")){
                         getIntervalList().forEach(intervalKey -> {
                             String targetBroadCastKey   = broadCastCd+"_"+intervalKey;
-                            SIGNAL_MAP.put(targetBroadCastKey, setPredictMap(broadCastEntity, intervalKey));
+                            PREDICT_MAP.put(targetBroadCastKey, setPredictMap(broadCastEntity, intervalKey, MODEL_TYPE.NORMAL.getModelType()));
                         });
-
                         logTradingSignals(broadCastCd);
                     }
                 }
+
+                ObjectMapper mapper = objectMapper();
+                ObjectNode rootNode = mapper.createObjectNode();
+                rootNode.put("symbol", symbol);
+                rootNode.put("interval", interval);
+
+                ObjectNode indicatorsNode = rootNode.putObject("indicators");
+                ObjectNode signalsNode = rootNode.putObject("tradingSignals");
+
+                for (String intervalKey : getIntervalList()) {
+                    String targetBroadCastKey = broadCastCd + "_" + intervalKey;
+                    double[] predictValues = (double[]) PREDICT_MAP.getOrDefault(broadCastKey, new double[3]);
+
+                    // 지표 데이터 추가
+                    ObjectNode intervalNode = indicatorsNode.putObject(intervalKey);
+                    List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
+                    for (Indicator<Num> indicator : indicators) {
+                        intervalNode.put(indicator.getClass().getSimpleName(), indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue());
+                    }
+
+                    // 트레이딩 시그널 데이터 추가
+                    ObjectNode signalNode = signalsNode.putObject(intervalKey);
+                    signalNode.put("LONG", predictValues[2]);
+                    signalNode.put("SHORT", predictValues[0]);
+                }
+
+                // JSON 데이터를 문자열로 변환하여 Redis로 전송
+                String jsonData = mapper.writeValueAsString(rootNode);
+                redisTemplate.convertAndSend("signalBroadCast", jsonData);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -358,33 +402,24 @@ public class BroadCastService {
      */
     public void logTradingSignals(String broadCastCd) {
         StringBuilder logBuilder = new StringBuilder("\n");
-        String headerFormat = "%-8s | %-14s %-14s | %-14s %-14s\n";
-        String dataFormat = "%-8s | %s%-14.4f%s %s%-14.4f%s | %s%-14.4f%s %s%-14.4f%s\n";
+        String headerFormat = "%-8s | %-14s %-14s\n";
+        String dataFormat = "%-8s | %s%-14.4f%s %s%-14.4f%s\n";
 
-        logBuilder.append(String.format(headerFormat, "Interval", "LONG Entry", "LONG Exit", "SHORT Entry", "SHORT Exit"));
-        logBuilder.append("-".repeat(73) + "\n");
+        logBuilder.append(String.format(headerFormat, "Interval", "LONG Entry", "LONG Exit"));
+        logBuilder.append("-".repeat(41) + "\n");
 
         for (String intervalKey : getIntervalList()) {
-            double longEntryPredict = 0.0, longExitPredict = 0.0, shortEntryPredict = 0.0, shortExitPredict = 0.0;
+            double longEntryPredict = 0.0, longExitPredict = 0.0;
 
-            for (String positionSide : getPositionSideList()) {
-                String broadCastKey = broadCastCd + "_" + intervalKey;
-
-                if (positionSide.equals("LONG")) {
-                    longEntryPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[2];
-                    longExitPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[0];
-                } else if (positionSide.equals("SHORT")) {
-                    shortEntryPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[0];
-                    shortExitPredict = ((double[]) SIGNAL_MAP.getOrDefault(broadCastKey, 0.0))[2];
-                }
-            }
+            String broadCastKey = broadCastCd + "_" + intervalKey;
+            double[] predictValues = (double[]) PREDICT_MAP.getOrDefault(broadCastKey, new double[3]);
+            longEntryPredict = predictValues[2];
+            longExitPredict = predictValues[0];
 
             logBuilder.append(String.format(dataFormat,
                     intervalKey,
                     getColorForValue(longEntryPredict, true), longEntryPredict, CONSOLE_COLORS.RESET,
-                    getColorForValue(longExitPredict, false), longExitPredict, CONSOLE_COLORS.RESET,
-                    getColorForValue(shortEntryPredict, true), shortEntryPredict, CONSOLE_COLORS.RESET,
-                    getColorForValue(shortExitPredict, false), shortExitPredict, CONSOLE_COLORS.RESET));
+                    getColorForValue(longExitPredict, false), longExitPredict, CONSOLE_COLORS.RESET));
         }
 
         log.info(logBuilder.toString());
@@ -440,7 +475,9 @@ public class BroadCastService {
             String broadCastKey = broadCastCd+"_"+interval;
             SERIES_MAP.remove(broadCastKey);
             ML_MODEL_MAP.remove(broadCastKey);
-            SIGNAL_MAP.remove(broadCastKey);
+            INDICATORS_MAP.remove(broadCastKey);
+            PREDICT_MAP.remove(broadCastKey);
+            ML_TREND_PREDICT_MODEL_MAP.remove(broadCastKey);
         });
 
         BROADCASTING_OPEN_PROCESS_FLAG = false;
@@ -627,13 +664,22 @@ public class BroadCastService {
         }
     }
 
-    private MLModel setupMLModel(BroadCastEntity broadCastEntity, String interval, boolean testFlag) {
+    private MLModel setupMLModel(BroadCastEntity broadCastEntity, String interval, String modelType, boolean testFlag) {
         String broadCastCd  = broadCastEntity.getBroadCastCd();
         String broadCastKey = broadCastCd+"_"+interval;
 
         BaseBarSeries series             = SERIES_MAP.get(broadCastKey);
         List <Indicator<Num>> indicators = INDICATORS_MAP.get(broadCastKey);
-        MLModel mlModel = new MLModel(indicators);
+        MLModel mlModel = null;
+        switch (MODEL_TYPE.valueOf(modelType)) {
+            case TREND_PREDICT:
+                mlModel = new MLTrendPredictModel(indicators);
+                break;
+            case NORMAL:
+            default:
+                mlModel = new MLModel(indicators);
+                break;
+        }
         int totalSize = series.getBarCount();
         int trainSize = (int) (totalSize * 0.75);
         BarSeries trainSeries = series.getSubSeries(0, trainSize);

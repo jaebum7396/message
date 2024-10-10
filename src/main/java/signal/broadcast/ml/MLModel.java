@@ -45,7 +45,7 @@ public class MLModel {
         this.indicators = indicators;
     }
 
-    private double[] preprocessIndicators(List<Indicator<Num>> indicators, int index) {
+    double[] preprocessIndicators(List<Indicator<Num>> indicators, int index) {
         double[] preprocessedData = new double[indicators.size()];
         for (int j = 0; j < indicators.size(); j++) {
             if (indicators.get(j) instanceof ClosePriceIndicator) {

@@ -61,13 +61,6 @@ public class MyWebSocketConnection extends WebSocketConnection {
         }
         //t.printStackTrace();  // 에러 스택 트레이스 출력
         // 자원 정리
-        cleanUpResources();
         onFailureCallback.onReceive(String.valueOf(super.getConnectionId()));
-    }
-
-    // 자원 정리 메서드
-    private void cleanUpResources() {
-        // 필요 시 사용한 자원을 정리하는 로직 추가
-        System.out.println("Cleaning up resources...");
     }
 }

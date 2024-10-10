@@ -17,7 +17,7 @@ public class RedisMessageSubscriber implements MessageListener {
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
-        System.out.println("onMessage()" + message);
+        //System.out.println("onMessage()" + message);
         try {
             // redis에서 발행된 데이터를 받아 deserialize
             //String publishMessage = (String) redisTemplate.getStringSerializer().deserialize(message.getBody());
