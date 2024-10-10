@@ -10,7 +10,7 @@ eureka:
 
 spring:
   application:
-    name: trade
+    name: signal
   profiles:
     #active: local
     active: deploy
