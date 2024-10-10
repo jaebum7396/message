@@ -310,6 +310,10 @@ public class BroadCastService {
                     ObjectNode intervalNode = indicatorsNode.putObject(intervalKey);
                     intervalNode.put("LONG PREDICT", predictValues[2]);
                     intervalNode.put("SHORT PREDICT", predictValues[0]);
+                    ClosePriceIndicator closePrice = new ClosePriceIndicator(SERIES_MAP.get(targetBroadCastKey));
+                    intervalNode.put("ClosePrice", closePrice.getValue(closePrice.getBarSeries().getEndIndex()).doubleValue());
+                    PercentBIndicator percentB = new PercentBIndicator(closePrice, 20, 2.0);
+                    intervalNode.put("PercentB", percentB.getValue(percentB.getBarSeries().getEndIndex()).doubleValue());
                     // 지표 데이터 추가
                     List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
                     for (Indicator<Num> indicator : indicators) {
