@@ -2,6 +2,7 @@ package signal.broadcast.service;
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.utils.WebSocketCallback;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.jsonwebtoken.Claims;
@@ -300,6 +301,17 @@ public class BroadCastService {
                 ObjectMapper mapper = objectMapper();
                 ObjectNode rootNode = mapper.createObjectNode();
                 rootNode.put("symbol", symbol);
+                rootNode.put("interval", interval);
+                rootNode.put("isFinal", isFinal);
+                BaseBarSeries series = SERIES_MAP.put(broadCastKey, SERIES_MAP.get(broadCastKey));
+                Bar currentBar = series.getLastBar();
+
+                rootNode.put("openPrice", (JsonNode) currentBar.getOpenPrice());
+                rootNode.put("highPrice", (JsonNode) currentBar.getHighPrice());
+                rootNode.put("lowPrice", (JsonNode) currentBar.getLowPrice());
+                rootNode.put("closePrice", (JsonNode) currentBar.getClosePrice());
+                rootNode.put("volume", (JsonNode) currentBar.getVolume());
+                rootNode.put("time", currentBar.getEndTime().toInstant().toEpochMilli());
 
                 ObjectNode indicatorsNode = rootNode.putObject("indicators");
 
