@@ -306,11 +306,11 @@ public class BroadCastService {
                 BaseBarSeries series = SERIES_MAP.put(broadCastKey, SERIES_MAP.get(broadCastKey));
                 Bar currentBar = series.getLastBar();
 
-                rootNode.put("openPrice", (JsonNode) currentBar.getOpenPrice());
-                rootNode.put("highPrice", (JsonNode) currentBar.getHighPrice());
-                rootNode.put("lowPrice", (JsonNode) currentBar.getLowPrice());
-                rootNode.put("closePrice", (JsonNode) currentBar.getClosePrice());
-                rootNode.put("volume", (JsonNode) currentBar.getVolume());
+                rootNode.put("openPrice", String.valueOf(currentBar.getOpenPrice()));
+                rootNode.put("highPrice", String.valueOf(currentBar.getHighPrice()));
+                rootNode.put("lowPrice", String.valueOf(currentBar.getLowPrice()));
+                rootNode.put("closePrice", String.valueOf(currentBar.getClosePrice()));
+                rootNode.put("volume", String.valueOf(currentBar.getVolume()));
                 rootNode.put("time", currentBar.getEndTime().toInstant().toEpochMilli());
 
                 ObjectNode indicatorsNode = rootNode.putObject("indicators");
