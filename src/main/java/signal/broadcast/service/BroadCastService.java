@@ -133,7 +133,7 @@ public class BroadCastService {
         getIntervalList().forEach(interval -> {
             String broadCastKey = broadCastEntity.getBroadCastCd()+"_"+interval;
             // 캔들 데이터 스크래핑 및 series 생성
-            klineScraping(broadCastEntity, interval, null, 0, 1);
+            klineScraping(broadCastEntity, interval, null, 0, 4);
             // 지표 생성
             INDICATORS_MAP.put(broadCastKey, initializeIndicators(broadCastEntity, interval));
             // 머신러닝 모델 생성
@@ -263,13 +263,15 @@ public class BroadCastService {
                     throw new BroadCastException(symbol+" 해당 broadcast 존재하지 않습니다.");
                 }
                 if(broadCastEntities.size() > 1){
-                    for (BroadCastEntity broadCastEntity : broadCastEntities) {
+                    throw new BroadCastException(symbol+" 해당 broadcast 중복되어 있습니다.");
+                    /*for (BroadCastEntity broadCastEntity : broadCastEntities) {
                         if(broadCastEntity.getSymbol().equals(symbol)){
                             restartBroadCast(broadCastEntity);
                         }
-                    }
+                    }*/
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 Map<Integer, BroadCastEntity> broadCastEntitys = umWebSocketStreamClient.getBroadCastEntities();
                 broadCastEntitys.forEach((key, broadCastEntity) -> {
                     if(broadCastEntity.getSymbol().equals(symbol)){
@@ -612,66 +614,70 @@ public class BroadCastService {
     }
 
     public void klineScraping(BroadCastEntity broadCastEntity, String interval, String endTime, int idx, int page) {
-        log.info(broadCastEntity.getSymbol() + " klineScraping("+interval+") >>>>>" + idx + "/" + page);
-        String broadCastCd = broadCastEntity.getBroadCastCd();
+        try{
+            log.info(broadCastEntity.getSymbol() + " klineScraping("+interval+") >>>>>" + idx + "/" + page);
+            String broadCastCd = broadCastEntity.getBroadCastCd();
 
-        LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
-        requestParam.put("timestamp", getServerTime());
-        requestParam.put("symbol", broadCastEntity.getSymbol());
-        requestParam.put("interval", interval);
-        requestParam.put("limit", 1500);
-        if (idx != 0) {
-            requestParam.put("endTime", endTime);
-        }
-        UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
-        String resultStr = client.market().klines(requestParam);
-
-        JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
-        JSONArray firstIdxArray = jsonArray.getJSONArray(0);
-        String firstTime = String.valueOf(firstIdxArray.get(0));
-
-        String broadCastKey = broadCastCd+"_"+interval;
-        List<Bar> allBars = new ArrayList<>();
-
-        // 기존 시리즈의 바를 리스트에 추가
-        Optional<BaseBarSeries> existingSeriesOpt = Optional.ofNullable(SERIES_MAP.get(broadCastKey));
-        if (existingSeriesOpt.isPresent()) {
-            BaseBarSeries existingSeries = existingSeriesOpt.get();
-            for (int i = 0; i < existingSeries.getBarCount(); i++) {
-                allBars.add(existingSeries.getBar(i));
+            LinkedHashMap<String, Object> requestParam = new LinkedHashMap<>();
+            requestParam.put("timestamp", getServerTime());
+            requestParam.put("symbol", broadCastEntity.getSymbol());
+            requestParam.put("interval", interval);
+            requestParam.put("limit", 1500);
+            if (idx != 0) {
+                requestParam.put("endTime", endTime);
             }
-        }
+            UMFuturesClientImpl client = new UMFuturesClientImpl(BINANCE_API_KEY, BINANCE_SECRET_KEY, true);
+            String resultStr = client.market().klines(requestParam);
 
-        // 새로운 데이터를 리스트에 추가
-        for (int i = 0; i < jsonArray.length(); i++) {
-            JSONArray klineArray = jsonArray.getJSONArray(i);
-            Bar newBar = jsonArrayToBar(klineArray);
-            allBars.add(newBar);
-        }
+            JSONArray jsonArray = new JSONArray(new JSONObject(resultStr).get("data").toString());
+            JSONArray firstIdxArray = jsonArray.getJSONArray(0);
+            String firstTime = String.valueOf(firstIdxArray.get(0));
 
-        // 중복 제거 및 정렬
-        List<Bar> uniqueSortedBars = allBars.stream()
-                .distinct()
-                .sorted(Comparator.comparing(Bar::getEndTime))
-                .collect(Collectors.toList());
+            String broadCastKey = broadCastCd+"_"+interval;
+            List<Bar> allBars = new ArrayList<>();
 
-        // 새로운 시리즈 생성
-        BaseBarSeries newSeries = new BaseBarSeries();
-        for (Bar bar : uniqueSortedBars) {
-            newSeries.addBar(bar);
-        }
+            // 기존 시리즈의 바를 리스트에 추가
+            Optional<BaseBarSeries> existingSeriesOpt = Optional.ofNullable(SERIES_MAP.get(broadCastKey));
+            if (existingSeriesOpt.isPresent()) {
+                BaseBarSeries existingSeries = existingSeriesOpt.get();
+                for (int i = 0; i < existingSeries.getBarCount(); i++) {
+                    allBars.add(existingSeries.getBar(i));
+                }
+            }
 
-        // 새로운 시리즈를 맵에 저장
-        SERIES_MAP.put(broadCastKey, newSeries);
+            // 새로운 데이터를 리스트에 추가
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONArray klineArray = jsonArray.getJSONArray(i);
+                Bar newBar = jsonArrayToBar(klineArray);
+                allBars.add(newBar);
+            }
 
-        String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
-        log.info("*************** [현재 가중치 : " + weight + "] ***************");
+            // 중복 제거 및 정렬
+            List<Bar> uniqueSortedBars = allBars.stream()
+                    .distinct()
+                    .sorted(Comparator.comparing(Bar::getEndTime))
+                    .collect(Collectors.toList());
 
-        idx++;
-        if (idx < page) {
-            klineScraping(broadCastEntity, interval, firstTime, idx, page);
-        } else {
-            log.info(broadCastEntity.getSymbol() + " klineScraping >>>>> END");
+            // 새로운 시리즈 생성
+            BaseBarSeries newSeries = new BaseBarSeries();
+            for (Bar bar : uniqueSortedBars) {
+                newSeries.addBar(bar);
+            }
+
+            // 새로운 시리즈를 맵에 저장
+            SERIES_MAP.put(broadCastKey, newSeries);
+
+            String weight = new JSONObject(resultStr).getString("x-mbx-used-weight-1m");
+            log.info("*************** [현재 가중치 : " + weight + "] ***************");
+
+            idx++;
+            if (idx < page) {
+                klineScraping(broadCastEntity, interval, firstTime, idx, page);
+            } else {
+                log.info(broadCastEntity.getSymbol() + " klineScraping >>>>> END");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
