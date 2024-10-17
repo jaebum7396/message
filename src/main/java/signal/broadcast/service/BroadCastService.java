@@ -54,9 +54,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import static org.deeplearning4j.eval.BaseEvaluation.getObjectMapper;
 import static signal.broadcast.model.enums.CANDLE_INTERVAL.getIntervalList;
-import static signal.broadcast.model.enums.POSITION_SIDE.getPositionSideList;
 import static signal.common.캔들유틸.jsonArrayToBar;
 import static signal.common.포맷유틸.convertTimestampToDateTime;
 import static signal.configuration.JacksonConfig.objectMapper;
