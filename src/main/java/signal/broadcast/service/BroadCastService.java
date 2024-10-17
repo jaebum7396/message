@@ -327,6 +327,14 @@ public class BroadCastService {
                     // 지표 데이터 추가
                     List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
                     for (Indicator<Num> indicator : indicators) {
+                        if (
+                            indicator.getClass().getSimpleName().equals("BollingerBandsLowerIndicator")
+                            || indicator.getClass().getSimpleName().equals("BollingerBandsMiddleIndicator")
+                            || indicator.getClass().getSimpleName().equals("BollingerBandsUpperIndicator")
+                            || indicator.getClass().getSimpleName().equals("EMAIndicator")
+                        ){
+                            continue;
+                        }
                         intervalNode.put(indicator.getClass().getSimpleName(), indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue());
                     }
                 }
@@ -378,10 +386,11 @@ public class BroadCastService {
 
         // 기존 지표 추가
         indicators.add(macdIndicator);
+        indicators.add(rsi);
+        indicators.add(new ATRIndicator(series, shortMovingPeriod));
         //indicators.add(percentB);
         indicators.add(shortEMA);
         indicators.add(longEMA);
-        indicators.add(new ATRIndicator(series, shortMovingPeriod));
         //indicators.add(new ADXIndicator(series, longMovingPeriod));
         indicators.add(new ChaikinMoneyFlowIndicator(series, longMovingPeriod));
         indicators.add(new PlusDIIndicator(series, longMovingPeriod));
@@ -391,7 +400,6 @@ public class BroadCastService {
         indicators.add(middleBBand);
         indicators.add(upperBBand);
         indicators.add(lowerBBand);
-        indicators.add(rsi);
         indicators.add(stochK);
         indicators.add(stochD);
         indicators.add(cci);
