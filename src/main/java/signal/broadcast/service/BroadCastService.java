@@ -38,6 +38,7 @@ import signal.broadcast.model.entity.BroadCastEntity;
 import signal.broadcast.model.enums.BROADCAST_STATUS;
 import signal.broadcast.model.enums.CONSOLE_COLORS;
 import signal.broadcast.model.enums.MODEL_TYPE;
+import signal.broadcast.model.indicator.TrendIndicator;
 import signal.broadcast.repository.BroadCastRepository;
 import signal.common.MemoryUsageMonitor;
 import signal.configuration.MyWebSocketClientImpl;
@@ -326,11 +327,16 @@ public class BroadCastService {
                     intervalNode.put("ClosePrice", closePrice.getValue(closePrice.getBarSeries().getEndIndex()).doubleValue());
                     PercentBIndicator percentB = new PercentBIndicator(closePrice, 20, 2.0);
                     intervalNode.put("PercentB", percentB.getValue(percentB.getBarSeries().getEndIndex()).doubleValue());
+
+                    // TrendIndicator 추가
+                    TrendIndicator trendIndicator = new TrendIndicator(series, 20, 50, 14);
+                    intervalNode.put("Trend", trendIndicator.getValue(trendIndicator.getBarSeries().getEndIndex()));
+
                     // 지표 데이터 추가
                     List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
                     for (Indicator<Num> indicator : indicators) {
                         if (
-                            indicator.getClass().getSimpleName().equals("BollingerBandsLowerIndicator")
+                               indicator.getClass().getSimpleName().equals("BollingerBandsLowerIndicator")
                             || indicator.getClass().getSimpleName().equals("BollingerBandsMiddleIndicator")
                             || indicator.getClass().getSimpleName().equals("BollingerBandsUpperIndicator")
                             || indicator.getClass().getSimpleName().equals("EMAIndicator")
