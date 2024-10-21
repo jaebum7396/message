@@ -325,12 +325,12 @@ public class BroadCastService {
                     intervalNode.put("SHORT PREDICT", predictValues[0]);
                     ClosePriceIndicator closePrice = new ClosePriceIndicator(SERIES_MAP.get(targetBroadCastKey));
                     intervalNode.put("ClosePrice", closePrice.getValue(closePrice.getBarSeries().getEndIndex()).doubleValue());
-                    PercentBIndicator percentB = new PercentBIndicator(closePrice, 20, 2.0);
-                    intervalNode.put("PercentB", percentB.getValue(percentB.getBarSeries().getEndIndex()).doubleValue());
-
                     // TrendIndicator 추가
                     TrendIndicator trendIndicator = new TrendIndicator(series, 20, 50, 14);
                     intervalNode.put("Trend", trendIndicator.getValue(trendIndicator.getBarSeries().getEndIndex()));
+                    // PercentBIndicator 추가
+                    PercentBIndicator percentB = new PercentBIndicator(closePrice, 20, 2.0);
+                    intervalNode.put("PercentB", percentB.getValue(percentB.getBarSeries().getEndIndex()).doubleValue());
 
                     // 지표 데이터 추가
                     List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
