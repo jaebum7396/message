@@ -132,7 +132,7 @@ public class BroadCastService {
         getIntervalList().forEach(interval -> {
             String broadCastKey = broadCastEntity.getBroadCastCd()+"_"+interval;
             // 캔들 데이터 스크래핑 및 series 생성
-            klineScraping(broadCastEntity, interval, null, 0, 4);
+            klineScraping(broadCastEntity, interval, null, 0, 10);
             // 지표 생성
             INDICATORS_MAP.put(broadCastKey, initializeIndicators(broadCastEntity, interval));
             // 머신러닝 모델 생성
@@ -149,9 +149,10 @@ public class BroadCastService {
         BroadCastEntity broadCastEntity = Optional.ofNullable(umWebSocketStreamClient.getBroadCastEntity(Integer.parseInt(streamId)))
                 .orElseThrow(() -> new BroadCastException(streamId + "번 BROADCAST 존재하지 않습니다."));
         log.info("[CLOSE] >>>>> " + streamId + " 번 스트림을 클로즈합니다. ");
-        broadCastEntity.setBroadCastStatus("CLOSE");
-        broadCastRepository.save(broadCastEntity);
-        resourceCleanup(broadCastEntity);
+        //broadCastEntity.setBroadCastStatus("CLOSE");
+        //broadCastRepository.save(broadCastEntity);
+        //resourceCleanup(broadCastEntity);
+        restartBroadCast(broadCastEntity);
     }
     /**
      * <h3>바이낸스 소켓 스트림이 실패 되었을 때 호출 되는 콜백</h3>
