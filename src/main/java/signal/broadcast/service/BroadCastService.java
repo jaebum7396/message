@@ -132,7 +132,7 @@ public class BroadCastService {
         getIntervalList().forEach(interval -> {
             String broadCastKey = broadCastEntity.getBroadCastCd()+"_"+interval;
             // 캔들 데이터 스크래핑 및 series 생성
-            klineScraping(broadCastEntity, interval, null, 0, 10);
+            klineScraping(broadCastEntity, interval, null, 0, 5);
             // 지표 생성
             INDICATORS_MAP.put(broadCastKey, initializeIndicators(broadCastEntity, interval));
             // 머신러닝 모델 생성
