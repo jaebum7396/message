@@ -241,8 +241,17 @@ public class BroadCastService {
     /**
      * <h3>수신 캔들 데이터 처리 메서드</h3>
      */
+    private long lastProcessTime = 0;
+    private static final long THROTTLE_PERIOD = 1000; // 1초
     private void klineProcess(String event) {
         try {
+
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastProcessTime < THROTTLE_PERIOD) {
+                return; // 1초가 지나지 않았으면 처리하지 않음
+            }
+            lastProcessTime = currentTime;
+
             JSONObject eventObj      = new JSONObject(event);
             JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
             JSONObject klineObj      = new JSONObject(klineEventObj.get("k").toString());
