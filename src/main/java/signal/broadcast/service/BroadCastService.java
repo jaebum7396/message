@@ -245,13 +245,6 @@ public class BroadCastService {
     private static final long THROTTLE_PERIOD = 1000; // 1초
     private void klineProcess(String event) {
         try {
-
-            long currentTime = System.currentTimeMillis();
-            if (currentTime - lastProcessTime < THROTTLE_PERIOD) {
-                return; // 1초가 지나지 않았으면 처리하지 않음
-            }
-            lastProcessTime = currentTime;
-
             JSONObject eventObj      = new JSONObject(event);
             JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
             JSONObject klineObj      = new JSONObject(klineEventObj.get("k").toString());
