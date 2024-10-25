@@ -241,8 +241,6 @@ public class BroadCastService {
     /**
      * <h3>수신 캔들 데이터 처리 메서드</h3>
      */
-    private long lastProcessTime = 0;
-    private static final long THROTTLE_PERIOD = 1000; // 1초
     private void klineProcess(String event) {
         try {
             JSONObject eventObj      = new JSONObject(event);
@@ -302,22 +300,25 @@ public class BroadCastService {
                     }
                 }
 
+                String topic = "signalBroadCast";
                 ObjectMapper mapper = objectMapper();
                 ObjectNode rootNode = mapper.createObjectNode();
-                rootNode.put("symbol", symbol);
-                rootNode.put("interval", interval);
-                rootNode.put("isFinal", isFinal);
+                rootNode.put("topic", topic);
+                ObjectNode payloadNode = rootNode.putObject("payload");
+                payloadNode.put("symbol", symbol);
+                payloadNode.put("interval", interval);
+                payloadNode.put("isFinal", isFinal);
                 BaseBarSeries series = SERIES_MAP.put(broadCastKey, SERIES_MAP.get(broadCastKey));
                 Bar currentBar = series.getLastBar();
 
-                rootNode.put("openPrice", String.valueOf(currentBar.getOpenPrice()));
-                rootNode.put("highPrice", String.valueOf(currentBar.getHighPrice()));
-                rootNode.put("lowPrice", String.valueOf(currentBar.getLowPrice()));
-                rootNode.put("closePrice", String.valueOf(currentBar.getClosePrice()));
-                rootNode.put("volume", String.valueOf(currentBar.getVolume()));
-                rootNode.put("time", currentBar.getEndTime().toInstant().toEpochMilli());
+                payloadNode.put("openPrice", String.valueOf(currentBar.getOpenPrice()));
+                payloadNode.put("highPrice", String.valueOf(currentBar.getHighPrice()));
+                payloadNode.put("lowPrice", String.valueOf(currentBar.getLowPrice()));
+                payloadNode.put("closePrice", String.valueOf(currentBar.getClosePrice()));
+                payloadNode.put("volume", String.valueOf(currentBar.getVolume()));
+                payloadNode.put("time", currentBar.getEndTime().toInstant().toEpochMilli());
 
-                ObjectNode indicatorsNode = rootNode.putObject("indicators");
+                ObjectNode indicatorsNode = payloadNode.putObject("indicators");
 
                 for (String intervalKey : getIntervalList()) {
                     String targetBroadCastKey = broadCastCd + "_" + intervalKey;
@@ -339,10 +340,10 @@ public class BroadCastService {
                     List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
                     for (Indicator<Num> indicator : indicators) {
                         if (
-                               indicator.getClass().getSimpleName().equals("BollingerBandsLowerIndicator")
-                            || indicator.getClass().getSimpleName().equals("BollingerBandsMiddleIndicator")
-                            || indicator.getClass().getSimpleName().equals("BollingerBandsUpperIndicator")
-                            || indicator.getClass().getSimpleName().equals("EMAIndicator")
+                                indicator.getClass().getSimpleName().equals("BollingerBandsLowerIndicator")
+                                        || indicator.getClass().getSimpleName().equals("BollingerBandsMiddleIndicator")
+                                        || indicator.getClass().getSimpleName().equals("BollingerBandsUpperIndicator")
+                                        || indicator.getClass().getSimpleName().equals("EMAIndicator")
                         ){
                             continue;
                         }
@@ -352,7 +353,7 @@ public class BroadCastService {
 
                 // JSON 데이터를 문자열로 변환하여 Redis로 전송
                 String jsonData = mapper.writeValueAsString(rootNode);
-                redisTemplate.convertAndSend("signalBroadCast", jsonData);
+                redisTemplate.convertAndSend(topic, jsonData);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -513,7 +514,7 @@ public class BroadCastService {
         // 메모리 사용량 출력
         new MemoryUsageMonitor().logMemoryUsage();
     }
-    
+
     // ****************************************************************************************
     // 스트림 종료 관련
     // ****************************************************************************************
@@ -551,7 +552,7 @@ public class BroadCastService {
         BroadCastEntity broadCastEntity = broadCastDTO.toEntity();
         return broadCastingOpen(broadCastEntity);
     }
-    
+
     public Map<String, Object> broadCastingOpen(BroadCastEntity broadCastEntity) {
         if (BROADCASTING_OPEN_PROCESS_FLAG) {
             throw new BroadCastException("이미 실행중입니다.");
