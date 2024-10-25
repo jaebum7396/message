@@ -352,8 +352,8 @@ public class BroadCastService {
                 }
 
                 // JSON 데이터를 문자열로 변환하여 Redis로 전송
-                String jsonData = mapper.writeValueAsString(rootNode);
-                redisTemplate.convertAndSend(topic, jsonData);
+                //String jsonData = mapper.writeValueAsString(rootNode);
+                redisTemplate.convertAndSend(topic, rootNode);
             }
         } catch (Exception e) {
             e.printStackTrace();
