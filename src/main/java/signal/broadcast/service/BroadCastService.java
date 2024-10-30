@@ -242,37 +242,42 @@ public class BroadCastService {
     /**
      * <h3>수신 캔들 데이터 처리 메서드</h3>
      */
-    private final AtomicLong lastProcessTime = new AtomicLong(0);
-    private static final long PROCESS_INTERVAL = 500; // 0.5초 (밀리초 단위)
+    private final Map<String, AtomicLong> intervalLastProcessTimes = new ConcurrentHashMap<>();
+    private static final long PROCESS_INTERVAL = 1000; // N초 (밀리초 단위)
     private void klineProcess(String event) {
         long startTime = System.nanoTime(); // 시작 시간 측정
-        long currentTime = System.currentTimeMillis();
-        long lastTime = lastProcessTime.get();
-
-        // 마지막 처리 시간으로부터 5초가 지났는지 확인
-        if (currentTime - lastTime < PROCESS_INTERVAL) {
-            log.debug("Skipping process, too soon since last execution");
-            return;
-        }
-
-        // CAS(Compare-And-Set)를 사용하여 스레드 안전하게 시간 업데이트
-        if (!lastProcessTime.compareAndSet(lastTime, currentTime)) {
-            // 다른 스레드가 이미 처리를 시작했다면 종료
-            return;
-        }
-
         try {
             JSONObject eventObj      = new JSONObject(event);
-            JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
-            JSONObject klineObj      = new JSONObject(klineEventObj.get("k").toString());
-
-            // 캔들이 끝났는지 체크 플래그
-            boolean isFinal          = klineObj.getBoolean("x");
 
             // 현재 스트림의 이름(symbol@kline_<interval>)
             String streamNm          = String.valueOf(eventObj.get("stream"));
-            String symbol            = streamNm.substring(0, streamNm.indexOf("@"));
             String interval          = streamNm.substring(streamNm.indexOf("_") + 1);
+
+            // 해당 interval에 대한 스로틀링 체크
+            long currentTime = System.currentTimeMillis();
+            AtomicLong lastProcessTime = intervalLastProcessTimes.computeIfAbsent(interval, k -> new AtomicLong(0));
+            long lastTime = lastProcessTime.get();
+
+            boolean throttling = true;
+            if(throttling){
+                if (currentTime - lastTime < PROCESS_INTERVAL) {
+                    log.debug("Skipping process for interval {}, too soon since last execution", interval);
+                    return;
+                }
+            }
+
+            // CAS로 해당 interval의 마지막 처리 시간 업데이트
+            if (!lastProcessTime.compareAndSet(lastTime, currentTime)) {
+                // 다른 스레드가 이미 처리를 시작했다면 종료
+                return;
+            }
+
+            JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
+            JSONObject klineObj      = new JSONObject(klineEventObj.get("k").toString());
+            String symbol            = streamNm.substring(0, streamNm.indexOf("@"));
+
+            // 캔들이 끝났는지 체크 플래그
+            boolean isFinal          = klineObj.getBoolean("x");
 
             boolean nextFlag = true;
             List<BroadCastEntity> broadCastEntities = new ArrayList<>();
@@ -339,27 +344,25 @@ public class BroadCastService {
 
                 ObjectNode indicatorsNode = payloadNode.putObject("indicators");
 
-                for (String intervalKey : getIntervalList()) {
-                    String targetBroadCastKey = broadCastCd + "_" + intervalKey;
-                    double[] predictValues = (double[]) PREDICT_MAP.getOrDefault(targetBroadCastKey, new double[3]);
+                String targetBroadCastKey = broadCastCd + "_" + interval;
+                double[] predictValues = (double[]) PREDICT_MAP.getOrDefault(targetBroadCastKey, new double[3]);
 
-                    ObjectNode intervalNode = indicatorsNode.putObject(intervalKey);
-                    intervalNode.put("LONG PREDICT", predictValues[2]);
-                    intervalNode.put("SHORT PREDICT", predictValues[0]);
+                ObjectNode intervalNode = indicatorsNode.putObject(interval);
+                intervalNode.put("LONG PREDICT", predictValues[2]);
+                intervalNode.put("SHORT PREDICT", predictValues[0]);
 
-                    // 지표 데이터 추가
-                    List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
-                    for (Indicator<Num> indicator : indicators) {
-                        if (
-                                indicator.getClass().getSimpleName().equals("BollingerBandsLowerIndicator")
-                                        || indicator.getClass().getSimpleName().equals("BollingerBandsMiddleIndicator")
-                                        || indicator.getClass().getSimpleName().equals("BollingerBandsUpperIndicator")
-                                        || indicator.getClass().getSimpleName().equals("EMAIndicator")
-                        ){
-                            continue;
-                        }
-                        intervalNode.put(indicator.getClass().getSimpleName().replaceAll("Indicator",""), indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue());
+                // 지표 데이터 추가
+                List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
+                for (Indicator<Num> indicator : indicators) {
+                    if (
+                            indicator.getClass().getSimpleName().equals("BollingerBandsLowerIndicator")
+                            || indicator.getClass().getSimpleName().equals("BollingerBandsMiddleIndicator")
+                            || indicator.getClass().getSimpleName().equals("BollingerBandsUpperIndicator")
+                            || indicator.getClass().getSimpleName().equals("EMAIndicator")
+                    ){
+                        continue;
                     }
+                    intervalNode.put(indicator.getClass().getSimpleName().replaceAll("Indicator",""), indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue());
                 }
 
                 // JSON 데이터를 문자열로 변환하여 Redis로 전송
