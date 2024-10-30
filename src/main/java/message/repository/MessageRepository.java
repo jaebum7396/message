@@ -10,6 +10,4 @@ import java.util.Optional;
 
 @Repository
 public interface MessageRepository extends JpaRepository<MessageEntity, String>, QuerydslPredicateExecutor<MessageEntity>, MessageRepositoryQ {
-    List<MessageEntity> findBySymbolAndBroadCastStatus(String symbol, String broad);
-    Optional<MessageEntity> findByStreamId(int streamId);
 }

@@ -3,10 +3,7 @@ package message.configuration;
 import io.jsonwebtoken.ExpiredJwtException;
 import lombok.extern.slf4j.Slf4j;
 import message.common.model.Response;
-import message.repository.MessageRepository;
 import message.service.MessageService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,11 +17,8 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class ErrorResponseAdvice {
-	private Logger logger = LoggerFactory.getLogger(ErrorResponseAdvice.class);
 	@Autowired
 	MessageService messageService;
-	@Autowired
-	MessageRepository messageRepository;
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity handleException(Exception e) {
