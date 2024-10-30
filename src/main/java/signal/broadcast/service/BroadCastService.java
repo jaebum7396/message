@@ -53,6 +53,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static signal.broadcast.model.enums.CANDLE_INTERVAL.getIntervalList;
@@ -241,7 +242,25 @@ public class BroadCastService {
     /**
      * <h3>수신 캔들 데이터 처리 메서드</h3>
      */
+    private final AtomicLong lastProcessTime = new AtomicLong(0);
+    private static final long PROCESS_INTERVAL = 500; // 0.5초 (밀리초 단위)
     private void klineProcess(String event) {
+        long startTime = System.nanoTime(); // 시작 시간 측정
+        long currentTime = System.currentTimeMillis();
+        long lastTime = lastProcessTime.get();
+
+        // 마지막 처리 시간으로부터 5초가 지났는지 확인
+        if (currentTime - lastTime < PROCESS_INTERVAL) {
+            log.debug("Skipping process, too soon since last execution");
+            return;
+        }
+
+        // CAS(Compare-And-Set)를 사용하여 스레드 안전하게 시간 업데이트
+        if (!lastProcessTime.compareAndSet(lastTime, currentTime)) {
+            // 다른 스레드가 이미 처리를 시작했다면 종료
+            return;
+        }
+
         try {
             JSONObject eventObj      = new JSONObject(event);
             JSONObject klineEventObj = new JSONObject(eventObj.get("data").toString());
@@ -327,14 +346,6 @@ public class BroadCastService {
                     ObjectNode intervalNode = indicatorsNode.putObject(intervalKey);
                     intervalNode.put("LONG PREDICT", predictValues[2]);
                     intervalNode.put("SHORT PREDICT", predictValues[0]);
-                    ClosePriceIndicator closePrice = new ClosePriceIndicator(SERIES_MAP.get(targetBroadCastKey));
-                    intervalNode.put("ClosePrice", closePrice.getValue(closePrice.getBarSeries().getEndIndex()).doubleValue());
-                    // TrendIndicator 추가
-                    TrendIndicator trendIndicator = new TrendIndicator(SERIES_MAP.get(targetBroadCastKey), 20, 50, 14);
-                    intervalNode.put("Trend", trendIndicator.getValue(trendIndicator.getBarSeries().getEndIndex()));
-                    // PercentBIndicator 추가
-                    PercentBIndicator percentB = new PercentBIndicator(closePrice, 20, 2.0);
-                    intervalNode.put("PercentB", percentB.getValue(percentB.getBarSeries().getEndIndex()).doubleValue());
 
                     // 지표 데이터 추가
                     List<Indicator<Num>> indicators = INDICATORS_MAP.get(targetBroadCastKey);
@@ -347,13 +358,16 @@ public class BroadCastService {
                         ){
                             continue;
                         }
-                        intervalNode.put(indicator.getClass().getSimpleName(), indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue());
+                        intervalNode.put(indicator.getClass().getSimpleName().replaceAll("Indicator",""), indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue());
                     }
                 }
 
                 // JSON 데이터를 문자열로 변환하여 Redis로 전송
                 //String jsonData = mapper.writeValueAsString(rootNode);
                 redisTemplate.convertAndSend(topic, rootNode);
+
+                long endTime = System.nanoTime(); // 전체 처리 완료 시간 측정
+                log.debug("전체 처리 소요시간: {} ms " + currentBar.getClosePrice(), (endTime - startTime) / 1_000_000.0);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -396,11 +410,16 @@ public class BroadCastService {
         ROCIndicator roc = new ROCIndicator(closePrice, shortMovingPeriod); // 모멘텀 측정
         WilliamsRIndicator williamsR = new WilliamsRIndicator(series, 14); // 과매수/과매도 및 반전 감지
 
+        // TrendIndicator 추가
+        CachedIndicator trendIndicator = new TrendIndicator(series, 20, 50, 14);
+
         // 기존 지표 추가
+        indicators.add(closePrice);
+        indicators.add(trendIndicator);
+        indicators.add(percentB);
         indicators.add(macdIndicator);
         indicators.add(rsi);
         indicators.add(new ATRIndicator(series, shortMovingPeriod));
-        //indicators.add(percentB);
         indicators.add(shortEMA);
         indicators.add(longEMA);
         //indicators.add(new ADXIndicator(series, longMovingPeriod));

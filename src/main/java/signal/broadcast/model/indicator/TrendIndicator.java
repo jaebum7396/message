@@ -5,8 +5,9 @@ import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.num.Num;
 
-public class TrendIndicator extends CachedIndicator<String> {
+public class TrendIndicator extends CachedIndicator<Num> {
     private final EMAIndicator shortEma;
     private final EMAIndicator longEma;
     private final RSIIndicator rsi;
@@ -20,17 +21,19 @@ public class TrendIndicator extends CachedIndicator<String> {
     }
 
     @Override
-    protected String calculate(int index) {
-        double shortEmaValue = shortEma.getValue(index).doubleValue();
-        double longEmaValue = longEma.getValue(index).doubleValue();
-        double rsiValue = rsi.getValue(index).doubleValue();
+    protected Num calculate(int index) {
+        Num shortEmaValue = shortEma.getValue(index);
+        Num longEmaValue = longEma.getValue(index);
+        Num rsiValue = rsi.getValue(index);
 
-        if (shortEmaValue > longEmaValue && rsiValue > 50) {
-            return "상승";
-        } else if (shortEmaValue < longEmaValue && rsiValue < 50) {
-            return "하락";
+        if (shortEmaValue.isGreaterThan(longEmaValue) &&
+                rsiValue.isGreaterThan(numOf(50))) {
+            return numOf(1); // 상승
+        } else if (shortEmaValue.isLessThan(longEmaValue) &&
+                rsiValue.isLessThan(numOf(50))) {
+            return numOf(-1); // 하락
         } else {
-            return "중립";
+            return numOf(0); // 횡보
         }
     }
 }
