@@ -46,7 +46,7 @@ public class RedisConfig {
     }
     @Bean
     public ChannelTopic channelTopic() {
-        return new ChannelTopic("signalBroadCast"); // 구독할 채널명 설정
+        return new ChannelTopic("signalBroadCastChat"); // 구독할 채널명 설정
     }
     // 어플리케이션에서 사용할 redisTemplate 설정
     @Bean

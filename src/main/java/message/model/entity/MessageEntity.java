@@ -24,12 +24,18 @@ public class MessageEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "MESSAGE_CD")
     private String messageCd; // ID 필드 추가 (데이터베이스 식별자)
 
-    @Column( name = "USER_CD")
-    private String userCd; //
-
     @Column( name = "TOPIC")
     private String topic; //
 
-    @Column( name = "PAYLOAD")
-    private String payload; //
+    @Column( name = "USER_CD")
+    private String userCd; //
+
+    @Column( name = "USER_NM")
+    private String userNm; //
+
+    @Column( name = "CONTENTS")
+    private String contents; //
+
+    @Column( name = "MESSAGE_DT")
+    private String messageDt; //
 }
