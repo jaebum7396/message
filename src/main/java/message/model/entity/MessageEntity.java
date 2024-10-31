@@ -33,8 +33,8 @@ public class MessageEntity extends BaseEntity implements Serializable, Cloneable
     @Column( name = "USER_NM")
     private String userNm; //
 
-    @Column( name = "CONTENTS")
-    private String contents; //
+    @Column( name = "MESSAGE")
+    private String message; //
 
     @Column( name = "MESSAGE_DT")
     private String messageDt; //

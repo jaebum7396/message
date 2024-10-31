@@ -48,7 +48,7 @@ public class RedisMessageSubscriber implements MessageListener {
                 messageEntity.setTopic(topic);
                 messageEntity.setUserCd(payload.get("connectionId").asText());
                 messageEntity.setUserNm(payload.get("userNm").asText());
-                messageEntity.setContents(payload.get("message").asText());
+                messageEntity.setMessage(payload.get("message").asText());
                 messageEntity.setMessageDt(dateTimeKr);
                 messageService.saveMessage(messageEntity);
             } catch (Exception e) {
