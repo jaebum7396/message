@@ -10,10 +10,7 @@ import message.service.MessageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -27,7 +24,7 @@ import static message.common.공통유틸.okResponsePackaging;
 public class MessageController {
     @Autowired
     MessageService messageService;
-    @PostMapping(value = "/message/prev")
+    @GetMapping(value = "/prev")
     @Operation(summary="이전 채팅 메시지 가져오기", description="이전 채팅 메시지 가져오기")
     public ResponseEntity<Response> getPrevMessages(HttpServletRequest request, @RequestParam String topic, Pageable page) throws Exception {
         return okResponsePackaging(messageService.getPrevMessages(request, topic, page));
