@@ -1,5 +1,7 @@
 package message.configuration;
 
+import message.service.MessageService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +30,9 @@ public class RedisConfig {
     @Value("${spring.redis.password}")
     private String redisPassword;
 
+    @Autowired
+    private MessageService messageService;
+
     @Bean
     public LettuceConnectionFactory redisConnectionFactory() {
         RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration(redisHost, redisPort);
@@ -42,7 +47,7 @@ public class RedisConfig {
     }
     @Bean
     public MessageListenerAdapter messageListenerAdapter() {
-        return new MessageListenerAdapter(new RedisMessageSubscriber(objectMapper(), redisTemplate(redisConnectionFactory())));
+        return new MessageListenerAdapter(new RedisMessageSubscriber(objectMapper(), redisTemplate(redisConnectionFactory()), messageService));
     }
     @Bean
     public ChannelTopic channelTopic() {

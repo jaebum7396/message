@@ -23,7 +23,7 @@ import java.time.format.DateTimeFormatter;
 public class RedisMessageSubscriber implements MessageListener {
     private final ObjectMapper objectMapper;
     private final RedisTemplate redisTemplate;
-    @Autowired MessageRepository messageRepository;
+    private final MessageService messageService;
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
@@ -51,9 +51,9 @@ public class RedisMessageSubscriber implements MessageListener {
                 messageEntity.setUserNm(payload.get("userNm").asText());
                 messageEntity.setContents(payload.get("message").asText());
                 messageEntity.setMessageDt(dateTimeKr);
-                messageRepository.save(messageEntity);
+                messageService.saveMessage(messageEntity);
             } catch (Exception e) {
-                log.error("JSON 파싱 실패", e);
+                e.printStackTrace();
                 log.error("실패한 문자열: {}", messageString);
             }
         } catch (Exception e) {

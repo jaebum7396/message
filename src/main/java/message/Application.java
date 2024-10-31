@@ -14,7 +14,7 @@ import message.configuration.RedisSubscriber;
 @EnableDiscoveryClient
 @EnableJpaAuditing
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
-@EnableJpaRepositories(basePackages = "message.broadcast.repository")
+@EnableJpaRepositories(basePackages = "message.repository")
 public class Application implements CommandLineRunner {
 	private static final int waitTime = 3000;
 	public static void main(String[] args) throws InterruptedException {
