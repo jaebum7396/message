@@ -31,7 +31,6 @@ public class RedisMessageSubscriber implements MessageListener {
         String dateTimeKr = LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         try {
             String messageString = (String) redisTemplate.getStringSerializer().deserialize(message.getBody());
-            System.out.println("messageString: " + messageString);
             if (messageString == null) {
                 log.error("메시지가 null임");
                 return;
