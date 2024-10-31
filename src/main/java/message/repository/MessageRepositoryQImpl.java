@@ -31,7 +31,7 @@ public class MessageRepositoryQImpl implements MessageRepositoryQ {
         JPQLQuery<MessageEntity> query = queryFactory
                 .selectFrom(qMessage)
                 .where(qMessage.topic.eq(topic))
-                .orderBy(qMessage.messageDt.desc())
+                .orderBy(qMessage.messageDt.asc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize());
 
