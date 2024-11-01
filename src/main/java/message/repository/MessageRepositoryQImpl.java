@@ -28,20 +28,29 @@ public class MessageRepositoryQImpl implements MessageRepositoryQ {
         //QChat chat = QChat.chat;
         QMessageEntity qMessage = new QMessageEntity("qChat");
 
-        JPQLQuery<MessageEntity> query = queryFactory
+        // 1. 전체 메시지 중 최신 순으로 페이지네이션
+        JPQLQuery<MessageEntity> subQuery = queryFactory
                 .selectFrom(qMessage)
                 .where(qMessage.topic.eq(topic))
-                .orderBy(qMessage.messageDt.asc())
+                .orderBy(qMessage.messageDt.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize());
 
-        List<MessageEntity> messages = query.fetch();
+        // 2. 서브쿼리로 조회된 ID 목록을 기반으로 다시 조회하여 오래된 순으로 정렬
+        List<String> messageIds = subQuery.select(qMessage.messageCd).fetch();
+
+        JPQLQuery<MessageEntity> finalQuery = queryFactory
+                .selectFrom(qMessage)
+                .where(qMessage.messageCd.in(messageIds))
+                .orderBy(qMessage.messageDt.asc());
+
+        List<MessageEntity> messages = finalQuery.fetch();
 
         long count = queryFactory
-                .select(qMessage.messageCd)
+                .select(qMessage.count()) // count() 프로젝션 사용
                 .from(qMessage)
                 .where(qMessage.topic.eq(topic))
-                .fetchCount();
+                .fetchOne();  // count 쿼리는 단일 결과를 반환하므로 fetchOne() 사용
 
         return new PageImpl<>(messages, pageable, count);
     }
