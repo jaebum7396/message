@@ -32,7 +32,7 @@ public class MessageRepositoryQImpl implements MessageRepositoryQ {
         JPQLQuery<MessageEntity> subQuery = queryFactory
                 .selectFrom(qMessage)
                 .where(qMessage.topic.eq(topic))
-                .orderBy(qMessage.messageDt.desc())
+                .orderBy(qMessage.insertDt.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize());
 
@@ -42,7 +42,7 @@ public class MessageRepositoryQImpl implements MessageRepositoryQ {
         JPQLQuery<MessageEntity> finalQuery = queryFactory
                 .selectFrom(qMessage)
                 .where(qMessage.messageCd.in(messageIds))
-                .orderBy(qMessage.messageDt.asc());
+                .orderBy(qMessage.insertDt.asc());
 
         List<MessageEntity> messages = finalQuery.fetch();
 

@@ -27,9 +27,8 @@ public class RedisMessageSubscriber implements MessageListener {
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
-        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
-        String dateTimeKr = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
-                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
+        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String dateTimeKr = LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         try {
             String messageString = (String) redisTemplate.getStringSerializer().deserialize(message.getBody());
             if (messageString == null) {
