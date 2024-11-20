@@ -3,7 +3,7 @@ cloud:
     uri: ${GATEWAY_URI}
 spring:
   datasource:
-    url: jdbc:mysql://${AFLK_DB_URI}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC
+    url: jdbc:mysql://${AFLK_DB_URI}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=KST
     username: ${AFLK_DB_USERNAME}
     password: ${AFLK_DB_PASSWORD}
     initialization-mode: always #import data
